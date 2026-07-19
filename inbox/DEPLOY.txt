@@ -1,0 +1,56 @@
+Milano — Consolidated Inbox widget · Deploy notes
+==================================================
+
+This folder is the deployable widget. It contains ONE file that matters:
+
+    index.html   ← the whole widget (self-contained; only loads
+                   grist-plugin-api.js from https://milano.getgrist.com)
+
+DEPLOY TO NETLIFY
+-----------------
+1. Go to https://app.netlify.com  →  "Add new site"  →  "Deploy manually".
+2. Drag THIS FOLDER (milano-inbox-widget-deploy) onto the drop zone.
+   (Netlify drag-drop replaces the whole site, so keep this widget in its
+    own folder / its own Netlify site — don't mix it with the calendar site.)
+3. Netlify gives you a site URL, e.g. https://milano-inbox-xxxx.netlify.app
+   The widget is served at the ROOT of that URL (index.html). The
+   /index.html or /<filename>.html path may 404 — always use the root URL.
+
+WIRE IT INTO GRIST
+------------------
+Inbox page  →  add a CUSTOM widget  →  paste the Netlify root URL, then:
+  • Table    = Jobs_Detail
+  • Access   = Full   (needed: it reads Stone_Order + Inst_, the Client and
+                       Catalogue lookup tables, and the schema metadata, and
+                       writes edits + new Client/Catalogue records back)
+  • SELECT BY = the Jobs list section   (so clicking a job drives the widget)
+Hard-refresh the Grist page after each redeploy.
+
+LOOKUP FIELDS (Client + Product)
+--------------------------------
+• Client is a lookup: search existing clients, or type a new name and pick
+  "Create ..." to add a Client row and link it (writes the Client_Name ref).
+• Product on each stone line is editable — click the pencil (next to the product
+  name) OR double-click the product to open a searchable picker. "＋ New product"
+  opens a form (name, code, supplier, price/slab…) that adds a Catalogue row and
+  assigns it to the line.
+• Price / slab prefills from the chosen product but stays editable (per-order
+  override). NOTE: for a typed price to persist, the Product_Price_slab column in
+  Grist must be editable / a default (trigger) formula — not a pure formula. If
+  edits don't stick, that column needs to be a default formula.
+• Each stone line's Note has a drag-resize handle like the Details note; resizing
+  one row resizes every note row, and the height is remembered.
+• The list search also matches stone names / product codes / suppliers (via the
+  Stones rollup + the lines), so a job can be found by a stone even when the
+  client name is forgotten.
+• Column ids for the Client/Catalogue tables are discovered automatically from
+  the Grist schema — nothing is hardcoded, so it adapts if those tables change.
+  (If a reference field on the new-product form points to yet another table,
+  it's shown but left for you to set in Grist.)
+
+TEST WITHOUT GRIST
+------------------
+Open the Netlify root URL (or index.html) directly in a browser: it renders
+built-in sample data so you can see the layout. Once it's embedded in Grist it
+automatically switches to live data. (A "Unknown interface" console message can
+appear only when it's embedded in a NON-Grist iframe/preview — harmless.)

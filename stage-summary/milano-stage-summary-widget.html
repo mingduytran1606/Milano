@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jobs by Stage (date range)</title>
+<script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+<style>
+  html,body{height:100%;margin:0}
+  *{box-sizing:border-box}
+  body{padding:1.4% 2.4%;font-family:Arial,Helvetica,sans-serif;font-size:clamp(11px,2.7vw,15px);
+       color:#1f3864;background:#fff}
+  #controls{display:flex;flex-wrap:wrap;align-items:end;gap:.5em .8em;margin-bottom:.7em}
+  .ctl{display:flex;flex-direction:column;min-width:0}
+  label.fld{font-size:.78em;color:#7a8194;margin:0 0 .12em}
+  select,input{padding:.4em .55em;font-size:1em;color:#1f3864;border:1px solid #c7cdda;
+       border-radius:.5em;outline:none;font-family:inherit;background:#fff}
+  select:focus,input:focus{border-color:#1f3864}
+  #custom{display:none;gap:.5em}
+  #custom.show{display:flex}
+  button{padding:.42em .8em;font-size:.9em;font-weight:600;color:#1f3864;background:#f4f6fb;
+       border:1px solid #c7cdda;border-radius:.5em;cursor:pointer}
+  button:hover{background:#e9edf6}
+  #range{font-size:.8em;color:#7a8194;margin:.1em 0 .5em}
+  table{width:100%;border-collapse:collapse;font-size:1em}
+  th,td{padding:.5em .6em;text-align:left;border-bottom:1px solid #eef0f5}
+  th{font-size:.78em;text-transform:uppercase;letter-spacing:.04em;color:#7a8194;font-weight:600}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  td.stage{font-weight:600}
+  .bar{position:relative}
+  .bar span{position:absolute;left:0;top:0;bottom:0;background:#dfe6f5;border-radius:.3em;z-index:0}
+  .bar b{position:relative;z-index:1;font-weight:600}
+  tr.total td{border-top:2px solid #1f3864;border-bottom:0;font-weight:700;padding-top:.6em}
+  tr.total td.stage{text-transform:uppercase;font-size:.85em;letter-spacing:.04em}
+  #status{font-size:.78em;color:#9aa0ab;margin-top:.5em;min-height:1em}
+  .err{color:#c00000}
+  .dot{display:inline-block;width:.6em;height:.6em;border-radius:50%;margin-right:.45em;vertical-align:middle}
+</style>
+</head>
+<body>
+  <div id="controls">
+    <div class="ctl"><label class="fld">Date field</label>
+      <select id="datefield">
+        <option value="Input_Date">Quote date</option>
+        <option value="Meas_Date">Measurement date</option>
+        <option value="Inst_Date">Install date</option>
+      </select></div>
+    <div class="ctl"><label class="fld">Period</label>
+      <select id="preset">
+        <option value="7">Last 7 days</option>
+        <option value="14">Last 14 days</option>
+        <option value="30">Last 30 days</option>
+        <option value="90">Last 90 days</option>
+        <option value="mtd">This month</option>
+        <option value="ytd">This year</option>
+        <option value="all">All time</option>
+        <option value="custom">Custom…</option>
+      </select></div>
+    <div id="custom" class="ctl" style="flex-direction:row">
+      <div class="ctl"><label class="fld">From</label><input type="date" id="from"></div>
+      <div class="ctl"><label class="fld">To</label><input type="date" id="to"></div>
+    </div>
+    <button id="refresh" title="Reload from the table">↻ Refresh</button>
+  </div>
+  <div id="range"></div>
+  <table>
+    <thead><tr><th>Stage</th><th class="num">Jobs</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div id="status">Loading…</div>
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id);};
+  var ALL=[], statusEl=$('status');
+  // preferred stage order + colours
+  var ORDER=['Quote','Scheduled','Live','In Progress','Completed','Cancelled','N/A'];
+  var COLOR={Quote:'#b58900',Scheduled:'#6f42c1',Live:'#1a7f37','In Progress':'#0969da',
+             Completed:'#57606a',Cancelled:'#c00000','N/A':'#9aa0ab'};
+  function status(m,c){statusEl.textContent=m||'';statusEl.className=c||'';}
+  function toMs(v){ // Grist Date col -> epoch seconds (number) or null
+    if(v===null||v===undefined||v==='')return null;
+    var n=typeof v==='number'?v:parseFloat(v);
+    return isNaN(n)?null:n*1000;
+  }
+  function startOfDay(d){return new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime();}
+  function endOfDay(d){return startOfDay(d)+86400000-1;}
+  function fmt(ms){var d=new Date(ms);return d.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});}
+
+  function computeRange(){
+    var p=$('preset').value, now=new Date();
+    if(p==='all') return {from:-Infinity,to:Infinity,label:'All time'};
+    if(p==='custom'){
+      var f=$('from').value, t=$('to').value;
+      var from=f?startOfDay(new Date(f+'T00:00')):-Infinity;
+      var to=t?endOfDay(new Date(t+'T00:00')):Infinity;
+      return {from:from,to:to,label:(f?fmt(from):'…')+' – '+(t?fmt(to):'…')};
+    }
+    if(p==='mtd'){var s=new Date(now.getFullYear(),now.getMonth(),1);return {from:s.getTime(),to:endOfDay(now),label:'This month'};}
+    if(p==='ytd'){var y=new Date(now.getFullYear(),0,1);return {from:y.getTime(),to:endOfDay(now),label:'This year'};}
+    var days=parseInt(p,10);
+    var from=startOfDay(new Date(now.getTime()-(days-1)*86400000));
+    return {from:from,to:endOfDay(now),label:'Last '+days+' days'};
+  }
+
+  function render(){
+    var field=$('datefield').value, R=computeRange();
+    $('range').textContent=R.label+' · by '+$('datefield').selectedOptions[0].text.toLowerCase();
+    var tally={}, order=[], totJobs=0, nodate=0;
+    for(var i=0;i<ALL.length;i++){
+      var r=ALL[i], ms=r[field];
+      if(ms===null){ nodate++; continue; }
+      if(ms<R.from||ms>R.to) continue;
+      var st=(r.stage||'').trim()||'(no stage)';
+      if(!tally[st]){tally[st]={jobs:0};order.push(st);}
+      tally[st].jobs++; totJobs++;
+    }
+    order.sort(function(a,b){
+      var ia=ORDER.indexOf(a), ib=ORDER.indexOf(b);
+      if(ia<0)ia=99; if(ib<0)ib=99;
+      return ia-ib || a.localeCompare(b);
+    });
+    var max=1; order.forEach(function(s){if(tally[s].jobs>max)max=tally[s].jobs;});
+    var html='';
+    order.forEach(function(s){
+      var t=tally[s], pct=Math.round(100*t.jobs/max);
+      var col=COLOR[s]||'#1f3864';
+      html+='<tr><td class="stage"><span class="dot" style="background:'+col+'"></span>'+esc(s)+'</td>'+
+            '<td class="num bar"><span style="width:'+pct+'%"></span><b>'+t.jobs+'</b></td></tr>';
+    });
+    if(!order.length) html='<tr><td colspan="2" style="color:#9aa0ab;padding:1em 0">No jobs in this period.</td></tr>';
+    else html+='<tr class="total"><td class="stage">Total</td><td class="num">'+totJobs+'</td></tr>';
+    $('rows').innerHTML=html;
+    status(ALL.length+' jobs loaded'+(nodate?(' · '+nodate+' have no '+$('datefield').selectedOptions[0].text.toLowerCase()):'' )+'.');
+  }
+  function esc(s){return String(s).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+
+  async function load(){
+    try{
+      var t=await grist.docApi.fetchTable('Jobs_Detail');
+      var n=(t.id||[]).length, rows=[];
+      for(var i=0;i<n;i++){
+        rows.push({
+          stage:t.Stage?t.Stage[i]:'',
+          qty:(t.Ordered_Qty&&typeof t.Ordered_Qty[i]==='number')?t.Ordered_Qty[i]:0,
+          Input_Date:toMs(t.Input_Date&&t.Input_Date[i]),
+          Meas_Date:toMs(t.Meas_Date&&t.Meas_Date[i]),
+          Inst_Date:toMs(t.Inst_Date&&t.Inst_Date[i])
+        });
+      }
+      ALL=rows; render();
+    }catch(e){ status('Could not read Jobs_Detail: '+e.message,'err'); }
+  }
+
+  ['preset','datefield','from','to'].forEach(function(id){
+    $(id).addEventListener('change',function(){
+      $('custom').classList.toggle('show',$('preset').value==='custom');
+      render();
+    });
+  });
+  $('refresh').addEventListener('click',load);
+
+  grist.ready({requiredAccess:'read table'});
+  // live updates when the widget is mapped to a table; harmless otherwise
+  if(grist.onRecords) grist.onRecords(function(){ load(); });
+  load();
+})();
+</script>
+</body>
+</html>

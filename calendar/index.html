@@ -1,0 +1,1726 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Milano Calendar (all-day)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; height:100%; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#fff; }
+  #wrap { display:flex; flex-direction:row; height:100vh; background:#fff; color:#222; }
+  #main { flex:1; min-width:0; order:1; display:flex; flex-direction:column; }
+
+  /* ---- jobs sidebar (right-hand side) ---- */
+  #sidebar { flex:0 0 232px; order:2; display:flex; flex-direction:column; min-height:0; border-left:1px solid #e0e0e0; background:#fafafa; }
+  #wrap.collapsed #sidebar { display:none; }
+  #btnJobs { margin-left:auto; }   /* sit at the right edge, over the jobs panel */
+  #btnJobs.active { background:#eafaf2; border-color:#16b378; color:#0f7a52; }
+  #sideHead { flex:0 0 auto; padding:8px 8px 6px; display:flex; flex-direction:column; gap:6px; border-bottom:1px solid #e8e8e8; position:relative; }
+  #sideTitle { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#888; }
+  #jobSearch { font-size:12px; padding:5px 8px; border:1px solid #ccc; border-radius:5px; background:#fff; color:#333; outline:none; }
+  #jobSearch:focus { border-color:#16b378; box-shadow:0 0 0 2px rgba(22,179,120,.15); }
+  #fsrow { display:flex; gap:4px; }
+  #filterBtn, #sortBtn { display:flex; align-items:center; gap:6px; font-size:11.5px; padding:5px 8px; border:1px solid #ccc; border-radius:5px; background:#fff; color:#444; cursor:pointer; text-align:left; }
+  #filterBtn { flex:1.2; }
+  #sortBtn { flex:1; }
+  #filterBtn:hover, #sortBtn:hover { background:#f0f0f0; }
+  #filterBtn.active, #sortBtn.active { border-color:#16b378; color:#0f7a52; background:#eafaf2; }
+  #sortCaret { margin-left:auto; transition:transform .15s; color:#999; }
+  #sortBtn.open #sortCaret { transform:rotate(90deg); }
+  #sortMenu { display:none; position:absolute; top:100%; left:8px; right:8px; margin-top:4px; z-index:10;
+    flex-direction:column; gap:2px; padding:6px; background:#fff; border:1px solid #d8d8d5; border-radius:6px;
+    box-shadow:0 6px 20px rgba(0,0,0,.14); }
+  #sortMenu.open { display:flex; }
+  .srow { display:flex; align-items:center; gap:6px; padding:6px 6px; border-radius:5px; cursor:pointer;
+          font-size:11.5px; color:#333; user-select:none; }
+  .srow:hover { background:#f0f0ee; }
+  .srow.on { color:#0f7a52; font-weight:600; background:#eafaf2; }
+  .srow .sarrow { margin-left:auto; color:#0f7a52; font-weight:700; }
+  .shint { font-size:9.5px; color:#aaa; padding:4px 6px 1px; }
+  #filterCount { font-size:10px; font-weight:600; background:#16b378; color:#fff; border-radius:9px; padding:0 6px; line-height:15px; display:none; }
+  #filterCount.show { display:inline-block; }
+  #filterCaret { margin-left:auto; transition:transform .15s; color:#999; }
+  #filterBtn.open #filterCaret { transform:rotate(90deg); }
+  #stageFilter { display:none; position:absolute; top:100%; left:8px; right:8px; margin-top:4px; z-index:10;
+    flex-direction:column; gap:2px; padding:6px; background:#fff; border:1px solid #d8d8d5; border-radius:6px;
+    box-shadow:0 6px 20px rgba(0,0,0,.14); }
+  #stageFilter.open { display:flex; }
+  #stageFilter { max-height:340px; overflow-y:auto; }
+  .fhead { font-size:9.5px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; color:#999; margin:5px 0 2px; }
+  .fhead:first-child { margin-top:0; }
+  .frow { display:flex; align-items:center; gap:6px; padding:6px 6px; border-radius:5px; cursor:pointer;
+          font-size:11.5px; font-weight:500; color:#333; user-select:none; }
+  .frow:hover { background:#f0f0ee; }
+  .frow .fcaret { margin-left:auto; color:#999; }
+  .frow .fnum { font-size:10px; font-weight:600; background:#16b378; color:#fff; border-radius:9px; padding:0 6px; line-height:15px; }
+  .fsel { font-size:10px; color:#0f7a52; padding:0 6px 5px; margin-top:-3px; line-height:1.4; overflow-wrap:break-word; }
+  .fback { font-size:11px; font-weight:500; color:#16b378; cursor:pointer; padding:2px 2px 5px; user-select:none; }
+  .fback:hover { text-decoration:underline; }
+  .fclearall { margin-top:6px; padding:6px 8px; border-top:1px solid #eee; font-size:11px; font-weight:600;
+               color:#e53935; cursor:pointer; text-align:center; border-radius:4px; user-select:none; }
+  .fclearall:hover { background:#fdecea; }
+  .schip { display:flex; align-items:center; gap:7px; font-size:11px; color:#444; padding:2px 2px; cursor:pointer; user-select:none; border-radius:4px; }
+  .schip:hover { background:#f0f0ee; }
+  .schip .sw { flex:0 0 auto; width:26px; height:15px; border-radius:8px; background:#d0d0cc; position:relative; transition:background .15s; }
+  .schip .sw::after { content:''; position:absolute; top:2px; left:2px; width:11px; height:11px; border-radius:50%; background:#fff; box-shadow:0 1px 1px rgba(0,0,0,.2); transition:left .15s; }
+  .schip.on .sw { background:#16b378; }
+  .schip.on .sw::after { left:13px; }
+  .schip .dot { flex:0 0 auto; width:9px; height:9px; border-radius:2px; box-shadow:0 0 0 1px rgba(0,0,0,.1) inset; }
+  .schip .slabel { flex:1; min-width:0; }
+  #stageFilter .clear { font-size:10px; color:#16b378; cursor:pointer; padding:3px 2px 1px; align-self:flex-start; }
+  #stageFilter .clear:hover { text-decoration:underline; }
+
+  /* ---- saved views ---- */
+  #viewsBtn { display:flex; align-items:center; gap:6px; width:100%; font-size:11.5px; padding:5px 8px;
+    border:1px solid #ccc; border-radius:5px; background:#fff; color:#444; cursor:pointer; text-align:left; }
+  #viewsBtn:hover { background:#f0f0f0; }
+  #viewsBtn.active { border-color:#16b378; color:#0f7a52; background:#eafaf2; }
+  #viewsBtn .veye { flex:0 0 auto; color:#999; }
+  #viewsBtn.active .veye { color:#16b378; }
+  #viewsBtn .vname { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+  #viewsBtn .vdirty { flex:0 0 auto; color:#e5860b; font-weight:700; }
+  #viewsCaret { flex:0 0 auto; margin-left:auto; transition:transform .15s; color:#999; }
+  #viewsBtn.open #viewsCaret { transform:rotate(90deg); }
+  #viewsMenu { display:none; position:absolute; top:100%; left:8px; right:8px; margin-top:4px; z-index:12;
+    flex-direction:column; gap:2px; padding:6px; background:#fff; border:1px solid #d8d8d5; border-radius:6px;
+    box-shadow:0 6px 20px rgba(0,0,0,.14); max-height:360px; overflow-y:auto; }
+  #viewsMenu.open { display:flex; }
+  .vrow { display:flex; align-items:center; gap:6px; padding:6px 6px; border-radius:5px; cursor:pointer;
+          font-size:11.5px; color:#333; user-select:none; }
+  .vrow:hover { background:#f0f0ee; }
+  .vrow.on { color:#0f7a52; font-weight:600; background:#eafaf2; }
+  .vrow .vlabel { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .vrow .vtick { flex:0 0 auto; color:#0f7a52; font-weight:700; }
+  .vrow .vdel { flex:0 0 auto; color:#bbb; font-weight:700; padding:0 5px; border-radius:4px; line-height:1.4; }
+  .vrow .vdel:hover { color:#e53935; background:#fdecea; }
+  .vaction { display:flex; align-items:center; gap:6px; padding:6px 6px; border-radius:5px; cursor:pointer;
+             font-size:11.5px; font-weight:500; color:#16b378; user-select:none; }
+  .vaction:hover { background:#eafaf2; }
+  .vaction.danger { color:#e53935; }
+  .vaction.danger:hover { background:#fdecea; }
+  .vsep { border-top:1px solid #eee; margin:4px 0 2px; }
+  .vempty { font-size:10.5px; color:#aaa; padding:4px 6px 6px; }
+
+  #jobList { flex:1; min-height:0; overflow-y:auto; padding:6px; display:flex; flex-direction:column; gap:6px; }
+  #jobList .empty { font-size:12px; color:#999; padding:10px 4px; text-align:center; }
+  .jobitem .jcount { cursor:pointer; }
+  .jobitem .jcount:hover { color:#16b378; }
+  .jvisits { display:flex; flex-direction:column; gap:2px; margin-top:3px; border-top:1px dashed #e4e2de; padding-top:4px; }
+  .jvisit { font-size:10px; color:#555; padding:2px 4px; border-radius:4px; cursor:pointer; line-height:1.35; }
+  .jvisit:hover { background:#eefaf3; }
+  .jvisit .vd { font-weight:600; color:#333; }
+  .jobitem { border:1px solid #e0e0e0; border-radius:6px; background:#fff; padding:6px 7px; cursor:grab;
+             box-shadow:0 1px 1px rgba(0,0,0,.05); display:flex; flex-direction:column; gap:3px; }
+  .jobitem:hover { border-color:#16b378; }
+  .jobitem:active { cursor:grabbing; }
+  .jobitem.lit { outline:2px solid #16b378; outline-offset:1px; }
+  .jobitem .ja { font-size:11.5px; font-weight:600; color:#222; line-height:1.3; overflow-wrap:break-word; }
+  .jobitem .jaddr { font-size:10px; color:#666; line-height:1.35; overflow-wrap:break-word; }
+  .jobitem .jmeta { display:flex; align-items:center; flex-wrap:wrap; gap:4px; font-size:10px; color:#666; }
+  .jobitem .jcount { margin-left:auto; font-size:9.5px; color:#999; white-space:nowrap; }
+  .jobitem .pill { font-size:9.5px; }
+
+  #toolbar { display:flex; align-items:center; gap:6px; padding:6px 8px; border-bottom:1px solid #e0e0e0; flex-wrap:wrap; flex:0 0 auto; }
+  #toolbar button, #toolbar select {
+    font-size:12px; padding:4px 10px; border:1px solid #ccc; border-radius:4px;
+    background:#fff; cursor:pointer; color:#333;
+  }
+  #toolbar button:hover { background:#f0f0f0; }
+  #rangeLabel { font-size:13px; font-weight:600; color:#333; margin-left:6px; }
+  #msg { padding:20px; font-size:13px; color:#666; display:none; }
+  #cal { flex:1; min-height:0; display:flex; flex-direction:column; }
+
+  /* ---- week / day view ---- */
+  .cols { flex:1; min-height:0; display:grid; grid-auto-columns:1fr; grid-auto-flow:column; }
+  .daycol { display:flex; flex-direction:column; border-right:1px solid #e8e8e8; min-width:0; }
+  .daycol:last-child { border-right:none; }
+  .dayhead { flex:0 0 auto; text-align:center; padding:5px 2px; border-bottom:1px solid #e0e0e0; font-size:12px; color:#666; background:#fafafa; }
+  .dayhead .num { font-size:17px; font-weight:600; color:#444; margin-right:4px; }
+  .dayhead.today { color:#e53935; background:#fdecea; font-weight:600; }
+  .dayhead.today .num { background:#e53935; color:#fff; border-radius:50%; display:inline-block; min-width:26px; line-height:26px; text-align:center; }
+  .daycol.today { background:#fef7f6; }
+  .daybody { flex:1; overflow-y:auto; padding:8px 8px 4px 4px; display:flex; flex-direction:column; gap:7px; }
+  .daybody.dragover { background:#eefaf3; }
+
+  /* ---- month view ---- */
+  #monthwrap { flex:1; min-height:0; overflow-y:auto; }
+  .mhead { display:grid; grid-template-columns:repeat(7,1fr); border-bottom:1px solid #e0e0e0; background:#fafafa; position:sticky; top:0; z-index:2; }
+  .mhead div { text-align:center; font-size:11px; color:#666; padding:4px 0; }
+  .mrow { display:grid; grid-template-columns:repeat(7,1fr); }
+  .mcell { border-right:1px solid #eee; border-bottom:1px solid #eee; min-height:92px; padding:3px 7px 3px 3px; display:flex; flex-direction:column; gap:7px; min-width:0; }
+  .mcell:last-child { border-right:none; }
+  .mcell .dnum { font-size:11px; font-weight:600; color:#555; padding:1px 3px; flex:0 0 auto; }
+  .mcell.other .dnum { color:#bbb; }
+  .mcell.today { background:#fef7f6; }
+  .mcell.today .dnum { color:#fff; background:#e53935; border-radius:9px; align-self:flex-start; }
+  .mcell.dragover { background:#eefaf3; }
+
+  /* ---- event cards ---- */
+  .ev { background:#fff; border:1px solid #e0e0e0; border-radius:6px; padding:5px 14px 5px 7px; cursor:pointer;
+        color:#222; flex:0 0 auto; box-shadow:0 1px 1px rgba(0,0,0,.08);
+        overflow-wrap:break-word; position:relative; }
+  .ev .del { position:absolute; top:-6px; right:-6px; width:16px; height:16px; line-height:13px; text-align:center;
+             font-size:11px; font-weight:700; color:#fff; background:#6d7681; border:1.5px solid #fff;
+             border-radius:50%; box-shadow:0 1px 2px rgba(0,0,0,.35); cursor:pointer; user-select:none; z-index:2; }
+  .ev .del:hover { background:#e53935; }
+  .avatar { width:18px; height:18px; border-radius:50%; background:#eceae6; color:#555; font-size:8.5px; font-weight:700;
+            display:inline-flex; align-items:center; justify-content:center; border:1px solid #d8d5cf;
+            vertical-align:middle; letter-spacing:.02em; }
+  .ev.selected, .ev.lit { outline:2px solid #16b378; outline-offset:1px; }
+  .ev.dim { opacity:.22; }
+  .ev .inst { margin-top:4px; padding-top:3px; border-top:1px solid #eee;
+              font-size:10.5px; font-weight:600; color:#444; line-height:1.35; white-space:normal; }
+  .ev .t { font-size:11.5px; font-weight:600; line-height:1.35; white-space:normal;
+           display:inline-block; max-width:100%; border-radius:8px; padding:2px 8px; }
+  .ev .d { font-size:10.5px; line-height:1.4; color:#555; margin-top:3px; white-space:normal; }
+  .ev .lbl { color:#999; }
+  .pill { border-radius:8px; padding:0 7px; display:inline-block; line-height:1.5; }
+  .mcell .ev { padding:4px 6px; }
+  .mcell .ev .t { font-size:10.5px; }
+  .mcell .ev .d { font-size:9.5px; }
+  .mcell .ev .inst { font-size:9.5px; }
+
+  /* ---- job details popup ---- */
+  #jobModal { display:none; position:fixed; inset:0; z-index:50; background:rgba(20,22,26,.42);
+    align-items:center; justify-content:center; padding:20px; }
+  #jobModal.open { display:flex; }
+  #jobModalCard { background:#fff; width:100%; max-width:440px; max-height:86vh; display:flex; flex-direction:column;
+    border-radius:10px; box-shadow:0 18px 50px rgba(0,0,0,.3); overflow:hidden; }
+  .jm-head { flex:0 0 auto; display:flex; align-items:flex-start; gap:8px; padding:14px 16px 10px; border-bottom:1px solid #eee; }
+  .jm-title { flex:1; min-width:0; font-size:15px; font-weight:700; color:#222; line-height:1.3; overflow-wrap:break-word; }
+  .jm-close { flex:0 0 auto; font-size:20px; line-height:1; color:#999; cursor:pointer; padding:0 2px; }
+  .jm-close:hover { color:#e53935; }
+  .jm-body { flex:1; min-height:0; overflow-y:auto; padding:12px 16px; }
+  .jm-row { display:flex; gap:10px; padding:5px 0; font-size:12.5px; line-height:1.45; border-bottom:1px solid #f4f4f2; }
+  .jm-row:last-child { border-bottom:none; }
+  .jm-k { flex:0 0 116px; color:#888; font-weight:600; }
+  .jm-v { flex:1; min-width:0; color:#222; overflow-wrap:break-word; }
+  .jm-sec { font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#aaa; margin:14px 0 4px; }
+  .jm-visit { font-size:12px; color:#333; padding:5px 8px; border-radius:5px; background:#f7f7f5; margin-bottom:4px; line-height:1.4; }
+  .jm-visit .vd { font-weight:600; color:#111; }
+  .jm-empty { font-size:12px; color:#aaa; padding:2px 0; }
+  .jm-foot { flex:0 0 auto; display:flex; align-items:center; gap:10px; padding:12px 16px; border-top:1px solid #eee; background:#fafafa; }
+  .jm-hint { flex:1; min-width:0; font-size:10.5px; color:#999; line-height:1.35; }
+  .jm-edit { flex:0 0 auto; font-size:12.5px; font-weight:600; text-decoration:none; color:#fff; background:#16b378;
+    padding:7px 14px; border-radius:6px; cursor:pointer; white-space:nowrap; }
+  .jm-edit:hover { background:#139968; }
+  .jm-edit.disabled { background:#cfd4d1; pointer-events:none; }
+  .jm-gear { flex:0 0 auto; font-size:15px; line-height:1; color:#aaa; cursor:pointer; padding:0 4px; }
+  .jm-gear:hover { color:#16b378; }
+  .jm-gear.on { color:#16b378; }
+  /* layout editor overlay inside the modal */
+  .jm-editor { display:none; flex-direction:column; }
+  #jobModalCard.editing .jm-body { display:none; }
+  #jobModalCard.editing .jm-editor { display:flex; }
+  #jobModalCard.editing .jm-foot { display:none; }
+  .jm-editor { flex:1; min-height:0; overflow-y:auto; padding:10px 14px; }
+  .jm-editnote { font-size:11px; color:#999; margin-bottom:8px; line-height:1.4; }
+  .jm-fld { display:flex; align-items:center; gap:9px; padding:7px 6px; border:1px solid #eee; border-radius:6px;
+            margin-bottom:5px; background:#fff; font-size:12.5px; color:#333; cursor:grab; }
+  .jm-fld:hover { border-color:#d8d5cf; }
+  .jm-fld.dragging { opacity:.4; }
+  .jm-fld.hidden-fld { color:#bbb; background:#fafafa; }
+  .jm-fld .grip { flex:0 0 auto; color:#c4c1ba; font-size:13px; cursor:grab; }
+  .jm-fld .flbl { flex:1; min-width:0; overflow-wrap:break-word; }
+  .jm-fld .fsw { flex:0 0 auto; width:30px; height:17px; border-radius:9px; background:#d0d0cc; position:relative; transition:background .15s; }
+  .jm-fld .fsw::after { content:''; position:absolute; top:2px; left:2px; width:13px; height:13px; border-radius:50%; background:#fff; box-shadow:0 1px 1px rgba(0,0,0,.25); transition:left .15s; }
+  .jm-fld.on .fsw { background:#16b378; }
+  .jm-fld.on .fsw::after { left:15px; }
+  .jm-editreset { font-size:11px; color:#16b378; cursor:pointer; padding:6px 2px; }
+  .jm-editreset:hover { text-decoration:underline; }
+  .jm-editdone { flex:0 0 auto; display:flex; justify-content:flex-end; padding:10px 14px; border-top:1px solid #eee; background:#fafafa; }
+  #jobModalCard:not(.editing) .jm-editdone { display:none; }
+  .jm-donebtn { font-size:12.5px; font-weight:600; color:#fff; background:#16b378; border:none; padding:7px 16px; border-radius:6px; cursor:pointer; }
+  .jm-donebtn:hover { background:#139968; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="sidebar">
+    <div id="sideHead">
+      <div id="sideTitle">Jobs</div>
+      <input id="jobSearch" type="text" placeholder="Search address, client, stage, staff…" autocomplete="off">
+      <button id="viewsBtn" type="button"><span class="veye">&#9673;</span><span class="vname">All jobs</span><span class="vdirty" style="display:none">&bull;</span><span id="viewsCaret">&#8250;</span></button>
+      <div id="fsrow">
+        <button id="filterBtn" type="button"><span>&#9881; Filter</span><span id="filterCount"></span><span id="filterCaret">&#8250;</span></button>
+        <button id="sortBtn" type="button"><span>&#8645; Sort</span><span id="sortCaret">&#8250;</span></button>
+      </div>
+      <div id="stageFilter"></div>
+      <div id="sortMenu"></div>
+      <div id="viewsMenu"></div>
+    </div>
+    <div id="jobList"></div>
+  </div>
+  <div id="main">
+    <div id="toolbar">
+      <button id="btnToday">Today</button>
+      <button id="btnPrev">&#8249;</button>
+      <button id="btnNext">&#8250;</button>
+      <select id="viewSel">
+        <option value="day">Day</option>
+        <option value="week" selected>Week</option>
+        <option value="month">Month</option>
+      </select>
+      <span id="rangeLabel"></span>
+      <button id="btnJobs" title="Show / hide the jobs panel">&#9783; Jobs</button>
+    </div>
+    <div id="msg"></div>
+    <div id="cal"></div>
+  </div>
+</div>
+
+<div id="jobModal">
+  <div id="jobModalCard">
+    <div class="jm-head">
+      <div class="jm-title"></div>
+      <span class="jm-gear" title="Edit this panel — choose fields and order">&#9998;</span>
+      <span class="jm-close" title="Close">&times;</span>
+    </div>
+    <div class="jm-body"></div>
+    <div class="jm-editor"></div>
+    <div class="jm-editdone"><button class="jm-donebtn" type="button">Done</button></div>
+    <div class="jm-foot">
+      <span class="jm-hint"></span>
+      <a class="jm-edit" target="_parent" rel="noopener" href="#">&#9998; Edit in Inbox</a>
+    </div>
+  </div>
+</div>
+
+<script src="https://milano.getgrist.com/grist-plugin-api.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  // sidebar reads these columns off the jobs table when they exist
+  var JOB_COLS = { addr:'Job_Address', client:'Client_Label', stage:'Stage', assigned:'Assigned_To', jid:'Job_ID' };
+
+  // ---- "Edit in Inbox" navigation ----
+  // Double-click a job → details popup → Edit jumps to that assignee's Inbox sub-page
+  // with the same job selected (Grist anchor link, opens in the same tab via target="_parent").
+  // If the doc's pages/sections change, update page (view id) + sec (Jobs section ref) below.
+  var INBOX = {
+    base: 'https://milano.getgrist.com/ezZUgCeS6Rq1/Milano',
+    clientCol: 193,                       // Jobs_Detail.Client_Name colRef (any col works for the anchor)
+    byAssignee: {                         // Assigned_To choice value -> { page: view id, sec: Jobs section ref }
+      'Julie':  { page: 29, sec: 142 },
+      'Phoebe': { page: 30, sec: 145 },
+      'Nhi':    { page: 31, sec: 148 },
+      'a Minh': { page: 32, sec: 151 }
+    },
+    fallback: { page: 24, sec: 122 },     // *Inbox (all jobs) when the assignee has no own page
+    pageName: { 29:'Julie', 30:'Phoebe', 31:'Nhi', 32:'Anh Minh', 24:'Inbox' }
+  };
+  function inboxTargetFor(job) {
+    var a = (job.assigned || []).map(String), pick = null;
+    for (var i = 0; i < a.length; i++) { if (INBOX.byAssignee[a[i]]) { pick = INBOX.byAssignee[a[i]]; break; } }
+    var cfg = pick || INBOX.fallback;
+    return {
+      name: INBOX.pageName[cfg.page] || 'Inbox',
+      url: job.id ? (INBOX.base + '/p/' + cfg.page + '#a1.s' + cfg.sec + '.r' + job.id + '.c' + INBOX.clientCol) : null
+    };
+  }
+
+  var view = 'week';
+  var refDate = new Date(); refDate.setHours(0,0,0,0);
+  var mappingsCache = null;
+  var recordsCache = [];
+  var metaByColId = {};    // this table's cols: colId -> {label, type, choiceOptions}
+  var jobMetaByColId = {}; // jobs table cols: colId -> {label, type, choiceOptions} (for the details popup)
+  var jobsCache = null;    // [{id, addr, client, stage, assigned[], jid}] from the jobs table
+  var selectedRowId = null;
+  var isolatedJobKey = null;   // when set, only this job's visits stay lit
+  var seqById = {};            // rec.id -> {n, total, key}
+  var jobQuery = '';
+  var filters = { stage: {}, assignee: {}, visits: {} };   // visits keys: '0' | '1' | '2+'
+  var filterView = null;       // null = category list; 'stage'|'assignee'|'visits' = drilled in
+  var sortBy = { key: 'client', dir: 1 };   // dir 1 = A-Z / soonest / fewest; -1 reversed
+  var SORT_OPTS = [
+    { key: 'client', label: 'Client' },
+    { key: 'addr',   label: 'Job address' },
+    { key: 'stage',  label: 'Stage' },
+    { key: 'next',   label: 'Next visit date' },
+    { key: 'visits', label: 'Visit count' }
+  ];
+  var expandedJobs = {};       // sidebar job key -> true when its visit list is open
+  var detailLayout = { order: [], hidden: {} };  // details-popup field arrangement (persisted)
+  var currentDetailJob = null; // job currently shown in the details popup (for live re-render)
+  var DETAIL_CORE = { jid: 'Job ID', client: 'Client', addr: 'Address', stage: 'Stage', assigned: 'Assigned to' };
+  var sidebarOpen = true;
+  var pendingCursor = null;    // row to select once Grist delivers it via onRecords
+  var lastScrolledKey = null;  // last isolated job scrolled into view in the sidebar
+  var savedViews = [];         // [{name, filters, sortBy, view}] persisted per-widget
+  var activeViewName = null;   // name of the currently applied saved view (null = All jobs)
+  var viewsLoaded = false;     // apply the persisted active view only once, on first load
+
+  // ---- date helpers ----
+  function gristToLocalDate(v) {
+    if (v === null || v === undefined || v === '') return null;
+    // onRecords delivers Date columns as JS Date objects (UTC midnight);
+    // raw numbers (epoch seconds) can appear too — handle both.
+    var d = (v instanceof Date) ? v : new Date(Number(v) * 1000);
+    if (isNaN(d)) return null;
+    return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  }
+  function localDateToGrist(d) {
+    return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 1000;
+  }
+  function dkey(d) { return d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate(); }
+  function fmtDate(d) { return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear(); }
+  function fmtShort(d) { return d.getDate() + ' ' + MONTHS[d.getMonth()]; }
+  function addDays(d, n) { var x = new Date(d); x.setDate(x.getDate()+n); return x; }
+  function weekStart(d) { return addDays(d, -((d.getDay()+6)%7)); }  // Monday
+  function sameDay(a, b) { return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+
+  // ---- value helpers ----
+  function listVals(v) {
+    if (v === null || v === undefined || v === '') return [];
+    if (Array.isArray(v)) return (v[0] === 'L' ? v.slice(1) : v).map(String);
+    return [String(v)];
+  }
+  function fmtVal(v) {
+    if (v === null || v === undefined || v === '') return '';
+    if (v instanceof Date) return fmtDate(gristToLocalDate(v));
+    if (Array.isArray(v)) return listVals(v).join(', ');
+    if (typeof v === 'number') return String(Math.round(v * 100) / 100);
+    return String(v);
+  }
+  function colMeta(colId) { return metaByColId[colId] || {}; }
+  function colLabel(colId) { return colMeta(colId).label || colId; }
+  function isChoiceCol(colId) {
+    var t = colMeta(colId).type || '';
+    return t === 'Choice' || t === 'ChoiceList';
+  }
+  function pillSpan(val, colId) {
+    var opts = (colMeta(colId).choiceOptions || {})[val] || {};
+    var s = document.createElement('span');
+    s.className = 'pill';
+    s.style.background = opts.fillColor || '#E8E8E8';
+    s.style.color = opts.textColor || '#000000';
+    s.textContent = val;
+    return s;
+  }
+  // neutral initials avatar for assignees (no colour) — full name in the tooltip
+  function avatarSpan(name) {
+    var parts = String(name).trim().split(/\s+/).filter(Boolean);
+    var ini = parts.length > 1
+      ? (parts[0][0] + parts[parts.length - 1][0])
+      : String(name).trim().slice(0, 2);
+    var s = document.createElement('span');
+    s.className = 'avatar';
+    s.textContent = ini.toUpperCase();
+    s.title = name;
+    return s;
+  }
+
+  // normalize a Ref cell to its row id — Grist may deliver a plain number,
+  // an encoded ['R', tableId, rowId], or a Reference object with .rowId
+  function refId(v) {
+    if (typeof v === 'number' && v) return v;
+    if (Array.isArray(v) && v[0] === 'R') return Number(v[2]) || null;
+    if (v && typeof v === 'object' && typeof v.rowId === 'number') return v.rowId || null;
+    return null;
+  }
+  // job identity for grouping; groupBy holds a Ref which Grist may deliver as a
+  // row id, an encoded ref, a Reference object, or the ref's DISPLAY value (Job ID text)
+  function jobKey(rec) {
+    if (mappingsCache && mappingsCache.groupBy != null) {
+      var v = rec[mappingsCache.groupBy];
+      var id = refId(v);
+      if (id) return 'g:' + id;
+      if (typeof v === 'string' && v.trim()) return 'g:' + v.trim();
+      if (v !== null && v !== undefined && v !== '' && v !== 0)
+        return 'g:' + (typeof v === 'object' ? JSON.stringify(v) : v);
+    }
+    return 't:' + fmtVal(rec[mappingsCache.title]);
+  }
+  // every key a sidebar job might appear under in the visit records
+  function jobAliases(j) {
+    var a = ['g:' + j.id];
+    if (j.jid) a.push('g:' + j.jid);
+    return a;
+  }
+
+  // number each job's dated visits 1..N by date (earliest = 1)
+  function computeSeq() {
+    var groups = {};
+    recordsCache.forEach(function (rec) {
+      var d = gristToLocalDate(rec[mappingsCache.startDate]);
+      if (!d) return;
+      var k = jobKey(rec);
+      (groups[k] = groups[k] || []).push({ id: rec.id, d: d });
+    });
+    var seq = {};
+    Object.keys(groups).forEach(function (k) {
+      var arr = groups[k];
+      arr.sort(function (a, b) { return (a.d - b.d) || (a.id - b.id); });
+      arr.forEach(function (it, i) { seq[it.id] = { n: i + 1, total: arr.length, key: k }; });
+    });
+    return seq;
+  }
+
+  // ---- filters (stage / assignee / visit count) ----
+  function stageOf(rec) { return mappingsCache.type ? fmtVal(rec[mappingsCache.type]) : ''; }
+  function activeKeys(obj) { return Object.keys(obj).filter(function (k) { return obj[k]; }); }
+  function filterCount() {
+    return activeKeys(filters.stage).length + activeKeys(filters.assignee).length + activeKeys(filters.visits).length;
+  }
+  function assigneeColId() {
+    var d = (mappingsCache && mappingsCache.details) || [];
+    for (var i = 0; i < d.length; i++) if ((colMeta(d[i]).type || '') === 'ChoiceList') return d[i];
+    return null;
+  }
+  function matchVisitBucket(n, sel) {
+    return sel.some(function (b) { return b === '2+' ? n >= 2 : Number(b) === n; });
+  }
+  // does a calendar visit pass the filters?
+  function recPasses(rec) {
+    var st = activeKeys(filters.stage);
+    if (st.length && st.indexOf(stageOf(rec)) === -1) return false;
+    var as = activeKeys(filters.assignee);
+    if (as.length) {
+      var ac = assigneeColId();
+      var have = ac ? listVals(rec[ac]) : [];
+      if (!have.some(function (v) { return as.indexOf(v) !== -1; })) return false;
+    }
+    var vs = activeKeys(filters.visits);
+    if (vs.length) {
+      var info = seqById[rec.id];
+      if (!matchVisitBucket(info ? info.total : 1, vs)) return false;
+    }
+    return true;
+  }
+  // does a sidebar job pass the filters?
+  function jobPasses(j, counts) {
+    var st = activeKeys(filters.stage);
+    if (st.length && st.indexOf(j.stage) === -1) return false;
+    var as = activeKeys(filters.assignee);
+    if (as.length && !(j.assigned || []).some(function (v) { return as.indexOf(v) !== -1; })) return false;
+    var vs = activeKeys(filters.visits);
+    if (vs.length) {
+      var n = 0;
+      (j.id ? jobAliases(j) : [j.key]).forEach(function (k) { n = Math.max(n, counts[k] || 0); });
+      if (!matchVisitBucket(n, vs)) return false;
+    }
+    return true;
+  }
+
+  // ---- manual per-day ordering ----
+  function orderVal(rec) {
+    if (mappingsCache.orderBy == null) return Infinity;
+    var v = rec[mappingsCache.orderBy];
+    return (typeof v === 'number' && v !== 0) ? v : Infinity;
+  }
+  function sortDay(arr) {
+    return arr.slice().sort(function (a, b) {
+      var oa = orderVal(a), ob = orderVal(b);
+      if (oa !== ob) return oa < ob ? -1 : 1;
+      return a.id - b.id;
+    });
+  }
+  // find insertion index in a container from pointer Y (skipping the dragged card)
+  function dropIndex(container, clientY, excludeId) {
+    var cards = Array.prototype.slice.call(container.querySelectorAll('.ev'))
+      .filter(function (el) { return Number(el.dataset.rid) !== excludeId; });
+    for (var i = 0; i < cards.length; i++) {
+      var r = cards[i].getBoundingClientRect();
+      if (clientY < r.top + r.height / 2) return i;
+    }
+    return cards.length;
+  }
+  // rewrite order numbers for one day so the moved/new record sits at insertIdx
+  function commitDayOrder(day, movedId, insertIdx) {
+    if (mappingsCache.orderBy == null) return;
+    var dayRecs = sortDay(recordsCache.filter(function (r) {
+      var d = gristToLocalDate(r[mappingsCache.startDate]);
+      return d && sameDay(d, day) && r.id !== movedId;
+    }));
+    var moved = recordsCache.find(function (r) { return r.id === movedId; });
+    if (!moved) return;
+    dayRecs.splice(Math.max(0, Math.min(insertIdx, dayRecs.length)), 0, moved);
+    var updates = [];
+    dayRecs.forEach(function (r, i) {
+      var pos = (i + 1) * 10;
+      if (r[mappingsCache.orderBy] !== pos) {
+        r[mappingsCache.orderBy] = pos;   // optimistic local
+        var f = {}; f[mappingsCache.orderBy] = pos;
+        updates.push({ id: r.id, fields: f });
+      }
+    });
+    if (updates.length) {
+      grist.getTable().update(updates).catch(function (err) { console.error(err); });
+    }
+  }
+
+  // ---- data indexing ----
+  function eventsByDay() {
+    var map = {};
+    if (!mappingsCache) return map;
+    recordsCache.forEach(function (rec) {
+      if (!recPasses(rec)) return;
+      var d = gristToLocalDate(rec[mappingsCache.startDate]);
+      if (!d) return;
+      var k = dkey(d);
+      (map[k] = map[k] || []).push(rec);
+    });
+    Object.keys(map).forEach(function (k) { map[k] = sortDay(map[k]); });
+    return map;
+  }
+
+  // ---- event cards ----
+  function makeCard(rec) {
+    var card = document.createElement('div');
+    var key = jobKey(rec);
+    var cls = 'ev';
+    if (isolatedJobKey) cls += (key === isolatedJobKey) ? ' lit' : ' dim';
+    else if (rec.id === selectedRowId) cls += ' selected';
+    card.className = cls;
+    card.draggable = true;
+    card.dataset.rid = rec.id;
+
+    // red × in the corner: remove this installation
+    var del = document.createElement('span');
+    del.className = 'del';
+    del.textContent = '×';
+    del.title = 'Remove this installation';
+    del.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var d = gristToLocalDate(rec[mappingsCache.startDate]);
+      var what = (fmtVal(rec[mappingsCache.title]) || 'this job') + (d ? ' on ' + fmtDate(d) : '');
+      if (!confirm('Remove the installation for ' + what + '?')) return;
+      recordsCache = recordsCache.filter(function (r) { return r.id !== rec.id; });  // optimistic
+      if (selectedRowId === rec.id) { selectedRowId = null; isolatedJobKey = null; }
+      grist.getTable().destroy([rec.id]).catch(function (err) { console.error(err); });
+      render();
+    });
+    card.appendChild(del);
+
+    var info = seqById[rec.id];
+
+    var t = document.createElement('div');
+    t.className = 't';
+    t.textContent = fmtVal(rec[mappingsCache.title]) || '(no title)';
+    if (mappingsCache.type) {
+      var stageVal = fmtVal(rec[mappingsCache.type]);
+      var opts = (colMeta(mappingsCache.type).choiceOptions || {})[stageVal] || {};
+      t.style.background = opts.fillColor || '#E8E8E8';
+      t.style.color = opts.textColor || '#000000';
+    }
+    card.appendChild(t);
+
+    (mappingsCache.details || []).forEach(function (colId) {
+      var vals = listVals(rec[colId] instanceof Date || typeof rec[colId] === 'number'
+        ? fmtVal(rec[colId]) : rec[colId]);
+      if (!vals.length || (vals.length === 1 && vals[0] === '')) return;
+      var line = document.createElement('div');
+      line.className = 'd';
+      var lbl = document.createElement('span');
+      lbl.className = 'lbl';
+      lbl.textContent = colLabel(colId) + ': ';
+      line.appendChild(lbl);
+      var colType = colMeta(colId).type || '';
+      if (colType === 'ChoiceList') {
+        // assignees: neutral initials avatars instead of coloured pills
+        vals.forEach(function (v, i) {
+          if (i) line.appendChild(document.createTextNode(' '));
+          line.appendChild(avatarSpan(v));
+        });
+      } else if (colType === 'Choice') {
+        vals.forEach(function (v, i) {
+          if (i) line.appendChild(document.createTextNode(' '));
+          line.appendChild(pillSpan(v, colId));
+        });
+      } else {
+        line.appendChild(document.createTextNode(vals.join(', ')));
+      }
+      card.appendChild(line);
+    });
+
+    // bottom line: "Installation n/N: note" for multi-visit jobs; just the note for single visits
+    var noteVal = (mappingsCache.seqNote != null) ? fmtVal(rec[mappingsCache.seqNote]) : '';
+    var instText = '';
+    if (info && info.total > 1) instText = 'Installation ' + info.n + '/' + info.total + (noteVal ? ': ' + noteVal : '');
+    else if (noteVal) instText = noteVal;
+    if (instText) {
+      var il = document.createElement('div');
+      il.className = 'inst';
+      il.textContent = instText;
+      card.appendChild(il);
+    }
+
+    card.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (selectedRowId === rec.id && isolatedJobKey === key) {
+        selectedRowId = null; isolatedJobKey = null;   // click again to clear
+      } else {
+        selectedRowId = rec.id; isolatedJobKey = key;  // isolate this job's visits
+      }
+      grist.setCursorPos({ rowId: rec.id });
+      render();
+    });
+    // double-click a visit → full job details popup
+    card.addEventListener('dblclick', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      openJobDetails(jobForRecord(rec));
+    });
+    card.addEventListener('dragstart', function (e) {
+      e.dataTransfer.setData('text/plain', String(rec.id));
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    return card;
+  }
+
+  function makeDropTarget(el, day) {
+    el.addEventListener('dragover', function (e) { e.preventDefault(); el.classList.add('dragover'); });
+    el.addEventListener('dragleave', function () { el.classList.remove('dragover'); });
+    el.addEventListener('drop', function (e) {
+      e.preventDefault(); e.stopPropagation(); el.classList.remove('dragover');
+
+      // a job dragged in from the sidebar -> create a new visit at the drop slot
+      var jobPayload = e.dataTransfer.getData('application/x-mm-job');
+      if (jobPayload && mappingsCache.groupBy != null) {
+        var jobRowId = Number(jobPayload);
+        if (!jobRowId) return;
+        var job = (jobsCache || []).find(function (x) { return x.id === jobRowId; });
+        var jobName = job ? (job.client || job.addr || job.jid) : 'this job';
+        var note = prompt('Schedule installation for ' + jobName + ' on ' + fmtDate(day) + '.\n' +
+                          'Add a note (optional) — or Cancel to abort:', '');
+        if (note === null) return;   // cancelled -> no visit created
+        note = note.trim();
+        var idx = dropIndex(el, e.clientY, -1);
+        var fields = {};
+        fields[mappingsCache.groupBy] = jobRowId;
+        fields[mappingsCache.startDate] = localDateToGrist(day);
+        if (note && mappingsCache.seqNote != null) fields[mappingsCache.seqNote] = note;
+        grist.getTable().create({ fields: fields })
+          .then(function (res) {
+            if (res && res.id) {
+              // local echo so ordering can include it before onRecords refreshes
+              var rec = { id: res.id };
+              rec[mappingsCache.groupBy] = jobRowId;
+              rec[mappingsCache.startDate] = new Date(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate()));
+              if (note && mappingsCache.seqNote != null) rec[mappingsCache.seqNote] = note;
+              recordsCache.push(rec);
+              commitDayOrder(day, res.id, idx);
+              selectedRowId = res.id;
+              isolatedJobKey = 'g:' + jobRowId;
+              pendingCursor = res.id;   // re-assert once the row arrives via onRecords
+              grist.setCursorPos({ rowId: res.id });
+              render();
+            }
+          })
+          .catch(function (err) { console.error(err); });
+        return;
+      }
+
+      // an existing visit card moved -> reschedule and stick at the drop slot
+      var rowId = Number(e.dataTransfer.getData('text/plain'));
+      if (!rowId || !mappingsCache) return;
+      var idx2 = dropIndex(el, e.clientY, rowId);
+      var rec2 = recordsCache.find(function (r) { return r.id === rowId; });
+      if (rec2) rec2[mappingsCache.startDate] = new Date(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate()));
+      var fields2 = {};
+      fields2[mappingsCache.startDate] = localDateToGrist(day);
+      grist.getTable().update({ id: rowId, fields: fields2 }).catch(function (err) { console.error(err); });
+      commitDayOrder(day, rowId, idx2);
+      render();
+    });
+    el.addEventListener('dblclick', function (e) {
+      if (e.target !== el) return;
+      if (!mappingsCache) return;
+      var note = prompt('Create a new installation on ' + fmtDate(day) + '.\n' +
+                        'Add a note (optional) — or Cancel to abort:', '');
+      if (note === null) return;   // cancelled
+      note = note.trim();
+      var fields = {};
+      fields[mappingsCache.startDate] = localDateToGrist(day);
+      if (note && mappingsCache.seqNote != null) fields[mappingsCache.seqNote] = note;
+      grist.getTable().create({ fields: fields })
+        .then(function (res) { if (res && res.id) { selectedRowId = res.id; isolatedJobKey = null; grist.setCursorPos({ rowId: res.id }); } })
+        .catch(function (err) { console.error(err); });
+    });
+  }
+
+  // ---- jobs sidebar ----
+  function jobsFromRecords() {
+    // fallback: derive the job list from visit records (jobs without visits won't appear)
+    var byKey = {};
+    recordsCache.forEach(function (rec) {
+      var gv = mappingsCache.groupBy != null ? rec[mappingsCache.groupBy] : null;
+      var id = (typeof gv === 'number' && gv) ? gv : null;
+      var k = jobKey(rec);
+      if (!byKey[k]) byKey[k] = {
+        id: id, key: k,
+        addr: fmtVal(rec[mappingsCache.title]),
+        client: fmtVal(rec[(mappingsCache.details || [])[0]]),
+        stage: stageOf(rec), assigned: [], jid: ''
+      };
+    });
+    return Object.keys(byKey).map(function (k) { return byKey[k]; });
+  }
+  function visitCounts() {
+    var counts = {};
+    recordsCache.forEach(function (rec) {
+      var k = jobKey(rec);
+      counts[k] = (counts[k] || 0) + 1;
+    });
+    return counts;
+  }
+  function jobHaystack(j) {
+    return [j.addr, j.client, j.stage, j.jid, (j.assigned || []).join(' ')].join(' ').toLowerCase();
+  }
+  function renderSidebar() {
+    var list = document.getElementById('jobList');
+    if (!list || !mappingsCache) return;
+    list.innerHTML = '';
+    var jobs = (jobsCache && jobsCache.length) ? jobsCache : jobsFromRecords();
+    var counts = visitCounts();
+    var q = jobQuery.trim().toLowerCase();
+    var shown = jobs.filter(function (j) {
+      return jobPasses(j, counts) && (!q || jobHaystack(j).indexOf(q) !== -1);
+    });
+    // per-job "next visit" date: earliest upcoming, else earliest overall
+    var today0 = new Date(); today0.setHours(0, 0, 0, 0);
+    var datesByKey = {};
+    recordsCache.forEach(function (r) {
+      var d = gristToLocalDate(r[mappingsCache.startDate]);
+      if (!d) return;
+      var k = jobKey(r);
+      (datesByKey[k] = datesByKey[k] || []).push(d);
+    });
+    function nextOf(j) {
+      var all = [];
+      (j.id ? jobAliases(j) : [j.key]).forEach(function (k) { all = all.concat(datesByKey[k] || []); });
+      if (!all.length) return null;
+      var up = all.filter(function (d) { return d >= today0; });
+      return new Date(Math.min.apply(null, up.length ? up : all));
+    }
+    function cntOf(j) {
+      var n = 0;
+      (j.id ? jobAliases(j) : [j.key]).forEach(function (k) { n = Math.max(n, counts[k] || 0); });
+      return n;
+    }
+    function nameOf(j) { return (j.client || j.addr || '').toLowerCase(); }
+    shown.sort(function (a, b) {
+      var dir = sortBy.dir, r = 0;
+      if (sortBy.key === 'addr') r = dir * (a.addr || '').toLowerCase().localeCompare((b.addr || '').toLowerCase());
+      else if (sortBy.key === 'stage') r = dir * (a.stage || '').localeCompare(b.stage || '');
+      else if (sortBy.key === 'visits') r = dir * (cntOf(a) - cntOf(b));
+      else if (sortBy.key === 'next') {
+        var da = nextOf(a), db = nextOf(b);
+        if (!da && !db) r = 0;
+        else if (!da) r = 1;            // jobs without visits always last
+        else if (!db) r = -1;
+        else r = dir * (da - db);
+      }
+      else r = dir * nameOf(a).localeCompare(nameOf(b));
+      return r || nameOf(a).localeCompare(nameOf(b));
+    });
+    if (!shown.length) {
+      var em = document.createElement('div'); em.className = 'empty';
+      em.textContent = q ? 'No jobs match "' + jobQuery.trim() + '"' : 'No jobs';
+      list.appendChild(em);
+      return;
+    }
+    shown.forEach(function (j) {
+      var aliases = j.id ? jobAliases(j) : [j.key];
+      var item = document.createElement('div');
+      item.className = 'jobitem' + (aliases.indexOf(isolatedJobKey) !== -1 ? ' lit' : '');
+      item.draggable = !!j.id;
+      item.title = j.id ? 'Drag onto a day to schedule an installation' : '';
+
+      // client name on top, address underneath
+      var ja = document.createElement('div');
+      ja.className = 'ja';
+      ja.textContent = j.client || j.addr || '(no client)';
+      item.appendChild(ja);
+      if (j.client && j.addr) {
+        var ad = document.createElement('div');
+        ad.className = 'jaddr';
+        ad.textContent = j.addr;
+        item.appendChild(ad);
+      }
+
+      var meta = document.createElement('div');
+      meta.className = 'jmeta';
+      if (j.stage && mappingsCache.type) meta.appendChild(pillSpan(j.stage, mappingsCache.type));
+      var n = 0;
+      aliases.forEach(function (k) { n = Math.max(n, counts[k] || 0); });
+      var expanded = !!expandedJobs[aliases[0]];
+      var cnt = document.createElement('span');
+      cnt.className = 'jcount';
+      cnt.textContent = n ? ((expanded ? '▾ ' : '▸ ') + n + (n === 1 ? ' visit' : ' visits')) : 'no visits';
+      if (n) {
+        cnt.title = 'Show this job’s installation dates';
+        cnt.addEventListener('click', function (e) {
+          e.stopPropagation();
+          expandedJobs[aliases[0]] = !expanded;
+          render();
+        });
+      }
+      meta.appendChild(cnt);
+      item.appendChild(meta);
+
+      // expanded: list every visit; click one to jump the calendar to that date
+      if (expanded && n) {
+        var box = document.createElement('div');
+        box.className = 'jvisits';
+        var visits = recordsCache.filter(function (r) {
+          return aliases.indexOf(jobKey(r)) !== -1 && gristToLocalDate(r[mappingsCache.startDate]);
+        }).sort(function (a, b) {
+          return gristToLocalDate(a[mappingsCache.startDate]) - gristToLocalDate(b[mappingsCache.startDate]);
+        });
+        visits.forEach(function (v, i) {
+          var row = document.createElement('div');
+          row.className = 'jvisit';
+          var d = gristToLocalDate(v[mappingsCache.startDate]);
+          var note = (mappingsCache.seqNote != null) ? fmtVal(v[mappingsCache.seqNote]) : '';
+          var vd = document.createElement('span');
+          vd.className = 'vd';
+          vd.textContent = (i + 1) + '/' + visits.length + ' · ' + fmtShort(d) + ' ' + d.getFullYear();
+          row.appendChild(vd);
+          if (note) row.appendChild(document.createTextNode(' — ' + note));
+          row.title = 'Show this visit on the calendar';
+          row.addEventListener('click', function (e) {
+            e.stopPropagation();
+            refDate = new Date(d);
+            selectedRowId = v.id;
+            isolatedJobKey = jobKey(v);
+            grist.setCursorPos({ rowId: v.id });
+            render();
+          });
+          box.appendChild(row);
+        });
+        item.appendChild(box);
+      }
+
+      item.addEventListener('click', function () {
+        if (aliases.indexOf(isolatedJobKey) !== -1) {
+          isolatedJobKey = null;                 // click again to clear
+        } else {
+          // isolate under whichever alias the visit records actually use
+          var hit = aliases.filter(function (k) { return counts[k]; })[0];
+          isolatedJobKey = hit || aliases[0];
+        }
+        selectedRowId = null;
+        render();
+      });
+      item.addEventListener('dblclick', function (e) {
+        e.stopPropagation();
+        openJobDetails(j);
+      });
+      if (j.id) {
+        item.addEventListener('dragstart', function (e) {
+          e.dataTransfer.setData('application/x-mm-job', String(j.id));
+          e.dataTransfer.effectAllowed = 'copy';
+        });
+      }
+      list.appendChild(item);
+    });
+  }
+
+  function filterChip(host, bucket, val, label, dotColor) {
+    var chip = document.createElement('div');
+    chip.className = 'schip' + (filters[bucket][val] ? ' on' : '');
+    var sw = document.createElement('span'); sw.className = 'sw'; chip.appendChild(sw);
+    if (dotColor !== null) {
+      var dot = document.createElement('span'); dot.className = 'dot';
+      dot.style.background = dotColor || '#E8E8E8'; chip.appendChild(dot);
+    }
+    var sl = document.createElement('span'); sl.className = 'slabel'; sl.textContent = label; chip.appendChild(sl);
+    chip.addEventListener('click', function () {
+      filters[bucket][val] = !filters[bucket][val];
+      render();
+    });
+    host.appendChild(chip);
+  }
+  function sectionHead(host, label) {
+    var h = document.createElement('div'); h.className = 'fhead'; h.textContent = label; host.appendChild(h);
+  }
+  function sectionDefs() {
+    var defs = [];
+    var stageOpts = (mappingsCache.type ? colMeta(mappingsCache.type).choiceOptions : {}) || {};
+    if (Object.keys(stageOpts).length) {
+      defs.push({ key: 'stage', label: 'Stage', values: Object.keys(stageOpts),
+        dot: function (v) { return (stageOpts[v] || {}).fillColor; }, name: function (v) { return v; } });
+    }
+    var ac = assigneeColId();
+    var aOpts = ac ? (colMeta(ac).choiceOptions || {}) : {};
+    if (Object.keys(aOpts).length) {
+      defs.push({ key: 'assignee', label: colLabel(ac), values: Object.keys(aOpts),
+        dot: function () { return null; }, name: function (v) { return v; } });   // no colour for assignees
+    }
+    var vnames = { '0': 'No visits', '1': '1 visit', '2+': '2+ visits' };
+    defs.push({ key: 'visits', label: 'Visits', values: ['0', '1', '2+'],
+      dot: function () { return null; }, name: function (v) { return vnames[v]; } });
+    return defs;
+  }
+  function clearAllRow(host) {
+    if (!filterCount()) return;
+    var row = document.createElement('div');
+    row.className = 'fclearall';
+    row.textContent = 'Clear all filters';
+    row.addEventListener('click', function () {
+      filters = { stage: {}, assignee: {}, visits: {} };
+      render();
+    });
+    host.appendChild(row);
+  }
+  function updateFilterBadge() {
+    var n = filterCount();
+    var badge = document.getElementById('filterCount');
+    var btn = document.getElementById('filterBtn');
+    if (badge) { badge.textContent = n; badge.classList.toggle('show', n > 0); }
+    if (btn) btn.classList.toggle('active', n > 0);
+  }
+  function renderSortMenu() {
+    var host = document.getElementById('sortMenu');
+    if (!host) return;
+    host.innerHTML = '';
+    var hint = document.createElement('div');
+    hint.className = 'shint';
+    hint.textContent = 'Click the active option again to reverse';
+    host.appendChild(hint);
+    SORT_OPTS.forEach(function (o) {
+      var on = sortBy.key === o.key;
+      var row = document.createElement('div');
+      row.className = 'srow' + (on ? ' on' : '');
+      var lbl = document.createElement('span'); lbl.textContent = o.label; row.appendChild(lbl);
+      if (on) {
+        var ar = document.createElement('span');
+        ar.className = 'sarrow';
+        ar.textContent = sortBy.dir === 1 ? '↑' : '↓';
+        row.appendChild(ar);
+      }
+      row.addEventListener('click', function () {
+        if (sortBy.key === o.key) sortBy.dir = -sortBy.dir;      // reverse
+        else sortBy = { key: o.key, dir: o.key === 'visits' ? -1 : 1 };  // visits default: most first
+        grist.setOption('sort', sortBy);
+        render();
+      });
+      host.appendChild(row);
+    });
+    var btn = document.getElementById('sortBtn');
+    if (btn) btn.classList.toggle('active', !(sortBy.key === 'client' && sortBy.dir === 1));
+  }
+  function renderFilterPanel() {
+    var host = document.getElementById('stageFilter');
+    if (!host || !mappingsCache) return;
+    host.innerHTML = '';
+    var defs = sectionDefs();
+
+    var def = filterView && defs.filter(function (d) { return d.key === filterView; })[0];
+    if (def) {
+      // ---- drilled-in view: back + the category's toggles ----
+      var back = document.createElement('div');
+      back.className = 'fback';
+      back.textContent = '‹ Back';
+      back.addEventListener('click', function () { filterView = null; renderFilterPanel(); });
+      host.appendChild(back);
+      sectionHead(host, def.label);
+      def.values.forEach(function (v) { filterChip(host, def.key, v, def.name(v), def.dot(v)); });
+      if (activeKeys(filters[def.key]).length) {
+        var c = document.createElement('span'); c.className = 'clear'; c.textContent = 'Clear ' + def.label.toLowerCase();
+        c.addEventListener('click', function () { filters[def.key] = {}; render(); });
+        host.appendChild(c);
+      }
+      clearAllRow(host);
+      updateFilterBadge();
+      return;
+    }
+
+    // ---- root view: the three categories, with current picks under each ----
+    defs.forEach(function (d) {
+      var row = document.createElement('div');
+      row.className = 'frow';
+      var lbl = document.createElement('span'); lbl.textContent = d.label; row.appendChild(lbl);
+      var picked = activeKeys(filters[d.key]);
+      if (picked.length) {
+        var num = document.createElement('span'); num.className = 'fnum'; num.textContent = picked.length;
+        row.appendChild(num);
+      }
+      var caret = document.createElement('span'); caret.className = 'fcaret'; caret.textContent = '›'; row.appendChild(caret);
+      row.addEventListener('click', function () { filterView = d.key; renderFilterPanel(); });
+      host.appendChild(row);
+      if (picked.length) {
+        var sel = document.createElement('div');
+        sel.className = 'fsel';
+        sel.textContent = picked.map(d.name).join(', ');
+        host.appendChild(sel);
+      }
+    });
+    clearAllRow(host);
+    updateFilterBadge();
+  }
+
+  // ---- saved views (named filter + sort + calendar-mode sets) ----
+  function findView(name) {
+    if (name == null) return null;
+    for (var i = 0; i < savedViews.length; i++) if (savedViews[i].name === name) return savedViews[i];
+    return null;
+  }
+  // snapshot of everything a view remembers, with only the active filter keys kept
+  function currentSnapshot() {
+    var f = { stage: {}, assignee: {}, visits: {} };
+    ['stage', 'assignee', 'visits'].forEach(function (b) {
+      Object.keys(filters[b]).forEach(function (k) { if (filters[b][k]) f[b][k] = true; });
+    });
+    return { filters: f, sortBy: { key: sortBy.key, dir: sortBy.dir }, view: view };
+  }
+  // stable signature so we can tell whether the live state still matches a saved view
+  function snapSig(s) {
+    var f = {};
+    ['stage', 'assignee', 'visits'].forEach(function (b) {
+      var ks = Object.keys(s.filters[b] || {}).filter(function (k) { return s.filters[b][k]; }).sort();
+      if (ks.length) f[b] = ks;
+    });
+    return JSON.stringify({ f: f, s: s.sortBy || null, v: s.view || null });
+  }
+  function isViewDirty() {
+    var v = findView(activeViewName);
+    if (!v) return false;
+    return snapSig(currentSnapshot()) !== snapSig({ filters: v.filters, sortBy: v.sortBy, view: v.view });
+  }
+  function persistViews() {
+    grist.setOption('savedViews', savedViews);
+    grist.setOption('activeView', activeViewName || '');
+  }
+  function applyView(v, silent) {
+    filters = { stage: {}, assignee: {}, visits: {} };
+    ['stage', 'assignee', 'visits'].forEach(function (b) {
+      var src = (v.filters && v.filters[b]) || {};
+      Object.keys(src).forEach(function (k) { if (src[k]) filters[b][k] = true; });
+    });
+    if (v.sortBy && v.sortBy.key) sortBy = { key: v.sortBy.key, dir: v.sortBy.dir };
+    if (v.view) {
+      view = v.view;
+      var sel = document.getElementById('viewSel');
+      if (sel) sel.value = view;
+    }
+    activeViewName = v.name;
+    filterView = null;
+    if (!silent) persistViews();
+    render();
+  }
+  function saveViewAs() {
+    var name = prompt('Name this view (e.g. "In progress", "My jobs", "Melbourne"):', '');
+    if (name === null) return;
+    name = name.trim();
+    if (!name) return;
+    var snap = currentSnapshot();
+    var existing = findView(name);
+    if (existing) {
+      if (!confirm('A view named "' + name + '" already exists. Overwrite it?')) return;
+      existing.filters = snap.filters; existing.sortBy = snap.sortBy; existing.view = snap.view;
+    } else {
+      savedViews.push({ name: name, filters: snap.filters, sortBy: snap.sortBy, view: snap.view });
+    }
+    activeViewName = name;
+    persistViews();
+    render();
+  }
+  function updateActiveView() {
+    var v = findView(activeViewName);
+    if (!v) return;
+    var snap = currentSnapshot();
+    v.filters = snap.filters; v.sortBy = snap.sortBy; v.view = snap.view;
+    persistViews();
+    render();
+  }
+  function deleteView(name) {
+    savedViews = savedViews.filter(function (v) { return v.name !== name; });
+    if (activeViewName === name) activeViewName = null;
+    persistViews();
+    render();
+  }
+  function clearActiveView() {
+    filters = { stage: {}, assignee: {}, visits: {} };
+    activeViewName = null;
+    filterView = null;
+    persistViews();
+    render();
+  }
+  function updateViewsBtn() {
+    var btn = document.getElementById('viewsBtn');
+    if (!btn) return;
+    var nameEl = btn.querySelector('.vname');
+    var dirtyEl = btn.querySelector('.vdirty');
+    if (activeViewName) {
+      nameEl.textContent = activeViewName;
+      btn.classList.add('active');
+    } else {
+      nameEl.textContent = 'All jobs';
+      btn.classList.remove('active');
+    }
+    if (dirtyEl) dirtyEl.style.display = isViewDirty() ? 'inline' : 'none';
+  }
+  function renderViewsMenu() {
+    var host = document.getElementById('viewsMenu');
+    if (!host) return;
+    host.innerHTML = '';
+    var hd = document.createElement('div'); hd.className = 'fhead'; hd.textContent = 'Saved views'; host.appendChild(hd);
+    if (!savedViews.length) {
+      var em = document.createElement('div'); em.className = 'vempty'; em.textContent = 'None yet — set up filters/sort, then Save current as…';
+      host.appendChild(em);
+    }
+    savedViews.slice().sort(function (a, b) { return a.name.toLowerCase().localeCompare(b.name.toLowerCase()); })
+      .forEach(function (v) {
+        var row = document.createElement('div');
+        row.className = 'vrow' + (v.name === activeViewName ? ' on' : '');
+        var lbl = document.createElement('span'); lbl.className = 'vlabel'; lbl.textContent = v.name; row.appendChild(lbl);
+        if (v.name === activeViewName) {
+          var tick = document.createElement('span'); tick.className = 'vtick'; tick.textContent = '✓'; row.appendChild(tick);
+        }
+        var del = document.createElement('span'); del.className = 'vdel'; del.textContent = '×'; del.title = 'Delete this view';
+        del.addEventListener('click', function (e) {
+          e.stopPropagation();
+          if (confirm('Delete the view "' + v.name + '"?')) deleteView(v.name);
+        });
+        row.appendChild(del);
+        row.addEventListener('click', function () { applyView(v, false); closeMenus(); });
+        host.appendChild(row);
+      });
+    var sep = document.createElement('div'); sep.className = 'vsep'; host.appendChild(sep);
+    if (activeViewName && isViewDirty()) {
+      var upd = document.createElement('div'); upd.className = 'vaction';
+      upd.textContent = '⟳ Update "' + activeViewName + '"';
+      upd.title = 'Save the current filters/sort into this view';
+      upd.addEventListener('click', function () { updateActiveView(); });
+      host.appendChild(upd);
+    }
+    var save = document.createElement('div'); save.className = 'vaction'; save.textContent = '＋ Save current as…';
+    save.addEventListener('click', function () { saveViewAs(); });
+    host.appendChild(save);
+    if (activeViewName || filterCount()) {
+      var clr = document.createElement('div'); clr.className = 'vaction danger'; clr.textContent = '✕ Clear (show all jobs)';
+      clr.addEventListener('click', function () { clearActiveView(); });
+      host.appendChild(clr);
+    }
+  }
+
+  // ---- job details popup ----
+  // coloured pill using the JOBS table's choiceOptions
+  function jmPill(val, colId) {
+    var opts = ((jobMetaByColId[colId] || {}).choiceOptions || {})[val] || {};
+    var s = document.createElement('span');
+    s.className = 'pill';
+    s.style.background = opts.fillColor || '#E8E8E8';
+    s.style.color = opts.textColor || '#000000';
+    s.textContent = val;
+    return s;
+  }
+  // find the sidebar job a calendar visit belongs to (or synthesise a minimal one)
+  function jobForRecord(rec) {
+    var key = jobKey(rec);
+    var jobs = (jobsCache && jobsCache.length) ? jobsCache : jobsFromRecords();
+    var found = jobs.filter(function (j) { return (j.id ? jobAliases(j) : [j.key]).indexOf(key) !== -1; })[0];
+    if (found) return found;
+    return { id: null, key: key, addr: '', client: fmtVal(rec[mappingsCache.title]), stage: stageOf(rec), assigned: [], jid: '', raw: null };
+  }
+  function jobVisits(job) {
+    var aliases = job.id ? jobAliases(job) : [job.key];
+    return recordsCache.filter(function (r) {
+      return aliases.indexOf(jobKey(r)) !== -1 && gristToLocalDate(r[mappingsCache.startDate]);
+    }).sort(function (a, b) {
+      return gristToLocalDate(a[mappingsCache.startDate]) - gristToLocalDate(b[mappingsCache.startDate]);
+    });
+  }
+  function jmRow(host, label, value) {
+    var row = document.createElement('div'); row.className = 'jm-row';
+    var k = document.createElement('div'); k.className = 'jm-k'; k.textContent = label; row.appendChild(k);
+    var v = document.createElement('div'); v.className = 'jm-v';
+    if (typeof value === 'string') v.textContent = value; else v.appendChild(value);
+    row.appendChild(v); host.appendChild(row);
+  }
+  // assignees shown as neutral initials avatars + name (no colour)
+  function jmAssignees(names) {
+    var wrap = document.createElement('span');
+    if (!names.length) { wrap.textContent = '—'; return wrap; }
+    names.forEach(function (nm, i) {
+      if (i) wrap.appendChild(document.createTextNode('  '));
+      wrap.appendChild(avatarSpan(nm));
+      wrap.appendChild(document.createTextNode(' ' + nm));
+    });
+    return wrap;
+  }
+  // build every populated field descriptor {id,label,node} for a job (before ordering/hiding)
+  function buildDetailFields(job) {
+    var fields = [];
+    if (job.jid) fields.push({ id: 'jid', label: 'Job ID', node: job.jid });
+    if (job.client) fields.push({ id: 'client', label: 'Client', node: job.client });
+    if (job.addr) fields.push({ id: 'addr', label: 'Address', node: job.addr });
+    if (job.stage) {
+      var sp = (mappingsCache && mappingsCache.type) ? pillSpan(job.stage, mappingsCache.type) : jmPill(job.stage, JOB_COLS.stage);
+      fields.push({ id: 'stage', label: 'Stage', node: sp });
+    }
+    fields.push({ id: 'assigned', label: 'Assigned to', node: jmAssignees(job.assigned || []) });
+
+    var skip = {}; [JOB_COLS.addr, JOB_COLS.client, JOB_COLS.stage, JOB_COLS.assigned, JOB_COLS.jid, 'Client_Name'].forEach(function (c) { skip[c] = 1; });
+    if (job.raw) {
+      Object.keys(job.raw).forEach(function (colId) {
+        if (skip[colId] || colId.indexOf('gristHelper_') === 0) return;
+        var meta = jobMetaByColId[colId] || {}, type = meta.type || '', val = job.raw[colId], node;
+        if (type.indexOf('Ref:') === 0 || type.indexOf('RefList:') === 0 || type === 'Attachments') return;
+        if ((val === null || val === undefined || val === '' || val === 0) && !(type === 'Bool' && val === true)) return;
+        if (type === 'Bool') { if (!val) return; node = 'Yes'; }
+        else if (type === 'Date' || type === 'DateTime') { var d = gristToLocalDate(val); if (!d) return; node = fmtDate(d); }
+        else if (type === 'ChoiceList') {
+          var vals = listVals(val); if (!vals.length) return;
+          node = document.createElement('span');
+          vals.forEach(function (vv, i) { if (i) node.appendChild(document.createTextNode(' ')); node.appendChild(jmPill(vv, colId)); });
+        }
+        else if (type === 'Choice') { node = jmPill(String(val), colId); }
+        else { node = fmtVal(val); if (node === '') return; }
+        fields.push({ id: colId, label: meta.label || colId, node: node });
+      });
+    }
+    return fields;
+  }
+  // apply the saved arrangement: reorder by detailLayout.order, drop hidden
+  function orderedDetailFields(fields) {
+    var byId = {}; fields.forEach(function (f) { byId[f.id] = f; });
+    var seen = {}, out = [];
+    (detailLayout.order || []).forEach(function (id) {
+      if (byId[id] && !detailLayout.hidden[id]) { out.push(byId[id]); seen[id] = 1; }
+    });
+    fields.forEach(function (f) { if (!seen[f.id] && !detailLayout.hidden[f.id]) out.push(f); });
+    return out;
+  }
+  function openJobDetails(job) {
+    currentDetailJob = job;
+    var modal = document.getElementById('jobModal');
+    document.getElementById('jobModalCard').classList.remove('editing');
+    var body = modal.querySelector('.jm-body');
+    modal.querySelector('.jm-title').textContent = job.client || job.addr || (job.jid ? 'Job ' + job.jid : 'Job details');
+    body.innerHTML = '';
+
+    orderedDetailFields(buildDetailFields(job)).forEach(function (f) { jmRow(body, f.label, f.node); });
+
+    if (detailLayout.hidden['__installations']) { finishJobModal(job); return; }
+    var vh = document.createElement('div'); vh.className = 'jm-sec'; vh.textContent = 'Installations'; body.appendChild(vh);
+    var visits = mappingsCache ? jobVisits(job) : [];
+    if (!visits.length) {
+      var em = document.createElement('div'); em.className = 'jm-empty'; em.textContent = 'No installation dates yet.'; body.appendChild(em);
+    } else {
+      visits.forEach(function (v, i) {
+        var d = gristToLocalDate(v[mappingsCache.startDate]);
+        var note = (mappingsCache.seqNote != null) ? fmtVal(v[mappingsCache.seqNote]) : '';
+        var row = document.createElement('div'); row.className = 'jm-visit';
+        var vd = document.createElement('span'); vd.className = 'vd';
+        vd.textContent = (i + 1) + '/' + visits.length + ' · ' + fmtDate(d);
+        row.appendChild(vd);
+        if (note) row.appendChild(document.createTextNode(' — ' + note));
+        body.appendChild(row);
+      });
+    }
+
+    finishJobModal(job);
+  }
+  // footer (Edit-in-Inbox) + reveal the modal — shared by both openJobDetails paths
+  function finishJobModal(job) {
+    var modal = document.getElementById('jobModal');
+    var tgt = inboxTargetFor(job);
+    var edit = modal.querySelector('.jm-edit'), hint = modal.querySelector('.jm-hint');
+    if (tgt.url) {
+      edit.href = tgt.url; edit.classList.remove('disabled');
+      edit.textContent = '✎ Edit in ' + tgt.name;
+      hint.textContent = 'Opens the ' + tgt.name + ' inbox with this job selected.';
+    } else {
+      edit.href = '#'; edit.classList.add('disabled');
+      edit.textContent = '✎ Edit';
+      hint.textContent = 'No linked job record to open.';
+    }
+    modal.classList.add('open');
+  }
+  function closeJobModal() {
+    document.getElementById('jobModal').classList.remove('open');
+    document.getElementById('jobModalCard').classList.remove('editing');
+    var g = document.querySelector('.jm-gear'); if (g) g.classList.remove('on');
+  }
+
+  // ---- details-popup layout editor (the pencil) ----
+  function detailCandidates() {
+    // stable universe of configurable fields: core + every non-ref jobs column + installations
+    var ids = ['jid', 'client', 'addr', 'stage', 'assigned'];
+    var skip = {}; [JOB_COLS.addr, JOB_COLS.client, JOB_COLS.stage, JOB_COLS.assigned, JOB_COLS.jid, 'Client_Name'].forEach(function (c) { skip[c] = 1; });
+    Object.keys(jobMetaByColId).forEach(function (colId) {
+      if (skip[colId] || colId.indexOf('gristHelper_') === 0) return;
+      var t = jobMetaByColId[colId].type || '';
+      if (t.indexOf('Ref:') === 0 || t.indexOf('RefList:') === 0 || t === 'Attachments') return;
+      ids.push(colId);
+    });
+    ids.push('__installations');
+    var seen = {}, ordered = [];
+    (detailLayout.order || []).forEach(function (id) { if (ids.indexOf(id) !== -1 && !seen[id]) { ordered.push(id); seen[id] = 1; } });
+    ids.forEach(function (id) { if (!seen[id]) { ordered.push(id); seen[id] = 1; } });
+    return ordered;
+  }
+  function detailLabel(id) {
+    if (id === '__installations') return 'Installation dates';
+    if (DETAIL_CORE[id]) return DETAIL_CORE[id];
+    return (jobMetaByColId[id] || {}).label || id;
+  }
+  function saveDetailLayout() { try { grist.setOption('detailLayout', detailLayout); } catch (e) {} }
+  function renderLayoutEditor() {
+    var host = document.querySelector('#jobModal .jm-editor');
+    host.innerHTML = '';
+    var note = document.createElement('div'); note.className = 'jm-editnote';
+    note.textContent = 'Toggle a field to show or hide it. Drag the handle to reorder. Applies to every job.';
+    host.appendChild(note);
+    detailCandidates().forEach(function (id) {
+      var on = !detailLayout.hidden[id];
+      var row = document.createElement('div');
+      row.className = 'jm-fld' + (on ? ' on' : ' hidden-fld');
+      row.draggable = true; row.dataset.fid = id;
+      var grip = document.createElement('span'); grip.className = 'grip'; grip.textContent = '⠿'; row.appendChild(grip);
+      var lbl = document.createElement('span'); lbl.className = 'flbl'; lbl.textContent = detailLabel(id); row.appendChild(lbl);
+      var sw = document.createElement('span'); sw.className = 'fsw'; row.appendChild(sw);
+      row.addEventListener('click', function (e) {
+        if (e.target === grip) return;
+        detailLayout.hidden[id] = on;
+        saveDetailLayout(); renderLayoutEditor();
+      });
+      row.addEventListener('dragstart', function (e) { row.classList.add('dragging'); e.dataTransfer.setData('text/plain', id); e.dataTransfer.effectAllowed = 'move'; });
+      row.addEventListener('dragend', function () { row.classList.remove('dragging'); });
+      row.addEventListener('dragover', function (e) { e.preventDefault(); });
+      row.addEventListener('drop', function (e) {
+        e.preventDefault();
+        var from = e.dataTransfer.getData('text/plain'); if (!from || from === id) return;
+        var order = detailCandidates();
+        order.splice(order.indexOf(from), 1);
+        var r = row.getBoundingClientRect();
+        order.splice(order.indexOf(id) + (e.clientY > r.top + r.height / 2 ? 1 : 0), 0, from);
+        detailLayout.order = order;
+        saveDetailLayout(); renderLayoutEditor();
+      });
+      host.appendChild(row);
+    });
+    var reset = document.createElement('div'); reset.className = 'jm-editreset'; reset.textContent = 'Reset to default';
+    reset.addEventListener('click', function () { detailLayout = { order: [], hidden: {} }; saveDetailLayout(); renderLayoutEditor(); });
+    host.appendChild(reset);
+  }
+  function openLayoutEditor() {
+    document.getElementById('jobModalCard').classList.add('editing');
+    document.querySelector('.jm-gear').classList.add('on');
+    renderLayoutEditor();
+  }
+  function closeLayoutEditor() {
+    document.getElementById('jobModalCard').classList.remove('editing');
+    document.querySelector('.jm-gear').classList.remove('on');
+    if (currentDetailJob) openJobDetails(currentDetailJob);
+  }
+
+  // ---- calendar rendering ----
+  function render() {
+    var cal = document.getElementById('cal');
+    cal.innerHTML = '';
+    if (!mappingsCache) { updateRangeLabel(); return; }
+    seqById = computeSeq();
+    var byDay = eventsByDay();
+    var today = new Date(); today.setHours(0,0,0,0);
+
+    if (view === 'month') {
+      var wrap = document.createElement('div'); wrap.id = 'monthwrap';
+      var head = document.createElement('div'); head.className = 'mhead';
+      DAYS.forEach(function (n) { var h = document.createElement('div'); h.textContent = n; head.appendChild(h); });
+      wrap.appendChild(head);
+      var first = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
+      var last = new Date(refDate.getFullYear(), refDate.getMonth()+1, 0);
+      var cur = weekStart(first);
+      while (cur <= last) {
+        var row = document.createElement('div'); row.className = 'mrow';
+        for (var i = 0; i < 7; i++) {
+          var day = addDays(cur, i);
+          var cell = document.createElement('div');
+          cell.className = 'mcell' + (day.getMonth() !== refDate.getMonth() ? ' other' : '') + (sameDay(day, today) ? ' today' : '');
+          var dn = document.createElement('div'); dn.className = 'dnum'; dn.textContent = day.getDate();
+          cell.appendChild(dn);
+          (byDay[dkey(day)] || []).forEach(function (rec) { cell.appendChild(makeCard(rec)); });
+          makeDropTarget(cell, day);
+          row.appendChild(cell);
+        }
+        wrap.appendChild(row);
+        cur = addDays(cur, 7);
+      }
+      cal.appendChild(wrap);
+    } else {
+      var n = view === 'day' ? 1 : 7;
+      var start = view === 'day' ? new Date(refDate) : weekStart(refDate);
+      var cols = document.createElement('div'); cols.className = 'cols';
+      for (var j = 0; j < n; j++) {
+        var day2 = addDays(start, j);
+        var isToday = sameDay(day2, today);
+        var colEl = document.createElement('div'); colEl.className = 'daycol' + (isToday ? ' today' : '');
+        var dh = document.createElement('div');
+        dh.className = 'dayhead' + (isToday ? ' today' : '');
+        dh.innerHTML = '<span class="num">' + day2.getDate() + '</span>' + DAYS[(day2.getDay()+6)%7];
+        colEl.appendChild(dh);
+        var body = document.createElement('div'); body.className = 'daybody';
+        (byDay[dkey(day2)] || []).forEach(function (rec) { body.appendChild(makeCard(rec)); });
+        makeDropTarget(body, day2);
+        colEl.appendChild(body);
+        cols.appendChild(colEl);
+      }
+      cal.appendChild(cols);
+    }
+    updateRangeLabel();
+    renderSidebar();
+    renderFilterPanel();
+    renderSortMenu();
+    renderViewsMenu();
+    updateViewsBtn();
+    // two-way highlight: bring the isolated job into view in the sidebar
+    if (isolatedJobKey && isolatedJobKey !== lastScrolledKey) {
+      var litItem = document.querySelector('.jobitem.lit');
+      if (litItem && litItem.scrollIntoView) litItem.scrollIntoView({ block: 'nearest' });
+    }
+    lastScrolledKey = isolatedJobKey;
+  }
+
+  function updateRangeLabel() {
+    var el = document.getElementById('rangeLabel');
+    if (view === 'month') {
+      el.textContent = MONTHS[refDate.getMonth()] + ' ' + refDate.getFullYear();
+    } else if (view === 'day') {
+      el.textContent = fmtDate(refDate);
+    } else {
+      var s = weekStart(refDate), e = addDays(s, 6);
+      el.textContent = fmtShort(s) + ' – ' + fmtDate(e);
+    }
+  }
+
+  function navigate(dir) {  // dir = -1 | 0 | 1
+    if (dir === 0) { refDate = new Date(); refDate.setHours(0,0,0,0); }
+    else if (view === 'month') refDate = new Date(refDate.getFullYear(), refDate.getMonth()+dir, 1);
+    else refDate = addDays(refDate, dir * (view === 'day' ? 1 : 7));
+    render();
+  }
+
+  // ---- column metadata + jobs table (needs full access) ----
+  function loadMeta() {
+    return grist.getTable().getTableId().then(function (tableId) {
+      return Promise.all([
+        grist.docApi.fetchTable('_grist_Tables'),
+        grist.docApi.fetchTable('_grist_Tables_column')
+      ]).then(function (res) {
+        var tables = res[0], cols = res[1];
+        var tref = tables.id[tables.tableId.indexOf(tableId)];
+        var m = {};
+        for (var i = 0; i < cols.id.length; i++) {
+          if (cols.parentId[i] !== tref) continue;
+          var co = {};
+          try { co = (JSON.parse(cols.widgetOptions[i] || '{}')).choiceOptions || {}; } catch (e) {}
+          m[cols.colId[i]] = { label: cols.label[i] || cols.colId[i], type: cols.type[i] || '', choiceOptions: co };
+        }
+        metaByColId = m;
+      });
+    }).catch(function (err) { console.warn('metadata read failed', err); });
+  }
+
+  function loadJobs() {
+    // the groupBy column is Ref:<JobsTable>; fetch that table so ALL jobs are listed
+    if (!mappingsCache || mappingsCache.groupBy == null) { jobsCache = null; return Promise.resolve(); }
+    var t = colMeta(mappingsCache.groupBy).type || '';
+    if (t.indexOf('Ref:') !== 0) { jobsCache = null; return Promise.resolve(); }
+    var jobsTable = t.slice(4);
+    return Promise.all([
+      grist.docApi.fetchTable(jobsTable),
+      grist.docApi.fetchTable('_grist_Tables'),
+      grist.docApi.fetchTable('_grist_Tables_column')
+    ]).then(function (res) {
+      var data = res[0], tables = res[1], cols = res[2];
+      // column metadata for the jobs table (labels/types/colours) — powers the details popup
+      var tref = tables.id[tables.tableId.indexOf(jobsTable)];
+      var jm = {};
+      for (var c = 0; c < cols.id.length; c++) {
+        if (cols.parentId[c] !== tref) continue;
+        var co = {};
+        try { co = (JSON.parse(cols.widgetOptions[c] || '{}')).choiceOptions || {}; } catch (e) {}
+        jm[cols.colId[c]] = { label: cols.label[c] || cols.colId[c], type: cols.type[c] || '', choiceOptions: co };
+      }
+      jobMetaByColId = jm;
+      var colIds = Object.keys(data).filter(function (k) { return k !== 'id' && k !== 'manualSort'; });
+      var out = [];
+      var n = (data.id || []).length;
+      for (var i = 0; i < n; i++) {
+        var raw = {};
+        colIds.forEach(function (k) { raw[k] = data[k][i]; });   // full row for the details view
+        out.push({
+          id: data.id[i],
+          key: 'g:' + data.id[i],
+          addr: data[JOB_COLS.addr] ? String(data[JOB_COLS.addr][i] || '') : '',
+          client: data[JOB_COLS.client] ? String(data[JOB_COLS.client][i] || '') : '',
+          stage: data[JOB_COLS.stage] ? String(data[JOB_COLS.stage][i] || '') : '',
+          assigned: data[JOB_COLS.assigned] ? listVals(data[JOB_COLS.assigned][i]) : [],
+          jid: data[JOB_COLS.jid] ? String(data[JOB_COLS.jid][i] || '') : '',
+          raw: raw
+        });
+      }
+      jobsCache = out;
+    }).catch(function (err) { console.warn('jobs table read failed', err); jobsCache = null; });
+  }
+
+  // ---- toolbar + sidebar controls ----
+  document.getElementById('btnToday').addEventListener('click', function () { navigate(0); });
+  document.getElementById('btnPrev').addEventListener('click', function () { navigate(-1); });
+  document.getElementById('btnNext').addEventListener('click', function () { navigate(1); });
+  document.getElementById('viewSel').addEventListener('change', function (e) {
+    view = e.target.value;
+    grist.setOption('view', view);
+    render();
+  });
+  document.getElementById('jobSearch').addEventListener('input', function (e) {
+    jobQuery = e.target.value;
+    renderSidebar();
+  });
+  function closeMenus() {
+    ['stageFilter', 'sortMenu', 'viewsMenu', 'filterBtn', 'sortBtn', 'viewsBtn'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.classList.remove('open');
+    });
+  }
+  document.getElementById('filterBtn').addEventListener('click', function (e) {
+    e.stopPropagation();
+    var willOpen = !document.getElementById('stageFilter').classList.contains('open');
+    closeMenus();
+    if (willOpen) {
+      document.getElementById('stageFilter').classList.add('open');
+      this.classList.add('open');
+      filterView = null; renderFilterPanel();   // always start at the category list
+    }
+  });
+  document.getElementById('sortBtn').addEventListener('click', function (e) {
+    e.stopPropagation();
+    var willOpen = !document.getElementById('sortMenu').classList.contains('open');
+    closeMenus();
+    if (willOpen) {
+      document.getElementById('sortMenu').classList.add('open');
+      this.classList.add('open');
+      renderSortMenu();
+    }
+  });
+  document.getElementById('viewsBtn').addEventListener('click', function (e) {
+    e.stopPropagation();
+    var willOpen = !document.getElementById('viewsMenu').classList.contains('open');
+    closeMenus();
+    if (willOpen) {
+      document.getElementById('viewsMenu').classList.add('open');
+      this.classList.add('open');
+      renderViewsMenu();
+    }
+  });
+  document.getElementById('stageFilter').addEventListener('click', function (e) { e.stopPropagation(); });
+  document.getElementById('sortMenu').addEventListener('click', function (e) { e.stopPropagation(); });
+  document.getElementById('viewsMenu').addEventListener('click', function (e) { e.stopPropagation(); });
+  document.addEventListener('click', closeMenus);
+
+  // ---- job details popup: close + edit controls ----
+  document.querySelector('#jobModal .jm-close').addEventListener('click', closeJobModal);
+  document.querySelector('#jobModal .jm-gear').addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (document.getElementById('jobModalCard').classList.contains('editing')) closeLayoutEditor();
+    else openLayoutEditor();
+  });
+  document.querySelector('#jobModal .jm-donebtn').addEventListener('click', function (e) { e.stopPropagation(); closeLayoutEditor(); });
+  document.getElementById('jobModal').addEventListener('click', function (e) {
+    if (e.target === this) closeJobModal();          // click the backdrop to close
+  });
+  document.getElementById('jobModalCard').addEventListener('click', function (e) { e.stopPropagation(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeJobModal();
+  });
+  (function () {
+    var wrap = document.getElementById('wrap');
+    var btn = document.getElementById('btnJobs');
+    function apply() {
+      wrap.classList.toggle('collapsed', !sidebarOpen);
+      btn.classList.toggle('active', sidebarOpen);
+    }
+    btn.classList.add('active');
+    btn.addEventListener('click', function () {
+      sidebarOpen = !sidebarOpen;
+      grist.setOption('sidebar', sidebarOpen);
+      apply();
+      if (sidebarOpen) { var s = document.getElementById('jobSearch'); if (s) s.focus(); }
+    });
+    window._applySidebar = apply;
+  })();
+  document.getElementById('cal').addEventListener('click', function () {
+    if (isolatedJobKey || selectedRowId) { isolatedJobKey = null; selectedRowId = null; render(); }
+  });
+
+  // ---- grist wiring ----
+  grist.ready({
+    requiredAccess: 'full',
+    columns: [
+      { name: 'startDate', title: 'Installation date', type: 'Date,DateTime', description: 'Day the visit is shown on' },
+      { name: 'title', title: 'Title', type: 'Text', description: 'Bold text shown on the card' },
+      { name: 'type', title: 'Colour by', optional: true, description: 'Choice column used for the title colour + stage filter (e.g. Stage)' },
+      { name: 'details', title: 'Detail lines', optional: true, allowMultiple: true, description: 'Extra fields shown under the title' },
+      { name: 'seqNote', title: 'Visit note', optional: true, description: 'Per-visit note shown in the bottom "Installation n/N: note" line' },
+      { name: 'groupBy', title: 'Group by (job)', optional: true, description: 'Reference to the job — links visits together and powers the jobs sidebar' },
+      { name: 'orderBy', title: 'Manual order', type: 'Numeric', optional: true, description: 'Numeric column that stores the hand-arranged order of cards within a day' }
+    ],
+    allowSelectBy: true
+  });
+
+  grist.onOptions(function (opts) {
+    if (!opts) return;
+    if (opts.view) {
+      view = opts.view;
+      document.getElementById('viewSel').value = view;
+    }
+    if (typeof opts.sidebar === 'boolean') {
+      sidebarOpen = opts.sidebar;
+      if (window._applySidebar) window._applySidebar();
+    }
+    if (opts.sort && opts.sort.key) sortBy = opts.sort;
+    if (opts.detailLayout && typeof opts.detailLayout === 'object') {
+      detailLayout = { order: opts.detailLayout.order || [], hidden: opts.detailLayout.hidden || {} };
+    }
+    if (Array.isArray(opts.savedViews)) savedViews = opts.savedViews;
+    if ('activeView' in opts) activeViewName = opts.activeView || null;
+    // restore the filters/sort of the saved view that was active last session — once
+    if (!viewsLoaded) {
+      viewsLoaded = true;
+      var v = findView(activeViewName);
+      if (v) { applyView(v, true); return; }
+    }
+    render();
+  });
+
+  function handleRecords(records, mappings) {
+    var msg = document.getElementById('msg');
+    if (!mappings || !mappings.startDate || !mappings.title) {
+      msg.style.display = 'block';
+      msg.textContent = 'Map the Installation date and Title columns in the widget panel on the right.';
+      return;
+    }
+    msg.style.display = 'none';
+    var mapChanged = !mappingsCache || JSON.stringify(mappingsCache) !== JSON.stringify(mappings);
+    mappingsCache = mappings;
+    recordsCache = records || [];
+    var pendingRec = pendingCursor && recordsCache.find(function (r) { return r.id === pendingCursor; });
+    if (pendingRec) {
+      grist.setCursorPos({ rowId: pendingCursor });   // now the section knows the row
+      if (isolatedJobKey) isolatedJobKey = jobKey(pendingRec);  // re-key off the real record
+      pendingCursor = null;
+    }
+    render();
+    if (mapChanged) { loadMeta().then(loadJobs).then(render); }
+    else { loadJobs().then(renderSidebar); }
+  }
+  grist.onRecords(handleRecords);
+  window._test = handleRecords;                                  // local debug hooks
+  window._setMeta = function (m) { metaByColId = m; render(); };
+  window._setJobs = function (j) { jobsCache = j; render(); };
+  window._setJobMeta = function (m) { jobMetaByColId = m; };
+  window._openJob = function (j) { openJobDetails(j); };
+  window._detailLayout = function () { return detailLayout; };
+
+  render();
+})();
+</script>
+</body>
+</html>

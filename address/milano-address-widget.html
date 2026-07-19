@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job (create / edit)</title>
+<script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+<style>
+  html,body{height:100%;margin:0}
+  *{box-sizing:border-box}
+  body{padding:1.4% 2.4%;display:grid;grid-template-columns:1fr;gap:.05em .8em;align-content:start;
+       font-family:Arial,Helvetica,sans-serif;font-size:clamp(11px,2.7vw,15px);
+       color:#1f3864;background:#fff}
+  #bar{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:.5em;margin-bottom:.15em}
+  #modeInfo{font-size:.85em;font-weight:600}
+  #toggle{font-size:.78em;padding:.3em .6em;border:1px solid #c7cdda;border-radius:.5em;background:#f4f6fb;color:#1f3864;cursor:pointer}
+  #toggle:disabled{opacity:.4;cursor:not-allowed}
+  .field{display:flex;flex-direction:column;min-width:0}
+  .field.wide,#save,#status{grid-column:1 / -1}
+  label.fld{font-size:.8em;color:#7a8194;margin:.16em 0 .05em}
+  input,select,textarea{width:100%;padding:.42em .6em;font-size:1em;color:#1f3864;
+       border:1px solid #c7cdda;border-radius:.5em;outline:none;font-family:inherit}
+  textarea{resize:vertical;min-height:1.9em}
+  input:focus,select:focus,textarea:focus{border-color:#1f3864}
+  #holder gmp-place-autocomplete{width:100%;font-size:1em}
+  #curaddr{font-size:.75em;color:#9aa0ab;margin-top:.1em;min-height:.9em}
+  .chips{display:flex;flex-wrap:wrap;gap:.35em .8em;padding:.15em 0}
+  .chips label{display:inline-flex;align-items:center;gap:.3em;font-size:.95em;color:#1f3864;cursor:pointer}
+  .chips input{width:auto;padding:0}
+  #save{margin-top:.35em;padding:.55em;font-size:1.02em;font-weight:600;
+       color:#fff;background:#1f3864;border:0;border-radius:.6em;cursor:pointer}
+  #save:disabled{background:#c7cdda;cursor:not-allowed}
+  #status{font-size:.78em;margin-top:.2em;min-height:1em}
+  .ok{color:#1a7f37}.err{color:#c00000}.muted{color:#9aa0ab}
+  @media (max-height:400px) and (min-width:300px){ body{grid-template-columns:1fr 1fr} }
+</style>
+</head>
+<body>
+  <div id="bar"><span id="modeInfo">New job</span><button id="toggle" disabled>Edit selected</button></div>
+
+  <div class="field"><label class="fld">Client</label>
+    <input id="client" list="clientlist" placeholder="Type / pick a client" autocomplete="off">
+    <datalist id="clientlist"></datalist></div>
+
+  <div class="field"><label class="fld">Job address</label><div id="holder"></div><div id="curaddr"></div></div>
+
+  <div class="field wide"><label class="fld">Assigned to</label>
+    <div id="assigned" class="chips">
+      <label><input type="checkbox" value="Julie">Julie</label>
+      <label><input type="checkbox" value="Phoebe">Phoebe</label>
+      <label><input type="checkbox" value="Nhi">Nhi</label>
+      <label><input type="checkbox" value="Thinh">Thinh</label>
+      <label><input type="checkbox" value="a Minh">a Minh</label>
+    </div></div>
+
+  <div class="field"><label class="fld">Stage</label>
+    <select id="stage">
+      <option>Quote</option><option>Scheduled</option><option>Live</option>
+      <option>In Progress</option><option>Completed</option><option>Cancelled</option><option>N/A</option>
+    </select></div>
+
+  <div class="field"><label class="fld">Note</label>
+    <textarea id="note" rows="2" placeholder="Optional note…"></textarea></div>
+
+  <button id="save" disabled>+ Create job</button>
+  <div id="status" class="muted">Loading…</div>
+<script>
+(function(){
+  var KEY=new URLSearchParams(location.search).get('key');
+  var $=function(id){return document.getElementById(id);};
+  var statusEl=$('status'),clientEl=$('client'),stageEl=$('stage'),noteEl=$('note'),
+      saveBtn=$('save'),toggleBtn=$('toggle'),modeInfo=$('modeInfo'),curaddr=$('curaddr'),listEl=$('clientlist');
+  var assignEls=document.querySelectorAll('#assigned input[type=checkbox]');
+  var pickedAddr='', clientMap={}, idToName={}, ready=false, currentRow=null, forceNew=false, mode='new';
+  function status(m,c){statusEl.textContent=m;statusEl.className=c||'muted';}
+
+  function computeMode(){ mode=(!forceNew && currentRow)?'edit':'new'; }
+  function updateUI(){
+    computeMode();
+    if(mode==='edit'){
+      modeInfo.textContent='Editing job'+(currentRow.Job_ID?(' #'+currentRow.Job_ID):'');
+      saveBtn.textContent='Update this job'; toggleBtn.textContent='+ New'; toggleBtn.disabled=false;
+    }else{
+      modeInfo.textContent='New job';
+      saveBtn.textContent='+ Create job'; toggleBtn.textContent='Edit selected'; toggleBtn.disabled=!currentRow;
+    }
+    refresh();
+  }
+  function refresh(){ saveBtn.disabled = !ready || (mode==='new' && !clientEl.value.trim()) || (mode==='edit' && !currentRow); }
+  function clearForm(){
+    clientEl.value=''; pickedAddr=''; curaddr.textContent='';
+    Array.prototype.forEach.call(assignEls,function(c){c.checked=false;});
+    stageEl.value='Quote'; noteEl.value=''; if(window._pac)_pac.value=''; refresh();
+  }
+  function prefill(rec){
+    var cid=rec.Client_Name;
+    clientEl.value=(cid && idToName[cid])?idToName[cid]:'';
+    pickedAddr=rec.Job_Address||''; curaddr.textContent=pickedAddr?('Current: '+pickedAddr):'';
+    var arr=rec.Assigned_To||[]; if(arr[0]==='L') arr=arr.slice(1);
+    Array.prototype.forEach.call(assignEls,function(c){c.checked=arr.indexOf(c.value)>=0;});
+    stageEl.value=rec.Stage||'Quote'; noteEl.value=rec.Note||''; refresh();
+  }
+  clientEl.addEventListener('input',refresh);
+  function clearStale(){ if(statusEl.classList.contains('ok')||statusEl.classList.contains('err')) status(ready?'Ready.':'Loading…','muted'); }
+  ['focusin','input','change'].forEach(function(e){ document.body.addEventListener(e,clearStale); });
+
+  grist.ready({ requiredAccess:'full' });
+  grist.onRecord(function(rec){
+    currentRow=rec; forceNew=false; computeMode();
+    if(mode==='edit') prefill(rec); else clearForm();
+    updateUI();
+  });
+  grist.docApi.fetchTable('Client').then(function(t){
+    var ids=t.id,names=t.Client_Name||[];
+    for(var i=0;i<ids.length;i++){var nm=(names[i]||'').trim();if(!nm)continue;
+      clientMap[nm.toLowerCase()]=ids[i]; idToName[ids[i]]=nm;
+      var o=document.createElement('option');o.value=nm;listEl.appendChild(o);}
+  }).catch(function(e){ status('Could not load clients: '+e.message,'err'); });
+
+  toggleBtn.addEventListener('click',function(){
+    if(mode==='edit'){ forceNew=true; clearForm(); }
+    else if(currentRow){ forceNew=false; prefill(currentRow); }
+    updateUI();
+  });
+
+  async function resolveClient(name){
+    name=name.trim(); if(!name) return null;
+    if(clientMap[name.toLowerCase()]) return clientMap[name.toLowerCase()];
+    var res=await grist.docApi.applyUserActions([['AddRecord','Client',null,{Client_Name:name}]]);
+    var id=res.retValues[0]; clientMap[name.toLowerCase()]=id; idToName[id]=name; return id;
+  }
+  async function doSave(){
+    var name=clientEl.value.trim();
+    if(mode==='new' && !name){ status('Enter a client.','err'); return; }
+    if(mode==='edit' && !currentRow){ status('No job selected.','err'); return; }
+    saveBtn.disabled=true; status(mode==='edit'?'Updating…':'Creating…','muted');
+    try{
+      var assignees=Array.prototype.filter.call(assignEls,function(c){return c.checked;}).map(function(c){return c.value;});
+      if(mode==='edit'){
+        var f={ Stage:stageEl.value||'Quote', Assigned_To:['L'].concat(assignees), Note:noteEl.value.trim() };
+        if(name) f.Client_Name=await resolveClient(name);
+        if(pickedAddr) f.Job_Address=pickedAddr;
+        await grist.docApi.applyUserActions([['UpdateRecord','Jobs_Detail',currentRow.id,f]]);
+        status('✓ Updated job'+(currentRow.Job_ID?(' #'+currentRow.Job_ID):''),'ok');
+      }else{
+        var g={ Client_Name:await resolveClient(name), Stage:stageEl.value||'Quote' };
+        if(pickedAddr) g.Job_Address=pickedAddr;
+        if(assignees.length) g.Assigned_To=['L'].concat(assignees);
+        if(noteEl.value.trim()) g.Note=noteEl.value.trim();
+        await grist.docApi.applyUserActions([['AddRecord','Jobs_Detail',null,g]]);
+        status('✓ Job created for '+name+' ('+g.Stage+').','ok'); clearForm();
+      }
+    }catch(e){ status('Error: '+e.message,'err'); }
+    refresh();
+  }
+  saveBtn.addEventListener('click',doSave);
+
+  async function init(){
+    try{
+      const { PlaceAutocompleteElement }=await google.maps.importLibrary('places');
+      const pac=new PlaceAutocompleteElement({ includedRegionCodes:['au'] });
+      window._pac=pac; pac.style.width='100%'; $('holder').appendChild(pac);
+      async function onSelect(ev){
+        var pred=ev.placePrediction||(ev.detail&&ev.detail.placePrediction); if(!pred)return;
+        var place=pred.toPlace(); await place.fetchFields({fields:['formattedAddress']});
+        pickedAddr=(place.formattedAddress||'').replace(/,\s*Australia$/i,'');
+        curaddr.textContent='New: '+pickedAddr;
+      }
+      pac.addEventListener('gmp-select',onSelect); pac.addEventListener('gmp-placeselect',onSelect);
+      ready=true; updateUI(); status('Ready.','muted');
+    }catch(e){ status('Google load error: '+e.message,'err'); }
+  }
+  if(!KEY){ status('Add ?key=YOUR_GOOGLE_KEY to the widget URL.','err'); return; }
+  (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({ key:KEY, v:"weekly" });
+  init();
+})();
+</script>
+</body>
+</html>

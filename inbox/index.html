@@ -94,6 +94,8 @@
   .psel{font-size:10.5px;color:var(--accent-ink);padding:0 7px 5px;margin-top:-2px;line-height:1.4}
   .paction{display:flex;align-items:center;gap:7px;padding:7px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;color:var(--accent-ink);user-select:none}
   .paction:hover{background:var(--accent-soft)}
+  .paction.primary{background:var(--accent);color:#fff;justify-content:center}
+  .paction.primary:hover{background:var(--accent);filter:brightness(1.06)}
   .paction.danger{color:var(--danger)}
   .paction.danger:hover{background:rgba(229,72,77,.1)}
   .psep{border-top:1px solid var(--line2);margin:5px 0 2px}
@@ -1548,14 +1550,14 @@ function renderGroupMenu(){
     row.onclick=()=>applyGrouping(g);
     host.appendChild(row);
   });
-  if(!state.savedGroupings.length) host.appendChild($("div","pempty","None yet — set up a grouping, then Save current as…"));
+  if(!state.savedGroupings.length) host.appendChild($("div","pempty","None yet — tap Create grouping below to build one."));
   host.appendChild($("div","psep"));
   if(gdirty){
     const upd=$("div","paction",'⟳ Update "'+state.activeGrouping+'" with these tweaks'); upd.onclick=()=>updateGrouping(); host.appendChild(upd);
     const rev=$("div","paction",'↩ Revert to saved "'+state.activeGrouping+'"'); rev.onclick=()=>{ const g=findGrouping(state.activeGrouping); if(g) applyGrouping(g); }; host.appendChild(rev);
   }
   if(groupingActive()){ const save=$("div","paction","＋ Save current grouping as…"); save.onclick=saveGroupingAs; host.appendChild(save); }
-  const edit=$("div","paction","⚙ Edit grouping…"); edit.onclick=()=>{ closeMenus(); state._cardTab="group"; openCardEditor(); }; host.appendChild(edit);
+  const create=$("div","paction primary",groupingActive()?"⚙ Edit grouping…":"＋ Create grouping…"); create.onclick=()=>{ closeMenus(); state._cardTab="group"; openCardEditor(); }; host.appendChild(create);
 }
 function renderGroupingEditor(host){
   host.innerHTML="";
@@ -1855,17 +1857,26 @@ function stoneTextByJob(){
     if(t) m[id]=(m[id]?m[id]+" ":"")+t; });
   return m;
 }
+// Search matches at word starts, so "live" no longer matches inside "de-live-red"
+// while "deliv" still matches "Delivered". Falls back to substring if q isn't a word.
+function searchMatcher(q){
+  const esc=q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+  const pre=/^\w/.test(q)?"\\b":"";   // anchor to a word start only when q begins with a word char
+  if(!pre) return {test:h=>h.includes(q)};
+  try{ return new RegExp(pre+esc); }catch(e){ return {test:h=>h.includes(q)}; }
+}
 // All filters EXCEPT the mini-nav person pill (search, stage, payment, assigned-filter, sort).
 function baseFilteredJobs(){
   const q=state.filter.q.trim().toLowerCase();
   const st=activeKeys(state.filter.stage), as=activeKeys(state.filter.assigned), py=activeKeys(state.filter.payment);
   const stoneTxt=q?stoneTextByJob():null;
+  const qm=q?searchMatcher(q):null;
   return state.jobs.filter(j=>{
     if(st.length && !st.includes(j.Stage)) return false;
     if(py.length && !py.includes(j.Payment_Status)) return false;
     if(as.length){ const have=choiceList(j.Assigned_To); if(!have.some(v=>as.includes(v))) return false; }
     if(q){ const hay=((j.Client_Label||"")+" "+(j.Job_Address||"")+" "+(j.Address_Formatted||"")+" "+(j.Job_ID||"")+" "+(j.Stage||"")+" "+choiceList(j.Assigned_To).join(" ")+" "+(j.Stones||"")+" "+(stoneTxt[j.id]||"")).toLowerCase();
-      if(!hay.includes(q)) return false; }
+      if(!qm.test(hay)) return false; }
     return true;
   }).sort(cmpJobs);
 }

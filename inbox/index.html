@@ -1002,9 +1002,11 @@ function stoneProductLabel(r){
 // Only advances from "not-yet" states; never overrides delivered-variants, On hold,
 // Cancelled, N/A or Return — so manual choices are preserved.
 const PRE_ORDER_STATES=["","3. Awaiting Order","7. Not Delivered Yet","1. No Stock"];
+// "6. Delivered" / "Delivered by …" but NOT "Not Delivered Yet".
+function isDeliveredStatus(r){ const low=String(r.Order_Status||"").toLowerCase(); return /deliver/.test(low) && !/not deliver/.test(low); }
 function autoStatus(r){
   const s=String(r.Order_Status||""), low=s.toLowerCase();
-  const isDelivered = /deliver/.test(low) && !/not deliver/.test(low);   // "6. Delivered"/"Delivered by …" but NOT "Not Delivered Yet"
+  const isDelivered = isDeliveredStatus(r);
   const oq=Number(r.Ordered_Qty)||0, dq=Number(r.Delivery_Qty)||0;
   if(toDate(r.Delivery_Date) && dq>0 && !isDelivered && !["cancelled","n/a","return"].includes(low)) return "6. Delivered";
   if(toDate(r.Order_Date) && oq>0 && PRE_ORDER_STATES.indexOf(s)>=0) return "2.  Placed Order";
@@ -2084,8 +2086,8 @@ function renderDetail(){
     line.appendChild(prod);
     const scell=$("div","statuscell");
     scell.appendChild(pill(r.Order_Status,ORD_C,{options:ORDS,onchange:v=>update("Stone_Order",r.id,{Order_Status:v})}));
-    scell.appendChild(stoneDateLine(r,"Order_Date","Ordered on"));
-    scell.appendChild(stoneDateLine(r,"Delivery_Date","Delivered on"));
+    // One date line only: delivered → "Delivered on"; otherwise → "Ordered on".
+    scell.appendChild(isDeliveredStatus(r) ? stoneDateLine(r,"Delivery_Date","Delivered on") : stoneDateLine(r,"Order_Date","Ordered on"));
     line.appendChild(scell);
     line.appendChild(stoneQtyInput(r,"Scope_Qty","Scope qty",false));
     line.appendChild(stoneQtyInput(r,"Ordered_Qty","Order qty",true));

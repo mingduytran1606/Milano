@@ -419,7 +419,7 @@
   .stones{display:flex;flex-direction:column;gap:7px;margin-top:9px}
   .stone{display:grid;grid-template-columns:auto minmax(0,1.6fr) minmax(0,1fr);align-items:center;gap:8px}
   .stone .snm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-stone,13px);font-weight:600}
-  .stone .snote{justify-self:end;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-stoneNote,12px);color:var(--muted)}
+  .stone .snote{justify-self:stretch;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-stoneNote,12px);color:var(--muted);cursor:default}
   .sinl{display:inline-flex;align-items:center;white-space:nowrap;cursor:default}
   .sdot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.14) inset}
   .slabel{max-width:0;opacity:0;overflow:hidden;white-space:nowrap;font-size:var(--fs-stoneStatus,11.5px);font-weight:600;color:var(--muted);transition:max-width .18s ease,opacity .15s ease,margin-left .18s ease}
@@ -1990,7 +1990,7 @@ function renderDetail(){
       si.appendChild($("span","slabel", stripNo(r.Order_Status)||"—"));
       row.appendChild(si);
       row.appendChild($("span","snm", (r.Scope_Qty!=null?r.Scope_Qty+"\u00d7 ":"")+esc(stoneProductLabel(r))));
-      row.appendChild($("span","snote", esc(r.Note)));
+      const sn=$("span","snote", esc(r.Note)); if(r.Note) sn.title=esc(r.Note); row.appendChild(sn);
       sl.appendChild(row);
     });
     scopeBlk.appendChild(sl);

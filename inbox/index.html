@@ -109,6 +109,13 @@
   .pchip.on .sw::after{left:14px}
   .pchip .cdot{flex:0 0 auto;width:10px;height:10px;border-radius:3px;box-shadow:0 0 0 1px rgba(0,0,0,.12) inset}
   .pchip .clabel{flex:1;min-width:0}
+  .pbulk{display:flex;gap:8px;padding:1px 4px 6px;border-bottom:1px solid var(--line2);margin-bottom:4px}
+  .plink{font:inherit;font-size:11px;font-weight:600;color:var(--accent-ink);background:none;border:0;padding:3px 6px;border-radius:6px;cursor:pointer}
+  .plink:hover{background:var(--accent-soft)}
+  .pchip .chip-acts{flex:0 0 auto;display:flex;gap:3px;margin-left:auto}
+  .chip-acts .pmini{font:inherit;font-size:9.5px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--muted);background:var(--line2);border:1px solid transparent;border-radius:5px;padding:2px 6px;cursor:pointer}
+  .chip-acts .pmini:hover{color:var(--accent-ink);background:var(--accent-soft);border-color:var(--accent-soft)}
+  .pchip.on .chip-acts .pmini{background:rgba(0,0,0,.05)}
 
   /* ---------- job list ---------- */
   .list{flex:1;min-height:0;overflow:auto}
@@ -1376,19 +1383,28 @@ function renderViewsMenu(){
 // the combined Filter menu is retired but kept guarded in case anything calls it.
 function renderChoiceFilter(menuId,key,values,colors){
   const host=document.getElementById(menuId); if(!host) return; host.innerHTML="";
-  const bucket=state.filter[key]||(state.filter[key]={});
+  const apply=()=>{ savePrefs(); renderChoiceFilter(menuId,key,values,colors); renderList(); };
+  const setBucket=obj=>{ state.filter[key]=obj; apply(); };
   host.appendChild($("div","phead",key==="stage"?"Stage":"Payment"));
-  if(!values.length) host.appendChild($("div","pempty","No options."));
+  if(!values.length){ host.appendChild($("div","pempty","No options.")); return; }
+  // bulk actions
+  const bulk=$("div","pbulk");
+  const bAll=$("button","plink","Select all"); bAll.type="button"; bAll.title="Show every "+key; bAll.onclick=()=>{ const b={}; values.forEach(v=>b[v]=true); setBucket(b); };
+  const bNone=$("button","plink","Deselect all"); bNone.type="button"; bNone.title="Clear this filter (show all)"; bNone.onclick=()=>setBucket({});
+  bulk.appendChild(bAll); bulk.appendChild(bNone); host.appendChild(bulk);
   values.forEach(v=>{
+    const bucket=state.filter[key]||(state.filter[key]={});
     const chip=$("div","pchip"+(bucket[v]?" on":"")); chip.appendChild($("span","sw"));
     if(colors&&colors[v]){ const d=$("span","cdot"); d.style.background=colors[v]; chip.appendChild(d); }
     chip.appendChild($("span","clabel",v));
-    chip.onclick=()=>{ bucket[v]=!bucket[v]; if(!bucket[v])delete bucket[v]; savePrefs(); renderChoiceFilter(menuId,key,values,colors); renderList(); };
+    // per-option shortcuts: "only" this one, or all "except" this one
+    const acts=$("span","chip-acts");
+    const only=$("button","pmini","only"); only.type="button"; only.title="Show only "+v; only.onclick=e=>{ e.stopPropagation(); setBucket({[v]:true}); };
+    const exc=$("button","pmini","except"); exc.type="button"; exc.title="Show all except "+v; exc.onclick=e=>{ e.stopPropagation(); const b={}; values.forEach(x=>{ if(x!==v) b[x]=true; }); setBucket(b); };
+    acts.appendChild(only); acts.appendChild(exc); chip.appendChild(acts);
+    chip.onclick=()=>{ const bk=state.filter[key]||(state.filter[key]={}); if(bk[v]) delete bk[v]; else bk[v]=true; apply(); };
     host.appendChild(chip);
   });
-  if(activeKeys(bucket).length){
-    const c=$("div","paction danger","Clear "+(key==="stage"?"stage":"payment")); c.onclick=()=>{ state.filter[key]={}; savePrefs(); renderChoiceFilter(menuId,key,values,colors); renderList(); }; host.appendChild(c);
-  }
 }
 function renderStageFilter(){ renderChoiceFilter("stageMenu","stage",STAGES,STAGE_C); }
 function renderPaymentFilter(){ renderChoiceFilter("paymentMenu","payment",PAYS,PAY_C); }

@@ -588,17 +588,18 @@ const PAY_DEFAULT = {
 const DEFAULT_AVATAR = "#8a94a0";
 const STAGE_C = Object.assign({}, STAGE_DEFAULT);
 const PAY_C   = Object.assign({}, PAY_DEFAULT);
-const ORD_C = {
+const ORD_DEFAULT = {
   "2.  Placed Order":"#FEF47A","3. Awaiting Order":"#FED6FB","6. Delivered":"#98FD90",
   "4. Awaiting Pickup":"#75B5FC","7. Not Delivered Yet":"#CCFEFE","5. On hold":"#FEE7C3",
   "1. No Stock":"#FD8182","Cancelled":"#DCDCDC","Delivered by WF":"#E1FEDE",
   "Delivered by Aboda":"#E1FEDE","Delivered by Client":"#E1FEDE","Return":"#CCFEFE","N/A":"#e9edf1"};
-// STAGES / PAYS start from the defaults but are replaced by the live Grist
+const ORD_C = Object.assign({}, ORD_DEFAULT);
+// STAGES / PAYS / ORDS start from the defaults but are replaced by the live Grist
 // column choices once the schema loads (so renaming a choice in Grist flows
-// through to the widget). ORDS stays derived from the built-in order map.
+// through to the widget).
 let STAGES = Object.keys(STAGE_C);
 let PAYS   = Object.keys(PAY_C);
-const ORDS = Object.keys(ORD_C);
+let ORDS   = Object.keys(ORD_C);
 
 // ---- Summary card font sizes (px) — tweak any element's size here ----
 const SUMMARY_FONT = {
@@ -776,18 +777,19 @@ function toHex6(h){ h=String(h||"").trim();
   if(/^#[0-9a-fA-F]{6}$/.test(h)) return h.toLowerCase();
   if(/^#[0-9a-fA-F]{3}$/.test(h)) return ("#"+h.slice(1).split("").map(c=>c+c).join("")).toLowerCase();
   return "#e9edf1"; }
-function normalizeColors(c){ c=c||{}; return {stage:c.stage||{}, payment:c.payment||{}, assignee:c.assignee||{}}; }
-// Push saved overrides into the live STAGE_C / PAY_C maps (reset to defaults first,
-// so calling this after a reset restores the originals).
+function normalizeColors(c){ c=c||{}; return {stage:c.stage||{}, payment:c.payment||{}, assignee:c.assignee||{}, order:c.order||{}}; }
+// Push saved overrides into the live STAGE_C / PAY_C / ORD_C maps (reset to
+// defaults first, so calling this after a reset restores the originals).
 function applyColorOverrides(){
   const c=state.colors||{};
   Object.assign(STAGE_C, STAGE_DEFAULT); Object.keys(c.stage||{}).forEach(k=>{ if(k in STAGE_C && c.stage[k]) STAGE_C[k]=c.stage[k]; });
   Object.assign(PAY_C,   PAY_DEFAULT);   Object.keys(c.payment||{}).forEach(k=>{ if(k in PAY_C && c.payment[k]) PAY_C[k]=c.payment[k]; });
+  Object.assign(ORD_C,   ORD_DEFAULT);   Object.keys(c.order||{}).forEach(k=>{ if(k in ORD_C && c.order[k]) ORD_C[k]=c.order[k]; });
 }
-// Live stage/payment choices come from the Grist column schema (falling back to
-// the built-in defaults when standalone). Renaming a choice in Grist therefore
-// flows through to the widget's list, pills, filters, sort and colour panel.
-function distinctVals(field){ return [...new Set((state.jobs||[]).map(j=>j[field]).filter(v=>v!=null&&v!==""))]; }
+// Live stage/payment/order choices come from the Grist column schema (falling
+// back to the built-in defaults when standalone). Renaming a choice in Grist
+// therefore flows through to the widget's lists, pills, filters and colour panel.
+function distinctVals(coll,field){ return [...new Set((coll||[]).map(r=>r[field]).filter(v=>v!=null&&v!==""))]; }
 function rebuildChoiceMap(target,defaults,names,gristColors,overrides){
   Object.keys(target).forEach(k=>delete target[k]);
   names.forEach((n,i)=>{ target[n]=(overrides&&overrides[n])||defaults[n]||(gristColors&&gristColors[n])||PALETTE[i%PALETTE.length]||"#e9edf1"; });
@@ -795,12 +797,16 @@ function rebuildChoiceMap(target,defaults,names,gristColors,overrides){
 function syncChoiceMaps(){
   const sc=state.schemaChoices||{}, scc=state.schemaChoiceColors||{}, ov=state.colors||{};
   if(Array.isArray(sc.stage)&&sc.stage.length){
-    const names=sc.stage.slice(); distinctVals("Stage").forEach(v=>{ if(!names.includes(v)) names.push(v); });
+    const names=sc.stage.slice(); distinctVals(state.jobs,"Stage").forEach(v=>{ if(!names.includes(v)) names.push(v); });
     rebuildChoiceMap(STAGE_C,STAGE_DEFAULT,names,scc.stage,ov.stage); STAGES=names;
   }
   if(Array.isArray(sc.payment)&&sc.payment.length){
-    const names=sc.payment.slice(); distinctVals("Payment_Status").forEach(v=>{ if(!names.includes(v)) names.push(v); });
+    const names=sc.payment.slice(); distinctVals(state.jobs,"Payment_Status").forEach(v=>{ if(!names.includes(v)) names.push(v); });
     rebuildChoiceMap(PAY_C,PAY_DEFAULT,names,scc.payment,ov.payment); PAYS=names;
+  }
+  if(Array.isArray(sc.order)&&sc.order.length){
+    const names=sc.order.slice(); distinctVals(state.stone,"Order_Status").forEach(v=>{ if(!names.includes(v)) names.push(v); });
+    rebuildChoiceMap(ORD_C,ORD_DEFAULT,names,scc.order,ov.order); ORDS=names;
   }
   normalizeStageOrder();
 }
@@ -810,6 +816,8 @@ function applyGristChoices(sc){
     state.schemaChoiceColors.stage   = sc.colChoiceColors("Jobs_Detail","Stage")||{};
     state.schemaChoices.payment      = sc.colChoices("Jobs_Detail","Payment_Status");
     state.schemaChoiceColors.payment = sc.colChoiceColors("Jobs_Detail","Payment_Status")||{};
+    state.schemaChoices.order        = sc.colChoices("Stone_Order","Order_Status");
+    state.schemaChoiceColors.order   = sc.colChoiceColors("Stone_Order","Order_Status")||{};
     syncChoiceMaps();
   }catch(e){ console.warn("choice sync failed",e); }
 }
@@ -834,11 +842,11 @@ const state = { jobs:[], stone:[], inst:[], clients:[], catalogue:[], selectedId
   listW:null,                           // adjustable list-pane width (drag splitter)
   assignChoices:null,                   // Assigned_To choice list (from schema / data)
   filter:{ q:"", stage:{}, assigned:{}, payment:{} },
-  sort:{ key:"input", dir:-1 }, sort2:{ key:"", dir:1 }, stageOrder:STAGES.slice(), fields:defaultFields(), cardOrder:CARD_ORDER_DEFAULT.slice(),
+  sort:{ key:"input", dir:-1 }, sort2:{ key:"", dir:1 }, stageOrder:STAGES.slice(), stageOrderShared:null, fields:defaultFields(), cardOrder:CARD_ORDER_DEFAULT.slice(),
   cardFontSize:12.5,
   listCardFont:Object.assign({},LIST_CARD_FONT), summaryFont:Object.assign({},SUMMARY_FONT),
-  colors:{stage:{},payment:{},assignee:{}}, fmtCollapsed:{},
-  schemaChoices:{stage:null,payment:null}, schemaChoiceColors:{stage:{},payment:{}},
+  colors:{stage:{},payment:{},assignee:{},order:{}}, fmtCollapsed:{},
+  schemaChoices:{stage:null,payment:null,order:null}, schemaChoiceColors:{stage:{},payment:{},order:{}},
   cardTemplate:DEFAULT_TEMPLATE, templateShared:null, _sharedTemplate:null,
   grouping:{by:"",rules:[],restMode:"value"}, groupCollapsed:{},
   savedGroupings:[], activeGrouping:"",
@@ -846,7 +854,7 @@ const state = { jobs:[], stone:[], inst:[], clients:[], catalogue:[], selectedId
 window._inbox = state;
 
 function loadPrefs(){ try{ return JSON.parse(localStorage.getItem(LSKEY))||{}; }catch(e){ return {}; } }
-function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ savedViews:state.savedViews.filter(v=>!v.shared), current:snapshot(true), stoneNoteH:state.stoneNoteH||null, listW:state.listW||null, templateShared:state.templateShared, groupCollapsed:state.groupCollapsed||{}, savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"", stoneColW:state.stoneColW||null, sumLeftPct:state.sumLeftPct||null, listCardFont:state.listCardFont, summaryFont:state.summaryFont, colors:state.colors, fmtCollapsed:state.fmtCollapsed })); }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ savedViews:state.savedViews.filter(v=>!v.shared), current:snapshot(true), stoneNoteH:state.stoneNoteH||null, listW:state.listW||null, templateShared:state.templateShared, groupCollapsed:state.groupCollapsed||{}, savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"", stoneColW:state.stoneColW||null, sumLeftPct:state.sumLeftPct||null, listCardFont:state.listCardFont, summaryFont:state.summaryFont, colors:state.colors, fmtCollapsed:state.fmtCollapsed, stageOrder:(state.stageOrder||STAGES).slice(), stageOrderShared:state.stageOrderShared })); }catch(e){} }
 function snapshot(withMeta){
   const s={ q:state.filter.q, stage:cleanSet(state.filter.stage), assigned:cleanSet(state.filter.assigned),
     payment:cleanSet(state.filter.payment), sort:{key:state.sort.key,dir:state.sort.dir}, sort2:{key:state.sort2.key,dir:state.sort2.dir}, stageOrder:(state.stageOrder||STAGES).slice(), cardFontSize:state.cardFontSize||12.5, fields:Object.assign({},state.fields),
@@ -1431,10 +1439,17 @@ function renderSortMenu(){
       row.ondragend=()=>row.classList.remove("dragging");
       row.ondragover=e=>e.preventDefault();
       row.ondrop=e=>{ e.preventDefault(); const from=(e.dataTransfer&&e.dataTransfer.getData("text/plain"))||state._sdrag;
-        if(from&&from!==stg){ reorderStage(from,stg); savePrefs(); renderSortMenu(); renderList(); } };
+        if(from&&from!==stg){ reorderStage(from,stg); savePrefs(); if(state.stageOrderShared) pushSharedStageOrder(); renderSortMenu(); renderList(); } };
       list.appendChild(row);
     });
     host.appendChild(list);
+    // save the order for the whole team or just this browser (like views)
+    const soAll=$("div","paction",'＋ Save order for everyone'); soAll.title="Team stage order — stored in the Grist doc";
+    soAll.onclick=()=>{ state.stageOrderShared=true; savePrefs(); pushSharedStageOrder(); renderSortMenu(); };
+    const soMe=$("div","paction",'＋ Save order just for me'); soMe.title="Personal stage order — this browser only";
+    soMe.onclick=()=>{ state.stageOrderShared=false; savePrefs(); renderSortMenu(); };
+    host.appendChild(soAll); host.appendChild(soMe);
+    host.appendChild($("div","phint", state.stageOrderShared ? "Shared with everyone" : "Personal to this browser"));
   }
 }
 function renderDispMenu(){
@@ -1478,7 +1493,7 @@ let _sharedSig=null;   // last shared config seen/pushed, to detect real changes
 function sharedConfigObj(){
   return { cardTemplate:state.cardTemplate||DEFAULT_TEMPLATE,
     grouping:state.grouping||{by:"",rules:[],restMode:"value"},
-    stageOrder:(state.stageOrder||STAGES).slice(), cardFontSize:state.cardFontSize||12.5,
+    cardFontSize:state.cardFontSize||12.5,
     listCardFont:state.listCardFont, summaryFont:state.summaryFont,
     colors:state.colors, fields:state.fields,
     savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"" };
@@ -1676,6 +1691,8 @@ function closeHistory(){ document.getElementById("histModal").hidden=true; }
 function applyView(v){ applyConfig(Object.assign({},v.config,{activeView:v.name})); state.filterDrill=null; savePrefs(); closeMenus(); renderAll(); }
 // Write the "everyone" views to the Grist doc so all viewers see them.
 function pushSharedViews(){ if(!state.grist) return; try{ grist.setOption("sharedViews", state.savedViews.filter(v=>v.shared).map(v=>({name:v.name,config:v.config}))); }catch(e){} }
+// Stage order shares the same way: "everyone" writes it to the doc.
+function pushSharedStageOrder(){ if(!state.grist) return; try{ grist.setOption("sharedStageOrder", (state.stageOrder||STAGES).slice()); }catch(e){} }
 // Save the current filters/sort/fields as a view. shared=true → team (Grist doc);
 // shared=false → personal (this browser only).
 function saveView(name,shared){
@@ -1752,7 +1769,7 @@ function colorRow(labelText,curHex,defHex,onpick){
   return wrap;
 }
 // Default open/closed state per panel section (colour lists start collapsed).
-const FMT_COLLAPSE_DEFAULT={list:false,summary:false,stage:true,payment:true,assignee:true};
+const FMT_COLLAPSE_DEFAULT={list:false,summary:false,stage:true,payment:true,order:true,assignee:true};
 function fmtCollapsed(key){ const c=state.fmtCollapsed||{}; return key in c ? !!c[key] : !!FMT_COLLAPSE_DEFAULT[key]; }
 // A collapsible section: clickable header (with caret) + a body built by `build`.
 function fmtSection(p,title,key,build){
@@ -1781,6 +1798,9 @@ function buildFormatPanel(){
   fmtSection(p,"Payment colours","payment",body=>{
     PAYS.forEach(s=> body.appendChild(colorRow(s, PAY_C[s], PAY_DEFAULT[s], v=>{ state.colors.payment[s]=v; PAY_C[s]=v; savePrefs(); renderAll(); })));
   });
+  fmtSection(p,"Order status colours","order",body=>{
+    ORDS.forEach(s=> body.appendChild(colorRow(stripNo(s)||s, ORD_C[s], ORD_DEFAULT[s]||"#e9edf1", v=>{ state.colors.order[s]=v; ORD_C[s]=v; savePrefs(); renderAll(); })));
+  });
   fmtSection(p,"Assignee colours","assignee",body=>{
     const people=[...new Set((state.jobs||[]).flatMap(j=>choiceList(j.Assigned_To)))].filter(Boolean).sort();
     if(people.length) people.forEach(n=> body.appendChild(colorRow(n, avatarColor(n), DEFAULT_AVATAR, v=>{ state.colors.assignee[n]=v; savePrefs(); renderAll(); })));
@@ -1793,7 +1813,7 @@ function buildFormatPanel(){
   const sMe=$("button","fmt-save","Save just for me"); sMe.title="Keep this design in this browser only (stops following the team design)";
   sMe.onclick=()=>{ saveForMyself(); sMe.textContent="Saved ✓"; setTimeout(()=>{sMe.textContent="Save just for me";},1200); };
   saveRow.appendChild(sMe); saveRow.appendChild(sAll); p.appendChild(saveRow);
-  const rst=$("button","fmt-reset","Reset to defaults"); rst.onclick=()=>{ state.listCardFont=Object.assign({},LIST_CARD_FONT); state.summaryFont=Object.assign({},SUMMARY_FONT); state.cardFontSize=LIST_CARD_FONT.base; state.colors={stage:{},payment:{},assignee:{}}; applyColorOverrides(); syncChoiceMaps(); applyCardFont(); savePrefs(); renderAll(); buildFormatPanel(); };
+  const rst=$("button","fmt-reset","Reset to defaults"); rst.onclick=()=>{ state.listCardFont=Object.assign({},LIST_CARD_FONT); state.summaryFont=Object.assign({},SUMMARY_FONT); state.cardFontSize=LIST_CARD_FONT.base; state.colors={stage:{},payment:{},assignee:{},order:{}}; applyColorOverrides(); syncChoiceMaps(); applyCardFont(); savePrefs(); renderAll(); buildFormatPanel(); };
   p.appendChild(rst);
 }
 function initFormatButton(){
@@ -2189,6 +2209,13 @@ if(typeof grist!=="undefined"){
       personal.forEach(v=>{ if(!merged.some(x=>x.name===v.name)) merged.push(v); });
       if(JSON.stringify(merged)!==JSON.stringify(state.savedViews)){ state.savedViews=merged; renderList(); updateToolbar(); }
     }
+    // Stage order — a team ordering adopted by everyone following it (also independent of the design toggle).
+    if(Array.isArray(opts.sharedStageOrder) && opts.sharedStageOrder.length){
+      if(state.stageOrderShared==null) state.stageOrderShared=true;   // first run: follow the team order if one exists
+      if(state.stageOrderShared && JSON.stringify(opts.sharedStageOrder)!==JSON.stringify(state.stageOrder)){
+        state.stageOrder=opts.sharedStageOrder.slice(); normalizeStageOrder(); renderList(); updateToolbar();
+      }
+    }
     const shared=(typeof opts.cardTemplate==="string" && opts.cardTemplate.trim())?opts.cardTemplate:null;
     state._sharedTemplate=shared;
     if(state.templateShared==null) state.templateShared=!!shared;   // first run: follow the team design if one exists
@@ -2200,7 +2227,6 @@ if(typeof grist!=="undefined"){
     if(!editing && opts.grouping){ const g=normalizeGrouping(opts.grouping); if(J(g)!==J(state.grouping)){ state.grouping=g; changed=true; } }
     if(typeof opts.activeGrouping==="string" && opts.activeGrouping!==state.activeGrouping){ state.activeGrouping=opts.activeGrouping; changed=true; }
     if(Array.isArray(opts.savedGroupings) && J(opts.savedGroupings)!==J(state.savedGroupings)){ state.savedGroupings=opts.savedGroupings.slice(); }
-    if(Array.isArray(opts.stageOrder) && J(opts.stageOrder)!==J(state.stageOrder)){ state.stageOrder=opts.stageOrder.slice(); normalizeStageOrder(); changed=true; }
     if(typeof opts.cardFontSize==="number" && opts.cardFontSize!==state.cardFontSize){ state.cardFontSize=opts.cardFontSize; fontChanged=true; }
     if(opts.listCardFont && J(opts.listCardFont)!==J(state.listCardFont)){ state.listCardFont=Object.assign({},LIST_CARD_FONT,opts.listCardFont); fontChanged=true; }
     if(opts.summaryFont && J(opts.summaryFont)!==J(state.summaryFont)){ state.summaryFont=Object.assign({},SUMMARY_FONT,opts.summaryFont); changed=true; }
@@ -2340,6 +2366,8 @@ document.addEventListener("click",closeMenus);
   state.colors=normalizeColors(p.colors); applyColorOverrides();
   state.fmtCollapsed=(p.fmtCollapsed&&typeof p.fmtCollapsed==="object")?p.fmtCollapsed:{};
   state.savedGroupings=p.savedGroupings||[]; state.activeGrouping=p.activeGrouping||"";
+  if(Array.isArray(p.stageOrder)) state.stageOrder=p.stageOrder.slice();
+  if("stageOrderShared" in p) state.stageOrderShared=(p.stageOrderShared==null?null:!!p.stageOrderShared);
   if(!state.assignChoices) state.assignChoices=["Julie","Phoebe","Nhi","a Minh","Louis"];
   if("templateShared" in p) state.templateShared=(p.templateShared==null?null:!!p.templateShared);
   if(!state.ref.client)  state.ref.client =DEMO_REF.client;

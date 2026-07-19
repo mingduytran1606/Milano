@@ -584,9 +584,12 @@ const ORD_C = {
   "4. Awaiting Pickup":"#75B5FC","7. Not Delivered Yet":"#CCFEFE","5. On hold":"#FEE7C3",
   "1. No Stock":"#FD8182","Cancelled":"#DCDCDC","Delivered by WF":"#E1FEDE",
   "Delivered by Aboda":"#E1FEDE","Delivered by Client":"#E1FEDE","Return":"#CCFEFE","N/A":"#e9edf1"};
-const STAGES = Object.keys(STAGE_C);
-const PAYS   = Object.keys(PAY_C);
-const ORDS   = Object.keys(ORD_C);
+// STAGES / PAYS start from the defaults but are replaced by the live Grist
+// column choices once the schema loads (so renaming a choice in Grist flows
+// through to the widget). ORDS stays derived from the built-in order map.
+let STAGES = Object.keys(STAGE_C);
+let PAYS   = Object.keys(PAY_C);
+const ORDS = Object.keys(ORD_C);
 
 // ---- Summary card font sizes (px) — tweak any element's size here ----
 const SUMMARY_FONT = {
@@ -772,6 +775,35 @@ function applyColorOverrides(){
   Object.assign(STAGE_C, STAGE_DEFAULT); Object.keys(c.stage||{}).forEach(k=>{ if(k in STAGE_C && c.stage[k]) STAGE_C[k]=c.stage[k]; });
   Object.assign(PAY_C,   PAY_DEFAULT);   Object.keys(c.payment||{}).forEach(k=>{ if(k in PAY_C && c.payment[k]) PAY_C[k]=c.payment[k]; });
 }
+// Live stage/payment choices come from the Grist column schema (falling back to
+// the built-in defaults when standalone). Renaming a choice in Grist therefore
+// flows through to the widget's list, pills, filters, sort and colour panel.
+function distinctVals(field){ return [...new Set((state.jobs||[]).map(j=>j[field]).filter(v=>v!=null&&v!==""))]; }
+function rebuildChoiceMap(target,defaults,names,gristColors,overrides){
+  Object.keys(target).forEach(k=>delete target[k]);
+  names.forEach((n,i)=>{ target[n]=(overrides&&overrides[n])||defaults[n]||(gristColors&&gristColors[n])||PALETTE[i%PALETTE.length]||"#e9edf1"; });
+}
+function syncChoiceMaps(){
+  const sc=state.schemaChoices||{}, scc=state.schemaChoiceColors||{}, ov=state.colors||{};
+  if(Array.isArray(sc.stage)&&sc.stage.length){
+    const names=sc.stage.slice(); distinctVals("Stage").forEach(v=>{ if(!names.includes(v)) names.push(v); });
+    rebuildChoiceMap(STAGE_C,STAGE_DEFAULT,names,scc.stage,ov.stage); STAGES=names;
+  }
+  if(Array.isArray(sc.payment)&&sc.payment.length){
+    const names=sc.payment.slice(); distinctVals("Payment_Status").forEach(v=>{ if(!names.includes(v)) names.push(v); });
+    rebuildChoiceMap(PAY_C,PAY_DEFAULT,names,scc.payment,ov.payment); PAYS=names;
+  }
+  normalizeStageOrder();
+}
+function applyGristChoices(sc){
+  try{
+    state.schemaChoices.stage        = sc.colChoices("Jobs_Detail","Stage");
+    state.schemaChoiceColors.stage   = sc.colChoiceColors("Jobs_Detail","Stage")||{};
+    state.schemaChoices.payment      = sc.colChoices("Jobs_Detail","Payment_Status");
+    state.schemaChoiceColors.payment = sc.colChoiceColors("Jobs_Detail","Payment_Status")||{};
+    syncChoiceMaps();
+  }catch(e){ console.warn("choice sync failed",e); }
+}
 function avatarColor(name){ const c=state.colors&&state.colors.assignee; return (c&&c[name])||DEFAULT_AVATAR; }
 // Black or white text depending on how light the avatar colour is.
 function contrastInk(hex){ const {r,g,b}=hexRgb(hex); return (r*299+g*587+b*114)/1000>150?"#1d2733":"#ffffff"; }
@@ -797,6 +829,7 @@ const state = { jobs:[], stone:[], inst:[], clients:[], catalogue:[], selectedId
   cardFontSize:12.5,
   listCardFont:Object.assign({},LIST_CARD_FONT), summaryFont:Object.assign({},SUMMARY_FONT),
   colors:{stage:{},payment:{},assignee:{}}, fmtCollapsed:{},
+  schemaChoices:{stage:null,payment:null}, schemaChoiceColors:{stage:{},payment:{}},
   cardTemplate:DEFAULT_TEMPLATE, templateShared:null, _sharedTemplate:null,
   grouping:{by:"",rules:[],restMode:"value"}, groupCollapsed:{},
   savedGroupings:[], activeGrouping:"",
@@ -1010,6 +1043,9 @@ async function loadGristSchema(){
   const colsOf=tid=>{ const t=tableById[tid]; return t?cols.filter(c=>c.parentId===t.id):[]; };
   const isEditable=c=>!c.isFormula && c.colId && !SPECIAL_COL.test(c.colId);
   const choicesOf=c=>{ try{ return JSON.parse(c.widgetOptions||"{}").choices||null; }catch(e){ return null; } };
+  // Per-choice fill colours Grist stores in the column's widgetOptions.
+  const choiceColorsOf=c=>{ try{ const o=JSON.parse(c.widgetOptions||"{}").choiceOptions||{}; const m={};
+    for(const k in o){ if(o[k]&&o[k].fillColor) m[k]=o[k].fillColor; } return m; }catch(e){ return {}; } };
   const editableCols=tid=>colsOf(tid).filter(isEditable).map(c=>({
     colId:c.colId, label:c.label||c.colId, type:(c.type||"Text").split(":")[0],
     isRef:/^Ref/.test(c.type||""), choices:choicesOf(c) }));
@@ -1022,7 +1058,8 @@ async function loadGristSchema(){
     return { colId, targetTableId, labelCol:(vis&&vis.colId)||bestLabelCol(targetTableId), editable:editableCols(targetTableId) };
   }
   function colChoices(tableId,colId){ const c=colsOf(tableId).find(x=>x.colId===colId); return c?choicesOf(c):null; }
-  return { refInfo, colChoices };
+  function colChoiceColors(tableId,colId){ const c=colsOf(tableId).find(x=>x.colId===colId); return c?choiceColorsOf(c):{}; }
+  return { refInfo, colChoices, colChoiceColors };
 }
 
 // ---- assigning / creating referenced records ----
@@ -1705,7 +1742,7 @@ function buildFormatPanel(){
     if(people.length) people.forEach(n=> body.appendChild(colorRow(n, avatarColor(n), DEFAULT_AVATAR, v=>{ state.colors.assignee[n]=v; savePrefs(); renderAll(); })));
     else body.appendChild($("div","fs-row","No assignees yet."));
   });
-  const rst=$("button","fmt-reset","Reset to defaults"); rst.onclick=()=>{ state.listCardFont=Object.assign({},LIST_CARD_FONT); state.summaryFont=Object.assign({},SUMMARY_FONT); state.cardFontSize=LIST_CARD_FONT.base; state.colors={stage:{},payment:{},assignee:{}}; applyColorOverrides(); applyCardFont(); savePrefs(); renderAll(); buildFormatPanel(); };
+  const rst=$("button","fmt-reset","Reset to defaults"); rst.onclick=()=>{ state.listCardFont=Object.assign({},LIST_CARD_FONT); state.summaryFont=Object.assign({},SUMMARY_FONT); state.cardFontSize=LIST_CARD_FONT.base; state.colors={stage:{},payment:{},assignee:{}}; applyColorOverrides(); syncChoiceMaps(); applyCardFont(); savePrefs(); renderAll(); buildFormatPanel(); };
   p.appendChild(rst);
 }
 function initFormatButton(){
@@ -2048,6 +2085,7 @@ async function pullTables(){
     state.ref.client  ? grist.docApi.fetchTable(state.ref.client.targetTableId ).then(t=>{state.clients  =columnarToRows(t);}).catch(()=>{}) : null,
     state.ref.product ? grist.docApi.fetchTable(state.ref.product.targetTableId).then(t=>{state.catalogue=columnarToRows(t);}).catch(()=>{}) : null,
   ]);
+  syncChoiceMaps();   // pick up any stage/payment values present in freshly-pulled data
   if((state.selectedId==null || !selectedJob()) && state.jobs.length){ const f=filteredJobs()[0]; state.selectedId=f?f.id:state.jobs[0].id; }
 }
 // Re-pull after an edit. Guarded so demo-mode callers never touch Grist.
@@ -2097,6 +2135,7 @@ if(typeof grist!=="undefined"){
       state.ref.client =sc.refInfo("Jobs_Detail","Client_Name");
       state.ref.product=sc.refInfo("Stone_Order","Product");
       state.assignChoices=sc.colChoices("Jobs_Detail","Assigned_To")||null;
+      applyGristChoices(sc);
       finishRefSetup();
     }catch(e){ state.ref.client=null; state.ref.product=null; console.warn("schema introspection failed — lookups disabled",e); }
     try{ await pullTables(); }catch(e){ console.warn("initial fetch failed",e); }

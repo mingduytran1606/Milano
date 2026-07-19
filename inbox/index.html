@@ -522,10 +522,6 @@
         <input id="fSearch" type="text" placeholder="Search address, client, stone, stage, staff…" autocomplete="off">
       </div>
       <div class="filt-row">
-        <button class="tbtn" id="viewsBtn" type="button" style="flex:1">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
-          <span class="tlabel" id="viewsName">All jobs</span><span class="caret">&#8250;</span>
-        </button>
         <button class="tbtn" id="groupBtn" type="button" style="flex:1" title="Group the job list">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18M3 5v4M21 5v4M6 13h12M6 13v2M18 13v2M9 19h6"/></svg>
           <span class="tlabel" id="groupName">No grouping</span><span class="caret">&#8250;</span>
@@ -541,7 +537,6 @@
           <span class="tlabel">Sort</span><span class="caret">&#8250;</span>
         </button>
       </div>
-      <div class="popmenu" id="viewsMenu" hidden></div>
       <div class="popmenu" id="groupMenu" hidden></div>
       <div class="popmenu" id="filterMenu" hidden></div>
       <div class="popmenu" id="sortMenu" hidden></div>
@@ -1323,8 +1318,8 @@ function clientTitle(j){
 // ============================================================
 //  MENUS
 // ============================================================
-const MENUS=[["viewsBtn","viewsMenu",renderViewsMenu],["groupBtn","groupMenu",renderGroupMenu],["filterBtn","filterMenu",renderFilterMenu],
-  ["sortBtn","sortMenu",renderSortMenu]];  // dispBtn now opens the Customize-card modal (see boot)
+const MENUS=[["groupBtn","groupMenu",renderGroupMenu],["filterBtn","filterMenu",renderFilterMenu],
+  ["sortBtn","sortMenu",renderSortMenu]];  // Views/saved-views removed from the toolbar (too confusing for the client); dispBtn opens the Customize-card modal (see boot)
 function closeMenus(){ MENUS.forEach(([b,m])=>{ document.getElementById(m).hidden=true; document.getElementById(b).classList.remove("open"); });
   const rm=document.getElementById("rowMenu"); if(rm)rm.hidden=true;
   const pp=document.getElementById("prodPicker"); if(pp)pp.hidden=true;
@@ -1338,7 +1333,8 @@ function toggleMenu(btnId,menuId,render){
 }
 
 function renderViewsMenu(){
-  const host=document.getElementById("viewsMenu"); host.innerHTML="";
+  const host=document.getElementById("viewsMenu"); if(!host) return;   // Views UI removed from the toolbar
+  host.innerHTML="";
   host.appendChild($("div","phead","Saved views"));
   const all=$("div","prow"+(!state.activeView?" on":"")); all.appendChild($("span","rlabel","All jobs (default)"));
   if(!state.activeView) all.appendChild($("span","rtick","✓"));
@@ -1906,9 +1902,6 @@ function renderTabs(){
   });
 }
 function updateToolbar(){
-  document.getElementById("viewsName").textContent = state.activeView ? state.activeView+(isViewDirty()?" •":"") : "All jobs";
-  document.getElementById("viewsBtn").classList.toggle("active", !!state.activeView);
-  document.getElementById("viewsBtn").title = (state.activeView&&isViewDirty()) ? 'This view has unsaved tweaks — open to Update or Revert' : '';
   const gn=document.getElementById("groupName");
   if(gn){ gn.textContent = state.activeGrouping ? state.activeGrouping+(isGroupingDirty()?" •":"") : (groupingActive()?"Grouped":"No grouping");
     document.getElementById("groupBtn").classList.toggle("active", groupingActive()); }

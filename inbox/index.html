@@ -416,17 +416,17 @@
   .scope-n{display:flex;align-items:baseline;gap:6px}
   .scope-n b{font-size:var(--fs-scopeNum,24px);font-weight:800;letter-spacing:-.02em;line-height:1}
   .scope-n span{font-size:var(--fs-scopeUnit,12px);color:var(--muted);font-weight:600}
-  .stones{display:flex;flex-direction:column;gap:7px;margin-top:9px}
-  .stone{display:grid;grid-template-columns:auto minmax(0,1.6fr) minmax(0,1fr);align-items:center;gap:8px}
+  .stones{display:flex;flex-direction:column;gap:3px;margin-top:10px}
+  .stone{display:grid;grid-template-columns:auto minmax(0,1.6fr) minmax(0,1fr);align-items:center;gap:8px;padding-left:16px}
   .stone .snm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-stone,13px);font-weight:600}
   .stone .snote{justify-self:stretch;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-stoneNote,12px);color:var(--muted);cursor:default}
   .sdot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.14) inset}
-  .stone .sdot-lead{cursor:default}
-  /* status snapshot at the top of the scope block */
-  .stone-summary{display:flex;flex-wrap:wrap;gap:5px 13px;margin:10px 0 2px}
-  .stsum-chip{display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-stoneStatus,11.5px);white-space:nowrap;cursor:default}
-  .stsum-n{font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
-  .stsum-l{color:var(--muted);font-weight:600}
+  /* stones grouped under a status heading */
+  .stgrp-head{display:flex;align-items:center;gap:7px;margin-top:11px;font-size:var(--fs-stoneStatus,11.5px)}
+  .stgrp-head:first-child{margin-top:0}
+  .stgrp-n{font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+  .stgrp-l{font-weight:700;color:var(--muted)}
+  .stone .sbul{justify-self:center;width:4px;height:4px;border-radius:50%;background:var(--muted);opacity:.5}
   .spill{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-pill,12px);font-weight:600;color:var(--ink);border-radius:999px;padding:3px 10px 3px 9px;cursor:pointer}
   .spill .pcaret{font-size:8px;opacity:.5;margin-left:1px;line-height:1}
   .sum-note{font:inherit;font-size:var(--fs-note,13px);line-height:1.5;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 11px;width:100%;resize:vertical;min-height:46px}
@@ -1987,29 +1987,28 @@ function renderDetail(){
   scopeBlk.appendChild($("span","sum-lbl","Scope"));
   const scn=$("div","scope-n"); scn.appendChild($("b",null, j.Scope_Qty!=null?String(j.Scope_Qty):"0")); scn.appendChild($("span",null,"slabs")); scopeBlk.appendChild(scn);
   if(stone.length){
-    // status snapshot — total slabs (the per-line "N×") grouped by order status
-    const byStatus=new Map();
-    stone.forEach(r=>{ const s=r.Order_Status||"—"; byStatus.set(s,(byStatus.get(s)||0)+(Number(r.Scope_Qty)||0)); });
-    const sumRow=$("div","stone-summary");
-    [...byStatus.entries()]
-      .sort((a,b)=> (b[1]-a[1]) || ((ORDS.indexOf(a[0])+1||99)-(ORDS.indexOf(b[0])+1||99)))
-      .forEach(([s,qty])=>{
-        const chip=$("span","stsum-chip"); chip.title=s;
-        const d=$("span","sdot"); d.style.background=softTint(ORD_C[s]).dot; chip.appendChild(d);
-        chip.appendChild($("span","stsum-n", String(qty)));
-        chip.appendChild($("span","stsum-l", stripNo(s)||"—"));
-        sumRow.appendChild(chip);
-      });
-    scopeBlk.appendChild(sumRow);
+    // group stone lines by status: a heading (total slabs + status) with its
+    // stones listed beneath, groups ordered by total slabs descending
+    const groups=new Map();
+    stone.forEach(r=>{ const s=r.Order_Status||"—"; if(!groups.has(s)) groups.set(s,[]); groups.get(s).push(r); });
+    const qtyOf=rows=>rows.reduce((m,r)=>m+(Number(r.Scope_Qty)||0),0);
     const sl=$("div","stones");
-    stone.forEach(r=>{
-      const row=$("div","stone");
-      const dot=$("span","sdot sdot-lead"); dot.style.background=softTint(ORD_C[r.Order_Status]).dot; dot.title=r.Order_Status||"";
-      row.appendChild(dot);
-      row.appendChild($("span","snm", (r.Scope_Qty!=null?r.Scope_Qty+"\u00d7 ":"")+esc(stoneProductLabel(r))));
-      const sn=$("span","snote", esc(r.Note)); if(r.Note) sn.title=esc(r.Note); row.appendChild(sn);
-      sl.appendChild(row);
-    });
+    [...groups.entries()]
+      .sort((a,b)=> (qtyOf(b[1])-qtyOf(a[1])) || ((ORDS.indexOf(a[0])+1||99)-(ORDS.indexOf(b[0])+1||99)))
+      .forEach(([s,rows])=>{
+        const head=$("div","stgrp-head"); head.title=s;
+        const d=$("span","sdot"); d.style.background=softTint(ORD_C[s]).dot; head.appendChild(d);
+        head.appendChild($("span","stgrp-n", String(qtyOf(rows))));
+        head.appendChild($("span","stgrp-l", stripNo(s)||"—"));
+        sl.appendChild(head);
+        rows.forEach(r=>{
+          const row=$("div","stone");
+          row.appendChild($("span","sbul"));
+          row.appendChild($("span","snm", (r.Scope_Qty!=null?r.Scope_Qty+"\u00d7 ":"")+esc(stoneProductLabel(r))));
+          const sn=$("span","snote", esc(r.Note)); if(r.Note) sn.title=esc(r.Note); row.appendChild(sn);
+          sl.appendChild(row);
+        });
+      });
     scopeBlk.appendChild(sl);
   }
   colL.appendChild(scopeBlk);

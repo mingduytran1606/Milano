@@ -396,6 +396,9 @@
   .sumcard .sum-addrinp{margin-top:0;margin-left:0;padding-left:0;font-size:var(--fs-address,13px)}
   .sumcard .sum-ct .client.editable:hover{background:transparent;border-bottom-color:var(--muted)}
   .sumcard .sum-jobid{grid-column:2;grid-row:1;justify-self:end;font-size:var(--fs-jobid,11px)}
+  .sumcard .sum-addr-top{flex:1 1 160px;min-width:120px}
+  .sumcard .sum-addr-top .sum-addrinp{width:100%}
+  .sumcard .sum-pills{grid-column:1;grid-row:2;display:flex;align-items:center;gap:9px;flex-wrap:wrap;min-width:0}
   .sumcard .sum-addr{grid-column:1;grid-row:2;min-width:0}
   .sumcard .sum-inp{grid-column:2;grid-row:2;justify-self:end;font-size:var(--fs-inputDate,13px);color:var(--muted);white-space:nowrap}
   .sum-assign{display:flex;align-items:center;cursor:pointer;border-radius:8px;padding:1px 2px}
@@ -457,6 +460,11 @@
   .fmt-h .fmt-x{margin-left:auto;cursor:pointer;color:var(--muted);font-size:19px;line-height:1}
   .fmt-h .fmt-x:hover{color:var(--danger)}
   .fmt-sec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:14px 0 6px}
+  .fmt-sec.toggle{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;padding:3px 0}
+  .fmt-sec.toggle:hover{color:var(--ink)}
+  .fmt-sec .fmt-caret{transition:transform .15s;font-size:13px;line-height:1}
+  .fmt-sec.toggle:not(.collapsed) .fmt-caret{transform:rotate(90deg)}
+  .fmt-body[hidden]{display:none}
   .fs-row{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:2px 0}
   .fs-row .fs-l{flex:1;min-width:0;color:var(--ink)}
   .fs-btn{flex:0 0 auto;width:22px;height:22px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center}
@@ -785,7 +793,7 @@ const state = { jobs:[], stone:[], inst:[], clients:[], catalogue:[], selectedId
   sort:{ key:"input", dir:-1 }, sort2:{ key:"", dir:1 }, stageOrder:STAGES.slice(), fields:defaultFields(), cardOrder:CARD_ORDER_DEFAULT.slice(),
   cardFontSize:12.5,
   listCardFont:Object.assign({},LIST_CARD_FONT), summaryFont:Object.assign({},SUMMARY_FONT),
-  colors:{stage:{},payment:{},assignee:{}},
+  colors:{stage:{},payment:{},assignee:{}}, fmtCollapsed:{},
   cardTemplate:DEFAULT_TEMPLATE, templateShared:null, _sharedTemplate:null,
   grouping:{by:"",rules:[],restMode:"value"}, groupCollapsed:{},
   savedGroupings:[], activeGrouping:"",
@@ -793,7 +801,7 @@ const state = { jobs:[], stone:[], inst:[], clients:[], catalogue:[], selectedId
 window._inbox = state;
 
 function loadPrefs(){ try{ return JSON.parse(localStorage.getItem(LSKEY))||{}; }catch(e){ return {}; } }
-function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ savedViews:state.savedViews, current:snapshot(true), stoneNoteH:state.stoneNoteH||null, listW:state.listW||null, templateShared:state.templateShared, groupCollapsed:state.groupCollapsed||{}, savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"", stoneColW:state.stoneColW||null, sumLeftPct:state.sumLeftPct||null, listCardFont:state.listCardFont, summaryFont:state.summaryFont, colors:state.colors })); }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ savedViews:state.savedViews, current:snapshot(true), stoneNoteH:state.stoneNoteH||null, listW:state.listW||null, templateShared:state.templateShared, groupCollapsed:state.groupCollapsed||{}, savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"", stoneColW:state.stoneColW||null, sumLeftPct:state.sumLeftPct||null, listCardFont:state.listCardFont, summaryFont:state.summaryFont, colors:state.colors, fmtCollapsed:state.fmtCollapsed })); }catch(e){} }
 function snapshot(withMeta){
   const s={ q:state.filter.q, stage:cleanSet(state.filter.stage), assigned:cleanSet(state.filter.assigned),
     payment:cleanSet(state.filter.payment), sort:{key:state.sort.key,dir:state.sort.dir}, sort2:{key:state.sort2.key,dir:state.sort2.dir}, stageOrder:(state.stageOrder||STAGES).slice(), cardFontSize:state.cardFontSize||12.5, fields:Object.assign({},state.fields),
@@ -1637,24 +1645,41 @@ function colorRow(labelText,curHex,defHex,onpick){
   row.appendChild(sw); row.appendChild($("span","fmt-cl",labelText));
   return row;
 }
+// Default open/closed state per panel section (colour lists start collapsed).
+const FMT_COLLAPSE_DEFAULT={list:false,summary:false,stage:true,payment:true,assignee:true};
+function fmtCollapsed(key){ const c=state.fmtCollapsed||{}; return key in c ? !!c[key] : !!FMT_COLLAPSE_DEFAULT[key]; }
+// A collapsible section: clickable header (with caret) + a body built by `build`.
+function fmtSection(p,title,key,build){
+  const collapsed=fmtCollapsed(key);
+  const head=$("div","fmt-sec toggle"+(collapsed?" collapsed":""));
+  head.appendChild($("span","fmt-caret","\u203a")); head.appendChild($("span",null,title));
+  const body=$("div","fmt-body"); body.hidden=collapsed; build(body);
+  head.onclick=()=>{ const now=!fmtCollapsed(key); state.fmtCollapsed=state.fmtCollapsed||{}; state.fmtCollapsed[key]=now;
+    body.hidden=now; head.classList.toggle("collapsed",now); savePrefs(); };
+  p.appendChild(head); p.appendChild(body);
+}
 function buildFormatPanel(){
   const p=document.getElementById("fmtPanel"); p.innerHTML="";
   const h=$("div","fmt-h"); h.appendChild(document.createTextNode("Formatting"));
   const x=$("span","fmt-x","\u00d7"); x.onclick=()=>{ p.hidden=true; document.getElementById("fmtBtn").classList.remove("on"); }; h.appendChild(x);
   p.appendChild(h);
-  p.appendChild($("div","fmt-sec","Job card (list)"));
-  FMT_LIST_FIELDS.forEach(([k,l])=> p.appendChild(fontStepper(l,state.listCardFont,k,()=>{ if(k==="base")state.cardFontSize=state.listCardFont.base; applyCardFont(); savePrefs(); renderList(); })));
-  p.appendChild($("div","fmt-sec","Summary card (details)"));
-  FMT_SUM_FIELDS.forEach(([k,l])=> p.appendChild(fontStepper(l,state.summaryFont,k,()=>{ savePrefs(); renderDetail(); })));
-  // ---- colour customisation ----
-  p.appendChild($("div","fmt-sec","Stage colours"));
-  STAGES.forEach(s=> p.appendChild(colorRow(s, STAGE_C[s], STAGE_DEFAULT[s], v=>{ state.colors.stage[s]=v; STAGE_C[s]=v; savePrefs(); renderAll(); })));
-  p.appendChild($("div","fmt-sec","Payment colours"));
-  PAYS.forEach(s=> p.appendChild(colorRow(s, PAY_C[s], PAY_DEFAULT[s], v=>{ state.colors.payment[s]=v; PAY_C[s]=v; savePrefs(); renderAll(); })));
-  p.appendChild($("div","fmt-sec","Assignee colours"));
-  const people=[...new Set((state.jobs||[]).flatMap(j=>choiceList(j.Assigned_To)))].filter(Boolean).sort();
-  if(people.length) people.forEach(n=> p.appendChild(colorRow(n, avatarColor(n), DEFAULT_AVATAR, v=>{ state.colors.assignee[n]=v; savePrefs(); renderAll(); })));
-  else p.appendChild($("div","fs-row","No assignees yet."));
+  fmtSection(p,"Job card (list)","list",body=>{
+    FMT_LIST_FIELDS.forEach(([k,l])=> body.appendChild(fontStepper(l,state.listCardFont,k,()=>{ if(k==="base")state.cardFontSize=state.listCardFont.base; applyCardFont(); savePrefs(); renderList(); })));
+  });
+  fmtSection(p,"Summary card (details)","summary",body=>{
+    FMT_SUM_FIELDS.forEach(([k,l])=> body.appendChild(fontStepper(l,state.summaryFont,k,()=>{ savePrefs(); renderDetail(); })));
+  });
+  fmtSection(p,"Stage colours","stage",body=>{
+    STAGES.forEach(s=> body.appendChild(colorRow(s, STAGE_C[s], STAGE_DEFAULT[s], v=>{ state.colors.stage[s]=v; STAGE_C[s]=v; savePrefs(); renderAll(); })));
+  });
+  fmtSection(p,"Payment colours","payment",body=>{
+    PAYS.forEach(s=> body.appendChild(colorRow(s, PAY_C[s], PAY_DEFAULT[s], v=>{ state.colors.payment[s]=v; PAY_C[s]=v; savePrefs(); renderAll(); })));
+  });
+  fmtSection(p,"Assignee colours","assignee",body=>{
+    const people=[...new Set((state.jobs||[]).flatMap(j=>choiceList(j.Assigned_To)))].filter(Boolean).sort();
+    if(people.length) people.forEach(n=> body.appendChild(colorRow(n, avatarColor(n), DEFAULT_AVATAR, v=>{ state.colors.assignee[n]=v; savePrefs(); renderAll(); })));
+    else body.appendChild($("div","fs-row","No assignees yet."));
+  });
   const rst=$("button","fmt-reset","Reset to defaults"); rst.onclick=()=>{ state.listCardFont=Object.assign({},LIST_CARD_FONT); state.summaryFont=Object.assign({},SUMMARY_FONT); state.cardFontSize=LIST_CARD_FONT.base; state.colors={stage:{},payment:{},assignee:{}}; applyColorOverrides(); applyCardFont(); savePrefs(); renderAll(); buildFormatPanel(); };
   p.appendChild(rst);
 }
@@ -1828,20 +1853,23 @@ function renderDetail(){
   const top=$("div","sum-top");
   const titleRow=$("div","sum-title");
   const ct=clientTitle(j); ct.classList.add("sum-ct"); titleRow.appendChild(ct);
+  // address shares the title row with the client name (swapped up from row 2)
+  const ai=document.createElement("input"); ai.className="addr-inp sum-addrinp";
+  ai.value=esc(j.Job_Address||j.Address_Formatted); ai.placeholder="Address…";
+  ai.onblur=()=>{ const cur=esc(j.Job_Address||j.Address_Formatted); if(ai.value!==cur){ j.Job_Address=ai.value; update("Jobs_Detail",j.id,{Job_Address:ai.value}); renderList(); } };
+  const addrTop=$("div","sum-addr-top"); addrTop.appendChild(ai); titleRow.appendChild(addrTop);
+  top.appendChild(titleRow);
+  top.appendChild($("span","jobid sum-jobid",esc(j.Job_ID)));
+  // avatar + stage + payment pills move down to the second row (swapped with the address)
+  const pillsRow=$("div","sum-pills");
   const asg=$("div","sum-assign");
   asg.appendChild(currentAssignees(j).length?avatarStack(j.Assigned_To,true):$("span","sum-assign-add","+"));
   asg.title="Click to change who's assigned";
   asg.onclick=e=>{ e.stopPropagation(); openAssignPicker(j,asg); };
-  titleRow.appendChild(asg);
-  titleRow.appendChild(softChoice(j.Stage,STAGE_C,{onchange:v=>{j.Stage=v; update("Jobs_Detail",j.id,{Stage:v}); renderList();}}));
-  titleRow.appendChild(softChoice(j.Payment_Status,PAY_C,{onchange:v=>{j.Payment_Status=v; update("Jobs_Detail",j.id,{Payment_Status:v}); renderList();}}));
-  top.appendChild(titleRow);
-  top.appendChild($("span","jobid sum-jobid",esc(j.Job_ID)));
-  const addrLine=$("div","sum-addr");
-  const ai=document.createElement("input"); ai.className="addr-inp sum-addrinp";
-  ai.value=esc(j.Job_Address||j.Address_Formatted); ai.placeholder="Address…";
-  ai.onblur=()=>{ const cur=esc(j.Job_Address||j.Address_Formatted); if(ai.value!==cur){ j.Job_Address=ai.value; update("Jobs_Detail",j.id,{Job_Address:ai.value}); renderList(); } };
-  addrLine.appendChild(ai); top.appendChild(addrLine);
+  pillsRow.appendChild(asg);
+  pillsRow.appendChild(softChoice(j.Stage,STAGE_C,{onchange:v=>{j.Stage=v; update("Jobs_Detail",j.id,{Stage:v}); renderList();}}));
+  pillsRow.appendChild(softChoice(j.Payment_Status,PAY_C,{onchange:v=>{j.Payment_Status=v; update("Jobs_Detail",j.id,{Payment_Status:v}); renderList();}}));
+  top.appendChild(pillsRow);
   const inpd=$("div","sum-inp"); if(toDate(j.Input_Date)) inpd.textContent=fmtDate(j.Input_Date); top.appendChild(inpd);
   head.appendChild(top);
 
@@ -2160,6 +2188,7 @@ document.addEventListener("click",closeMenus);
   state.stoneColW=Array.isArray(p.stoneColW)?p.stoneColW:null; state.sumLeftPct=p.sumLeftPct||null;
   state.listCardFont=Object.assign({},LIST_CARD_FONT,p.listCardFont||{}); state.summaryFont=Object.assign({},SUMMARY_FONT,p.summaryFont||{});
   state.colors=normalizeColors(p.colors); applyColorOverrides();
+  state.fmtCollapsed=(p.fmtCollapsed&&typeof p.fmtCollapsed==="object")?p.fmtCollapsed:{};
   state.savedGroupings=p.savedGroupings||[]; state.activeGrouping=p.activeGrouping||"";
   if(!state.assignChoices) state.assignChoices=["Julie","Phoebe","Nhi","a Minh","Louis"];
   if("templateShared" in p) state.templateShared=(p.templateShared==null?null:!!p.templateShared);

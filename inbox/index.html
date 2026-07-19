@@ -479,7 +479,12 @@
   .pal-sw{width:100%;aspect-ratio:1/1;min-height:22px;border-radius:6px;border:1px solid rgba(0,0,0,.10);cursor:pointer;transition:transform .1s}
   .pal-sw:hover{transform:scale(1.12)}
   .pal-sw.on{box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--accent)}
-  .fmt-reset{margin-top:14px;width:100%;background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;font-weight:600;cursor:pointer}
+  .fmt-saverow{display:flex;gap:8px;margin-top:14px}
+  .fmt-save{flex:1;background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 6px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+  .fmt-save:hover{background:var(--line2)}
+  .fmt-save.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .fmt-save.primary:hover{filter:brightness(1.06)}
+  .fmt-reset{margin-top:8px;width:100%;background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;font-weight:600;cursor:pointer}
   .fmt-reset:hover{background:var(--line2)}
 
   @media (max-width:820px){
@@ -548,7 +553,7 @@
   <div class="modal-card">
     <div class="modal-head"><span class="modal-title">Customize job card</span><span class="modal-sub">Write a template · insert fields · format with markdown</span><span class="modal-close" id="cardClose">&times;</span></div>
     <div class="modal-body" id="cardBody"></div>
-    <div class="modal-foot"><button class="btn-ghost" id="cardReset">Reset to default</button><button class="btn-primary" id="cardDone">Done</button></div>
+    <div class="modal-foot"><button class="btn-ghost" id="cardReset">Reset to default</button><button class="btn-ghost" id="cardSaveMe">Save just for me</button><button class="btn-primary" id="cardSaveAll">Save for everyone</button></div>
   </div>
 </div>
 <div class="modal" id="histModal" hidden>
@@ -1455,15 +1460,27 @@ function insertAtCursor(ta,text){
   const s=ta.selectionStart==null?ta.value.length:ta.selectionStart, e=ta.selectionEnd==null?ta.value.length:ta.selectionEnd;
   ta.value=ta.value.slice(0,s)+text+ta.value.slice(e); ta.selectionStart=ta.selectionEnd=s+text.length;
 }
-function pushSharedTemplate(){
-  if(state.templateShared && state.grist){ try{
-    grist.setOption("cardTemplate", state.cardTemplate||DEFAULT_TEMPLATE);
-    grist.setOption("grouping", state.grouping||{by:"",rules:[],restMode:"value"});
-    grist.setOption("stageOrder", (state.stageOrder||STAGES).slice());
-    grist.setOption("cardFontSize", state.cardFontSize||12.5);
-  }catch(e){} }
+// Team-shared widget config — written to the Grist document ONLY when the user
+// explicitly picks "Save for everyone". "Save just for me" keeps everything in
+// localStorage and stops following the team design.
+let _sharedSig=null;   // last shared config seen/pushed, to detect real changes
+function sharedConfigObj(){
+  return { cardTemplate:state.cardTemplate||DEFAULT_TEMPLATE,
+    grouping:state.grouping||{by:"",rules:[],restMode:"value"},
+    stageOrder:(state.stageOrder||STAGES).slice(), cardFontSize:state.cardFontSize||12.5,
+    listCardFont:state.listCardFont, summaryFont:state.summaryFont,
+    colors:state.colors, fields:state.fields,
+    savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"" };
 }
-function setTemplateShared(on){ state.templateShared=on; savePrefs(); if(on) pushSharedTemplate(); }
+function pushSharedConfig(){
+  if(!state.grist) return;
+  const o=sharedConfigObj(); _sharedSig=JSON.stringify(o);
+  try{ if(grist.setOptions) grist.setOptions(o); else for(const k in o) grist.setOption(k,o[k]); }catch(e){}
+}
+// The two save choices offered wherever the design is edited.
+function saveForEveryone(){ state.templateShared=true;  savePrefs(); pushSharedConfig(); }
+function saveForMyself()  { state.templateShared=false; savePrefs(); }   // local only; stop following team
+const pushSharedTemplate=function(){ if(state.templateShared) pushSharedConfig(); };  // legacy callers push only when following
 function commitGrouping(){ state.activeGrouping=""; savePrefs(); renderList(); updateToolbar(); }   // manual edit = custom; shared push on Done/close
 function applyGrouping(g){ state.grouping=normalizeGrouping(g.grouping); state.activeGrouping=g.name; savePrefs(); closeMenus(); renderList(); updateToolbar(); }
 function saveGroupingAs(){
@@ -1549,10 +1566,8 @@ function openCardEditor(){
   // ---- Card layout panel ----
   const ta=document.createElement("textarea"); ta.className="tpl-ta"; ta.spellcheck=false; ta.value=state.cardTemplate||DEFAULT_TEMPLATE;
   ta.onblur=pushSharedTemplate; panelCard.appendChild(ta);
-  const share=$("label","tpl-share");
-  const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=!!state.templateShared; cb.onchange=()=>setTemplateShared(cb.checked);
-  share.appendChild(cb); share.appendChild($("span",null,"Apply to everyone — save this design in the Grist document"));
-  if(typeof grist==="undefined"||!state.grist) share.appendChild($("span","tpl-note"," (takes effect inside Grist)"));
+  const share=$("div","tpl-share");
+  share.appendChild($("span","tpl-note","When you save, choose “Save for everyone” (team design, stored in the Grist doc) or “Save just for me” (this browser only)."));
   panelCard.appendChild(share);
   // text size
   const fsRow=$("div","tpl-fs"); fsRow.appendChild($("span",null,"Card text size"));
@@ -1742,6 +1757,13 @@ function buildFormatPanel(){
     if(people.length) people.forEach(n=> body.appendChild(colorRow(n, avatarColor(n), DEFAULT_AVATAR, v=>{ state.colors.assignee[n]=v; savePrefs(); renderAll(); })));
     else body.appendChild($("div","fs-row","No assignees yet."));
   });
+  // save choice — team design vs personal
+  const saveRow=$("div","fmt-saverow");
+  const sAll=$("button","fmt-save primary","Save for everyone"); sAll.title="Store this design in the Grist doc so every viewer gets it";
+  sAll.onclick=()=>{ saveForEveryone(); sAll.textContent="Saved ✓"; setTimeout(()=>{sAll.textContent="Save for everyone";},1200); };
+  const sMe=$("button","fmt-save","Save just for me"); sMe.title="Keep this design in this browser only (stops following the team design)";
+  sMe.onclick=()=>{ saveForMyself(); sMe.textContent="Saved ✓"; setTimeout(()=>{sMe.textContent="Save just for me";},1200); };
+  saveRow.appendChild(sMe); saveRow.appendChild(sAll); p.appendChild(saveRow);
   const rst=$("button","fmt-reset","Reset to defaults"); rst.onclick=()=>{ state.listCardFont=Object.assign({},LIST_CARD_FONT); state.summaryFont=Object.assign({},SUMMARY_FONT); state.cardFontSize=LIST_CARD_FONT.base; state.colors={stage:{},payment:{},assignee:{}}; applyColorOverrides(); syncChoiceMaps(); applyCardFont(); savePrefs(); renderAll(); buildFormatPanel(); };
   p.appendChild(rst);
 }
@@ -2110,21 +2132,34 @@ if(typeof grist!=="undefined"){
   // Remember the cursor selection; only render live once we've actually flipped.
   try{ grist.onRecord(rec=>{ if(rec && rec.id!=null) state.selectedId=rec.id; if(state.grist){ renderList(); renderDetail(); } }); }catch(e){}
   // Shared card template — stored in the widget's doc options so it applies to EVERY viewer.
+  // Team design lives in the widget's doc options. It is adopted only while this
+  // viewer is "following" it (templateShared): saving "for everyone" turns that
+  // on, saving "just for me" turns it off. First run follows an existing team
+  // design. Each key is adopted only when it actually differs (no loops, and an
+  // in-progress card edit isn't clobbered).
   try{ grist.onOptions(opts=>{
-    const shared=(opts && typeof opts.cardTemplate==="string" && opts.cardTemplate.trim())?opts.cardTemplate:null;
+    opts=opts||{};
+    const shared=(typeof opts.cardTemplate==="string" && opts.cardTemplate.trim())?opts.cardTemplate:null;
     state._sharedTemplate=shared;
-    if(state.templateShared==null) state.templateShared=!!shared;                 // first run: follow the team design if one exists
-    if(state.templateShared && shared!=null && document.getElementById("cardModal").hidden && state.cardTemplate!==shared){
-      state.cardTemplate=shared; renderList();                                     // adopt live when the shared design changes
-    }
-    if(state.templateShared && opts && opts.grouping && document.getElementById("cardModal").hidden){
-      state.grouping=normalizeGrouping(opts.grouping); renderList();               // adopt shared grouping too
-    }
-    if(state.templateShared && opts && document.getElementById("cardModal").hidden){
-      if(Array.isArray(opts.stageOrder)){ state.stageOrder=opts.stageOrder.slice(); normalizeStageOrder(); }
-      if(typeof opts.cardFontSize==="number"){ state.cardFontSize=opts.cardFontSize; applyCardFont(); }
-      renderList();
-    }
+    if(state.templateShared==null) state.templateShared=!!shared;   // first run: follow the team design if one exists
+    if(!state.templateShared) return;                               // saved "just for me" → keep local design
+    const editing=!document.getElementById("cardModal").hidden;
+    const J=v=>JSON.stringify(v);
+    let changed=false, fontChanged=false, colorChanged=false;
+    if(!editing && shared!=null && state.cardTemplate!==shared){ state.cardTemplate=shared; changed=true; }
+    if(!editing && opts.grouping){ const g=normalizeGrouping(opts.grouping); if(J(g)!==J(state.grouping)){ state.grouping=g; changed=true; } }
+    if(typeof opts.activeGrouping==="string" && opts.activeGrouping!==state.activeGrouping){ state.activeGrouping=opts.activeGrouping; changed=true; }
+    if(Array.isArray(opts.savedGroupings) && J(opts.savedGroupings)!==J(state.savedGroupings)){ state.savedGroupings=opts.savedGroupings.slice(); }
+    if(Array.isArray(opts.stageOrder) && J(opts.stageOrder)!==J(state.stageOrder)){ state.stageOrder=opts.stageOrder.slice(); normalizeStageOrder(); changed=true; }
+    if(typeof opts.cardFontSize==="number" && opts.cardFontSize!==state.cardFontSize){ state.cardFontSize=opts.cardFontSize; fontChanged=true; }
+    if(opts.listCardFont && J(opts.listCardFont)!==J(state.listCardFont)){ state.listCardFont=Object.assign({},LIST_CARD_FONT,opts.listCardFont); fontChanged=true; }
+    if(opts.summaryFont && J(opts.summaryFont)!==J(state.summaryFont)){ state.summaryFont=Object.assign({},SUMMARY_FONT,opts.summaryFont); changed=true; }
+    if(opts.fields && J(opts.fields)!==J(state.fields)){ state.fields=Object.assign(defaultFields(),opts.fields); changed=true; }
+    if(opts.colors && J(opts.colors)!==J(state.colors)){ state.colors=normalizeColors(opts.colors); colorChanged=true; }
+    if(colorChanged){ applyColorOverrides(); syncChoiceMaps(); changed=true; }
+    if(fontChanged){ applyCardFont(); changed=true; }
+    _sharedSig=J(sharedConfigObj());               // remember what the team design looks like
+    if(changed){ renderAll(); if(!document.getElementById("fmtPanel").hidden) buildFormatPanel(); }
   }); }catch(e){}
   // This resolves only when a real Grist host answers; otherwise we stay in demo
   // mode instead of hanging. We load the schema and real tables FIRST, then flip
@@ -2235,8 +2270,9 @@ document.getElementById("formCancel").onclick=closeForm;
 document.getElementById("formSave").onclick=submitRecordForm;
 document.getElementById("formModal").onclick=e=>{ if(e.target.id==="formModal") closeForm(); };
 document.querySelector("#formModal .modal-card").onclick=e=>e.stopPropagation();
-document.getElementById("cardClose").onclick=()=>{ pushSharedTemplate(); closeCardModal(); };
-document.getElementById("cardDone").onclick=()=>{ pushSharedTemplate(); closeCardModal(); };
+document.getElementById("cardClose").onclick=()=>{ pushSharedTemplate(); closeCardModal(); };   // × keeps current choice
+document.getElementById("cardSaveAll").onclick=()=>{ saveForEveryone(); closeCardModal(); };
+document.getElementById("cardSaveMe").onclick =()=>{ saveForMyself();  closeCardModal(); };
 document.getElementById("cardReset").onclick=resetActivePanel;
 document.getElementById("cardModal").onclick=e=>{ if(e.target.id==="cardModal") closeCardModal(); };
 document.querySelector("#cardModal .modal-card").onclick=e=>e.stopPropagation();

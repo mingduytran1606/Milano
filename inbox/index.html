@@ -420,10 +420,13 @@
   .stone{display:grid;grid-template-columns:auto minmax(0,1.6fr) minmax(0,1fr);align-items:center;gap:8px}
   .stone .snm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-stone,13px);font-weight:600}
   .stone .snote{justify-self:stretch;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-stoneNote,12px);color:var(--muted);cursor:default}
-  .sinl{display:inline-flex;align-items:center;white-space:nowrap;cursor:default}
   .sdot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.14) inset}
-  .slabel{max-width:0;opacity:0;overflow:hidden;white-space:nowrap;font-size:var(--fs-stoneStatus,11.5px);font-weight:600;color:var(--muted);transition:max-width .18s ease,opacity .15s ease,margin-left .18s ease}
-  .stone:hover .slabel{max-width:150px;opacity:1;margin-left:6px}
+  .stone .sdot-lead{cursor:default}
+  /* status snapshot at the top of the scope block */
+  .stone-summary{display:flex;flex-wrap:wrap;gap:5px 13px;margin:10px 0 2px}
+  .stsum-chip{display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-stoneStatus,11.5px);white-space:nowrap;cursor:default}
+  .stsum-n{font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+  .stsum-l{color:var(--muted);font-weight:600}
   .spill{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-pill,12px);font-weight:600;color:var(--ink);border-radius:999px;padding:3px 10px 3px 9px;cursor:pointer}
   .spill .pcaret{font-size:8px;opacity:.5;margin-left:1px;line-height:1}
   .sum-note{font:inherit;font-size:var(--fs-note,13px);line-height:1.5;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 11px;width:100%;resize:vertical;min-height:46px}
@@ -1984,13 +1987,25 @@ function renderDetail(){
   scopeBlk.appendChild($("span","sum-lbl","Scope"));
   const scn=$("div","scope-n"); scn.appendChild($("b",null, j.Scope_Qty!=null?String(j.Scope_Qty):"0")); scn.appendChild($("span",null,"slabs")); scopeBlk.appendChild(scn);
   if(stone.length){
+    // status snapshot — total slabs (the per-line "N×") grouped by order status
+    const byStatus=new Map();
+    stone.forEach(r=>{ const s=r.Order_Status||"—"; byStatus.set(s,(byStatus.get(s)||0)+(Number(r.Scope_Qty)||0)); });
+    const sumRow=$("div","stone-summary");
+    [...byStatus.entries()]
+      .sort((a,b)=> (b[1]-a[1]) || ((ORDS.indexOf(a[0])+1||99)-(ORDS.indexOf(b[0])+1||99)))
+      .forEach(([s,qty])=>{
+        const chip=$("span","stsum-chip"); chip.title=s;
+        const d=$("span","sdot"); d.style.background=softTint(ORD_C[s]).dot; chip.appendChild(d);
+        chip.appendChild($("span","stsum-n", String(qty)));
+        chip.appendChild($("span","stsum-l", stripNo(s)||"—"));
+        sumRow.appendChild(chip);
+      });
+    scopeBlk.appendChild(sumRow);
     const sl=$("div","stones");
     stone.forEach(r=>{
       const row=$("div","stone");
-      const si=$("span","sinl"); si.title=r.Order_Status||"";
-      const dot=$("span","sdot"); dot.style.background=softTint(ORD_C[r.Order_Status]).dot; si.appendChild(dot);
-      si.appendChild($("span","slabel", stripNo(r.Order_Status)||"—"));
-      row.appendChild(si);
+      const dot=$("span","sdot sdot-lead"); dot.style.background=softTint(ORD_C[r.Order_Status]).dot; dot.title=r.Order_Status||"";
+      row.appendChild(dot);
       row.appendChild($("span","snm", (r.Scope_Qty!=null?r.Scope_Qty+"\u00d7 ":"")+esc(stoneProductLabel(r))));
       const sn=$("span","snote", esc(r.Note)); if(r.Note) sn.title=esc(r.Note); row.appendChild(sn);
       sl.appendChild(row);

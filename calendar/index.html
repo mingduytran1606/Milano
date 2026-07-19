@@ -576,15 +576,22 @@
     return sel.some(function (b) { return b === '2+' ? n >= 2 : Number(b) === n; });
   }
   // does a calendar visit pass the filters?
+  // Read stage/payment/assignee from the matched sidebar job (jobsCache reads those
+  // columns straight off the jobs table), so filtering works even when Assigned_To /
+  // Payment_Status aren't part of the widget's own column mapping. Fall back to the
+  // record's mapped columns when there's no jobs-table match.
   function recPasses(rec) {
+    var j = jobForRecord(rec);
     var st = activeKeys(filters.stage);
-    if (st.length && st.indexOf(stageOf(rec)) === -1) return false;
+    if (st.length && st.indexOf((j && j.stage) || stageOf(rec)) === -1) return false;
     var pm = activeKeys(filters.payment);
-    if (pm.length && pm.indexOf(String(rec[JOB_COLS.payment] || '')) === -1) return false;
-    // assignee pill bar
+    if (pm.length) {
+      var pay = (j && j.payment) || String(rec[JOB_COLS.payment] || '');
+      if (pm.indexOf(pay) === -1) return false;
+    }
     if (jobTab !== 'all') {
-      var ac = assigneeColId();
-      var have = ac ? listVals(rec[ac]) : [];
+      var have = (j && j.assigned && j.assigned.length) ? j.assigned
+               : (assigneeColId() ? listVals(rec[assigneeColId()]) : []);
       if (jobTab === '__none') { if (have.length) return false; }
       else if (have.indexOf(jobTab) === -1) return false;
     }

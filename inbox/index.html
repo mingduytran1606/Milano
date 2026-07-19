@@ -470,12 +470,15 @@
   .fs-btn{flex:0 0 auto;width:22px;height:22px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center}
   .fs-btn:hover{background:var(--line2);border-color:var(--accent)}
   .fs-v{flex:0 0 auto;min-width:42px;text-align:center;color:var(--muted);font-variant-numeric:tabular-nums}
-  .fmt-color-row{display:flex;align-items:center;gap:9px;padding:3px 0;font-size:12.5px}
-  .fmt-swatch{flex:0 0 auto;width:28px;height:22px;padding:0;border:1px solid var(--line);border-radius:6px;background:none;cursor:pointer}
-  .fmt-swatch::-webkit-color-swatch-wrapper{padding:2px}
-  .fmt-swatch::-webkit-color-swatch{border:none;border-radius:4px}
-  .fmt-swatch::-moz-color-swatch{border:none;border-radius:4px}
+  .fmt-color-row{display:flex;align-items:center;gap:9px;padding:4px;border-radius:8px;font-size:12.5px;cursor:pointer}
+  .fmt-color-row:hover{background:var(--line2)}
+  .fmt-swatch{flex:0 0 auto;width:28px;height:22px;border:1px solid rgba(0,0,0,.12);border-radius:6px}
   .fmt-cl{flex:1;min-width:0;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fmt-palette{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;padding:4px 4px 10px}
+  .fmt-palette[hidden]{display:none}
+  .pal-sw{width:100%;aspect-ratio:1/1;min-height:22px;border-radius:6px;border:1px solid rgba(0,0,0,.10);cursor:pointer;transition:transform .1s}
+  .pal-sw:hover{transform:scale(1.12)}
+  .pal-sw.on{box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--accent)}
   .fmt-reset{margin-top:14px;width:100%;background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;font-weight:600;cursor:pointer}
   .fmt-reset:hover{background:var(--line2)}
 
@@ -1636,14 +1639,36 @@ function fontStepper(labelText,obj,key,onchange){
   dec.onclick=()=>set(obj[key]-0.5); inc.onclick=()=>set(obj[key]+0.5);
   row.appendChild(dec); row.appendChild(val); row.appendChild(inc); return row;
 }
-// A swatch + label row for the colour section of the floating panel.
+// Curated pastel palette — the pre-selected colours offered in the panel.
+const PALETTE=[
+  "#ffb3ba","#ffccb3","#ffe0b3","#fff3b3","#f2f7b3","#d4f0b3","#b3f0bf","#b3f0dd",
+  "#b3ecf0","#b3d9f7","#b3c2f7","#c7b8f7","#dcb8f7","#f2b8f7","#f7b8d8","#eef1f4"];
+// A grid of pastel swatches; highlights whichever matches the current colour.
+function swatchGrid(getCur,onpick){
+  const g=$("div","fmt-palette");
+  PALETTE.forEach(hex=>{
+    const sw=$("span","pal-sw"); sw.style.background=hex; sw.title=hex; sw.dataset.hex=toHex6(hex);
+    sw.onclick=e=>{ e.stopPropagation(); [...g.children].forEach(c=>c.classList.remove("on")); sw.classList.add("on"); onpick(hex); };
+    g.appendChild(sw);
+  });
+  g._mark=()=>{ const cur=toHex6(getCur()); [...g.children].forEach(c=>c.classList.toggle("on", c.dataset.hex===cur)); };
+  g._mark();
+  return g;
+}
+// A swatch + label row that opens the pastel palette on click.
 function colorRow(labelText,curHex,defHex,onpick){
+  let cur=toHex6(curHex||defHex);
+  const wrap=$("div","fmt-color-wrap");
   const row=$("div","fmt-color-row");
-  const sw=document.createElement("input"); sw.type="color"; sw.className="fmt-swatch"; sw.value=toHex6(curHex||defHex);
-  sw.title="Pick a colour for "+labelText;
-  sw.onchange=()=>onpick(sw.value);
-  row.appendChild(sw); row.appendChild($("span","fmt-cl",labelText));
-  return row;
+  const sw=$("span","fmt-swatch"); sw.style.background=cur; row.appendChild(sw);
+  row.appendChild($("span","fmt-cl",labelText));
+  const grid=swatchGrid(()=>cur, v=>{ cur=toHex6(v); sw.style.background=cur; grid.hidden=true; onpick(v); });
+  grid.hidden=true;
+  row.onclick=()=>{ const willOpen=grid.hidden;
+    document.querySelectorAll("#fmtPanel .fmt-palette").forEach(o=>{ o.hidden=true; });  // one open at a time
+    if(willOpen){ grid.hidden=false; grid._mark(); } };
+  wrap.appendChild(row); wrap.appendChild(grid);
+  return wrap;
 }
 // Default open/closed state per panel section (colour lists start collapsed).
 const FMT_COLLAPSE_DEFAULT={list:false,summary:false,stage:true,payment:true,assignee:true};

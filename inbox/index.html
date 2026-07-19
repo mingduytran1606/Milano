@@ -865,7 +865,7 @@ function applyConfig(c){ if(!c)return;
   if("activeView" in c) state.activeView=c.activeView||""; }
 function sig(s){ return JSON.stringify({q:s.q||"",st:Object.keys(cleanSet(s.stage)).sort(),
   as:Object.keys(cleanSet(s.assigned)).sort(),py:Object.keys(cleanSet(s.payment)).sort(),
-  so:s.sort||null,so2:s.sort2||null,fl:s.fields||null}); }
+  so:s.sort||null,so2:s.sort2||null,sto:s.stageOrder||null,fl:s.fields||null}); }
 function findView(n){ return state.savedViews.find(v=>v.name===n)||null; }
 function isViewDirty(){ const v=findView(state.activeView); if(!v)return false; return sig(snapshot())!==sig(v.config); }
 function filterCount(){ return activeKeys(state.filter.stage).length+activeKeys(state.filter.assigned).length+activeKeys(state.filter.payment).length; }
@@ -1320,10 +1320,12 @@ function renderViewsMenu(){
   if(!state.activeView) all.appendChild($("span","rtick","✓"));
   all.onclick=()=>{ clearView(); };
   host.appendChild(all);
+  const dirty=state.activeView&&isViewDirty();
   state.savedViews.slice().sort((a,b)=>a.name.toLowerCase().localeCompare(b.name.toLowerCase())).forEach(v=>{
-    const row=$("div","prow"+(v.name===state.activeView?" on":""));
-    row.appendChild($("span","rlabel",v.name));
-    if(v.name===state.activeView) row.appendChild($("span","rtick","✓"));
+    const on=v.name===state.activeView;
+    const row=$("div","prow"+(on?" on":""));
+    row.appendChild($("span","rlabel",v.name+(on&&dirty?" (edited)":"")));
+    if(on) row.appendChild($("span","rtick","✓"));
     const del=$("span","rdel","×"); del.title="Delete view";
     del.onclick=e=>{ e.stopPropagation(); if(confirm('Delete the view "'+v.name+'"?')) deleteView(v.name); };
     row.appendChild(del);
@@ -1332,8 +1334,9 @@ function renderViewsMenu(){
   });
   if(!state.savedViews.length) host.appendChild($("div","pempty","None yet — set filters/sort/fields, then Save current as…"));
   host.appendChild($("div","psep"));
-  if(state.activeView && isViewDirty()){
-    const upd=$("div","paction",'⟳ Update "'+state.activeView+'"'); upd.onclick=()=>updateView(); host.appendChild(upd);
+  if(dirty){
+    const upd=$("div","paction",'⟳ Update "'+state.activeView+'" with these tweaks'); upd.onclick=()=>updateView(); host.appendChild(upd);
+    const rev=$("div","paction",'↩ Revert to saved "'+state.activeView+'"'); rev.onclick=()=>{ const v=findView(state.activeView); if(v) applyView(v); }; host.appendChild(rev);
   }
   const save=$("div","paction","＋ Save current as…"); save.onclick=()=>saveViewAs(); host.appendChild(save);
   if(state.activeView||filterCount()||state.filter.q){
@@ -1357,11 +1360,11 @@ function renderFilterMenu(){
       const chip=$("div","pchip"+(drill.bucket[v]?" on":"")); chip.appendChild($("span","sw"));
       if(drill.dot(v)!=null){ const d=$("span","cdot"); d.style.background=drill.dot(v); chip.appendChild(d); }
       chip.appendChild($("span","clabel",v));
-      chip.onclick=()=>{ drill.bucket[v]=!drill.bucket[v]; if(!drill.bucket[v])delete drill.bucket[v]; state.activeView=""; savePrefs(); renderFilterMenu(); renderList(); };
+      chip.onclick=()=>{ drill.bucket[v]=!drill.bucket[v]; if(!drill.bucket[v])delete drill.bucket[v]; savePrefs(); renderFilterMenu(); renderList(); };
       host.appendChild(chip);
     });
     if(activeKeys(drill.bucket).length){
-      const c=$("div","paction",'Clear '+drill.label.toLowerCase()); c.onclick=()=>{ DEFS.find(d=>d.key===drill.key).bucket=(state.filter[drill.key]={}); state.activeView=""; savePrefs(); renderFilterMenu(); renderList(); }; host.appendChild(c);
+      const c=$("div","paction",'Clear '+drill.label.toLowerCase()); c.onclick=()=>{ DEFS.find(d=>d.key===drill.key).bucket=(state.filter[drill.key]={}); savePrefs(); renderFilterMenu(); renderList(); }; host.appendChild(c);
     }
     return;
   }
@@ -1376,7 +1379,7 @@ function renderFilterMenu(){
   });
   if(filterCount()){
     host.appendChild($("div","psep"));
-    const clr=$("div","paction danger","Clear all filters"); clr.onclick=()=>{ state.filter.stage={};state.filter.assigned={};state.filter.payment={}; state.activeView=""; savePrefs(); renderFilterMenu(); renderList(); }; host.appendChild(clr);
+    const clr=$("div","paction danger","Clear all filters"); clr.onclick=()=>{ state.filter.stage={};state.filter.assigned={};state.filter.payment={}; savePrefs(); renderFilterMenu(); renderList(); }; host.appendChild(clr);
   }
 }
 function renderSortMenu(){
@@ -1389,21 +1392,21 @@ function renderSortMenu(){
     if(on) row.appendChild($("span","rarrow",state.sort.dir===1?"↑":"↓"));
     row.onclick=()=>{ if(state.sort.key===o.key)state.sort.dir=-state.sort.dir; else state.sort={key:o.key,dir:defaultDir(o.key)};
       if(state.sort2.key===state.sort.key)state.sort2={key:"",dir:1};  // secondary can't repeat the primary
-      state.activeView=""; savePrefs(); renderSortMenu(); renderList(); };
+      savePrefs(); renderSortMenu(); renderList(); };
     host.appendChild(row);
   });
   // secondary sort (tie-breaker)
   host.appendChild($("div","psep"));
   host.appendChild($("div","phead","Then by (tie-breaker)"));
   const none=$("div","prow"+(state.sort2.key?"":" on")); none.appendChild($("span","rlabel","None"));
-  none.onclick=()=>{ state.sort2={key:"",dir:1}; state.activeView=""; savePrefs(); renderSortMenu(); renderList(); };
+  none.onclick=()=>{ state.sort2={key:"",dir:1}; savePrefs(); renderSortMenu(); renderList(); };
   host.appendChild(none);
   SORT_OPTS.filter(o=>o.key!==state.sort.key).forEach(o=>{
     const on=state.sort2.key===o.key;
     const row=$("div","prow"+(on?" on":"")); row.appendChild($("span","rlabel",o.label));
     if(on) row.appendChild($("span","rarrow",state.sort2.dir===1?"↑":"↓"));
     row.onclick=()=>{ if(state.sort2.key===o.key)state.sort2.dir=-state.sort2.dir; else state.sort2={key:o.key,dir:defaultDir(o.key)};
-      state.activeView=""; savePrefs(); renderSortMenu(); renderList(); };
+      savePrefs(); renderSortMenu(); renderList(); };
     host.appendChild(row);
   });
   // stage-order editor — shown whenever stage drives either sort level
@@ -1420,7 +1423,7 @@ function renderSortMenu(){
       row.ondragend=()=>row.classList.remove("dragging");
       row.ondragover=e=>e.preventDefault();
       row.ondrop=e=>{ e.preventDefault(); const from=(e.dataTransfer&&e.dataTransfer.getData("text/plain"))||state._sdrag;
-        if(from&&from!==stg){ reorderStage(from,stg); state.activeView=""; savePrefs(); renderSortMenu(); renderList(); } };
+        if(from&&from!==stg){ reorderStage(from,stg); savePrefs(); renderSortMenu(); renderList(); } };
       list.appendChild(row);
     });
     host.appendChild(list);
@@ -1432,7 +1435,7 @@ function renderDispMenu(){
   FIELD_DEFS.forEach(([k,lbl])=>{
     const chip=$("div","pchip"+(state.fields[k]?" on":"")); chip.appendChild($("span","sw"));
     chip.appendChild($("span","clabel",lbl));
-    chip.onclick=()=>{ state.fields[k]=!state.fields[k]; state.activeView=""; savePrefs(); renderDispMenu(); renderList(); };
+    chip.onclick=()=>{ state.fields[k]=!state.fields[k]; savePrefs(); renderDispMenu(); renderList(); };
     host.appendChild(chip);
   });
 }
@@ -1815,8 +1818,9 @@ function filteredJobs(){
   }).sort(cmpJobs);
 }
 function updateToolbar(){
-  document.getElementById("viewsName").textContent = state.activeView||"All jobs";
+  document.getElementById("viewsName").textContent = state.activeView ? state.activeView+(isViewDirty()?" •":"") : "All jobs";
   document.getElementById("viewsBtn").classList.toggle("active", !!state.activeView);
+  document.getElementById("viewsBtn").title = (state.activeView&&isViewDirty()) ? 'This view has unsaved tweaks — open to Update or Revert' : '';
   const gn=document.getElementById("groupName");
   if(gn){ gn.textContent = state.activeGrouping || (groupingActive()?"Grouped":"No grouping");
     document.getElementById("groupBtn").classList.toggle("active", groupingActive()); }
@@ -2258,7 +2262,7 @@ const SAMPLE_INST=[
 // ============================================================
 document.getElementById("newJob").onclick=newJob;
 MENUS.forEach(([b,m,r])=>{ document.getElementById(b).onclick=e=>{ e.stopPropagation(); toggleMenu(b,m,r); }; document.getElementById(m).onclick=e=>e.stopPropagation(); });
-document.getElementById("fSearch").oninput=e=>{ state.filter.q=e.target.value; state.activeView=""; savePrefs(); renderList(); };
+document.getElementById("fSearch").oninput=e=>{ state.filter.q=e.target.value; savePrefs(); renderList(); };
 document.getElementById("rowMenu").onclick=e=>e.stopPropagation();
 document.getElementById("prodPicker").onclick=e=>e.stopPropagation();
 document.getElementById("choicePop").onclick=e=>e.stopPropagation();

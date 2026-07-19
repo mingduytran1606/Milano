@@ -887,9 +887,22 @@ function productDisplayCols(refInfo){
 function finishRefSetup(){
   if(state.ref.product && !state.ref.product.cols) state.ref.product.cols=productDisplayCols(state.ref.product);
 }
+// Drop any label part that's already fully contained (case-insensitive) in a
+// longer part — so when the name already spells out supplier/code we don't
+// repeat them, e.g. ["Lavistone","LS313","Lavistone | LS313 | Neutra 20mm"]
+// collapses to just "Lavistone | LS313 | Neutra 20mm".
+function dedupeLabelParts(parts){
+  const p=parts.map(v=>String(v).trim()).filter(Boolean);
+  const norm=s=>s.toLowerCase();
+  return p.filter((v,i)=>!p.some((w,j)=>{
+    if(i===j) return false;
+    const a=norm(v), b=norm(w);
+    return a===b ? j<i : (b.length>a.length && b.includes(a));
+  }));
+}
 function productLabel(row){
   const R=state.ref.product; if(!R||!R.cols) return row&&R&&R.labelCol?String(row[R.labelCol]||""):"";
-  const parts=[R.cols.supplier,R.cols.code,R.cols.name].map(k=>k?row[k]:null).filter(v=>v!=null&&v!=="");
+  const parts=dedupeLabelParts([R.cols.supplier,R.cols.code,R.cols.name].map(k=>k?row[k]:null).filter(v=>v!=null&&v!==""));
   return parts.length?parts.join(" · "):String(row[R.labelCol]||"#"+row.id);
 }
 // Label for a stone line's product: resolve the Product reference into the
@@ -900,7 +913,7 @@ function stoneProductLabel(r){
   if(R){ const pid=refId(r.Product);
     if(pid!=null){ const cat=(state.catalogue||[]).find(c=>c.id===pid);
       if(cat){ const v=productLabel(cat); if(v && v.trim()) return v; } } }
-  if(r.Product_Code) return (r.Product_Supplier?r.Product_Supplier+" · ":"")+r.Product_Code;
+  if(r.Product_Code) return dedupeLabelParts([r.Product_Supplier,r.Product_Code]).join(" · ");
   if(r.Product_Supplier) return r.Product_Supplier;
   if(r.Stone) return r.Stone;
   return "—";

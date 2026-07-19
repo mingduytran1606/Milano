@@ -1478,7 +1478,8 @@ function sharedConfigObj(){
     stageOrder:(state.stageOrder||STAGES).slice(), cardFontSize:state.cardFontSize||12.5,
     listCardFont:state.listCardFont, summaryFont:state.summaryFont,
     colors:state.colors, fields:state.fields,
-    savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"" };
+    savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"",
+    savedViews:state.savedViews||[] };
 }
 function pushSharedConfig(){
   if(!state.grist) return;
@@ -2183,6 +2184,7 @@ if(typeof grist!=="undefined"){
     if(!editing && opts.grouping){ const g=normalizeGrouping(opts.grouping); if(J(g)!==J(state.grouping)){ state.grouping=g; changed=true; } }
     if(typeof opts.activeGrouping==="string" && opts.activeGrouping!==state.activeGrouping){ state.activeGrouping=opts.activeGrouping; changed=true; }
     if(Array.isArray(opts.savedGroupings) && J(opts.savedGroupings)!==J(state.savedGroupings)){ state.savedGroupings=opts.savedGroupings.slice(); }
+    if(Array.isArray(opts.savedViews) && J(opts.savedViews)!==J(state.savedViews)){ state.savedViews=opts.savedViews.slice(); changed=true; }
     if(Array.isArray(opts.stageOrder) && J(opts.stageOrder)!==J(state.stageOrder)){ state.stageOrder=opts.stageOrder.slice(); normalizeStageOrder(); changed=true; }
     if(typeof opts.cardFontSize==="number" && opts.cardFontSize!==state.cardFontSize){ state.cardFontSize=opts.cardFontSize; fontChanged=true; }
     if(opts.listCardFont && J(opts.listCardFont)!==J(state.listCardFont)){ state.listCardFont=Object.assign({},LIST_CARD_FONT,opts.listCardFont); fontChanged=true; }

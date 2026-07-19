@@ -77,6 +77,7 @@
   .prow .rarrow{flex:0 0 auto;color:var(--accent-ink);font-weight:700}
   .prow .rcaret{flex:0 0 auto;margin-left:auto;color:var(--muted)}
   .prow .rnum{flex:0 0 auto;font-size:10px;font-weight:700;background:var(--accent);color:#fff;border-radius:9px;padding:0 6px;line-height:16px}
+  .prow .vtag{flex:0 0 auto;font-size:9.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--accent-ink);background:var(--accent-soft);border-radius:6px;padding:1px 6px}
   .prow .rdel{flex:0 0 auto;color:var(--muted);font-weight:700;padding:0 6px;border-radius:5px;line-height:1.4}
   .prow .rdel:hover{color:var(--danger);background:rgba(229,72,77,.12)}
   .pback{font-size:12px;font-weight:600;color:var(--accent-ink);cursor:pointer;padding:2px 4px 6px;user-select:none}
@@ -845,7 +846,7 @@ const state = { jobs:[], stone:[], inst:[], clients:[], catalogue:[], selectedId
 window._inbox = state;
 
 function loadPrefs(){ try{ return JSON.parse(localStorage.getItem(LSKEY))||{}; }catch(e){ return {}; } }
-function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ savedViews:state.savedViews, current:snapshot(true), stoneNoteH:state.stoneNoteH||null, listW:state.listW||null, templateShared:state.templateShared, groupCollapsed:state.groupCollapsed||{}, savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"", stoneColW:state.stoneColW||null, sumLeftPct:state.sumLeftPct||null, listCardFont:state.listCardFont, summaryFont:state.summaryFont, colors:state.colors, fmtCollapsed:state.fmtCollapsed })); }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ savedViews:state.savedViews.filter(v=>!v.shared), current:snapshot(true), stoneNoteH:state.stoneNoteH||null, listW:state.listW||null, templateShared:state.templateShared, groupCollapsed:state.groupCollapsed||{}, savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"", stoneColW:state.stoneColW||null, sumLeftPct:state.sumLeftPct||null, listCardFont:state.listCardFont, summaryFont:state.summaryFont, colors:state.colors, fmtCollapsed:state.fmtCollapsed })); }catch(e){} }
 function snapshot(withMeta){
   const s={ q:state.filter.q, stage:cleanSet(state.filter.stage), assigned:cleanSet(state.filter.assigned),
     payment:cleanSet(state.filter.payment), sort:{key:state.sort.key,dir:state.sort.dir}, sort2:{key:state.sort2.key,dir:state.sort2.dir}, stageOrder:(state.stageOrder||STAGES).slice(), cardFontSize:state.cardFontSize||12.5, fields:Object.assign({},state.fields),
@@ -1330,6 +1331,7 @@ function renderViewsMenu(){
     const on=v.name===state.activeView;
     const row=$("div","prow"+(on?" on":""));
     row.appendChild($("span","rlabel",v.name+(on&&dirty?" (edited)":"")));
+    if(v.shared) row.appendChild($("span","vtag","everyone"));
     if(on) row.appendChild($("span","rtick","✓"));
     const del=$("span","rdel","×"); del.title="Delete view";
     del.onclick=e=>{ e.stopPropagation(); if(confirm('Delete the view "'+v.name+'"?')) deleteView(v.name); };
@@ -1337,13 +1339,14 @@ function renderViewsMenu(){
     row.onclick=()=>applyView(v);
     host.appendChild(row);
   });
-  if(!state.savedViews.length) host.appendChild($("div","pempty","None yet — set filters/sort/fields, then Save current as…"));
+  if(!state.savedViews.length) host.appendChild($("div","pempty","None yet — set filters/sort/fields, then save below."));
   host.appendChild($("div","psep"));
   if(dirty){
     const upd=$("div","paction",'⟳ Update "'+state.activeView+'" with these tweaks'); upd.onclick=()=>updateView(); host.appendChild(upd);
     const rev=$("div","paction",'↩ Revert to saved "'+state.activeView+'"'); rev.onclick=()=>{ const v=findView(state.activeView); if(v) applyView(v); }; host.appendChild(rev);
   }
-  const save=$("div","paction","＋ Save current as…"); save.onclick=()=>saveViewAs(); host.appendChild(save);
+  const saveAll=$("div","paction",'＋ Save for everyone…'); saveAll.title="Team view — stored in the Grist doc for all viewers"; saveAll.onclick=()=>saveViewAs(true); host.appendChild(saveAll);
+  const saveMe=$("div","paction",'＋ Save just for me…'); saveMe.title="Personal view — this browser only"; saveMe.onclick=()=>saveViewAs(false); host.appendChild(saveMe);
   if(state.activeView||filterCount()||state.filter.q){
     const clr=$("div","paction danger","✕ Clear (show all)"); clr.onclick=()=>clearView(); host.appendChild(clr);
   }
@@ -1478,8 +1481,7 @@ function sharedConfigObj(){
     stageOrder:(state.stageOrder||STAGES).slice(), cardFontSize:state.cardFontSize||12.5,
     listCardFont:state.listCardFont, summaryFont:state.summaryFont,
     colors:state.colors, fields:state.fields,
-    savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"",
-    savedViews:state.savedViews||[] };
+    savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"" };
 }
 function pushSharedConfig(){
   if(!state.grist) return;
@@ -1672,15 +1674,20 @@ function closeHistory(){ document.getElementById("histModal").hidden=true; }
 
 // ---- saved-view actions ----
 function applyView(v){ applyConfig(Object.assign({},v.config,{activeView:v.name})); state.filterDrill=null; savePrefs(); closeMenus(); renderAll(); }
-function saveViewAs(){
-  const name=prompt('Name this view (e.g. "In progress", "My jobs"):', state.activeView||"");
-  if(!name)return; const cfg=snapshot(); const ex=findView(name);
-  if(ex){ if(!confirm('View "'+name+'" exists. Overwrite?'))return; ex.config=cfg; }
-  else state.savedViews.push({name,config:cfg});
-  state.activeView=name; savePrefs(); renderViewsMenu(); updateToolbar();
+// Write the "everyone" views to the Grist doc so all viewers see them.
+function pushSharedViews(){ if(!state.grist) return; try{ grist.setOption("sharedViews", state.savedViews.filter(v=>v.shared).map(v=>({name:v.name,config:v.config}))); }catch(e){} }
+// Save the current filters/sort/fields as a view. shared=true → team (Grist doc);
+// shared=false → personal (this browser only).
+function saveView(name,shared){
+  name=(name||"").trim(); if(!name)return;
+  const cfg=snapshot(); const ex=findView(name);
+  if(ex){ if(!confirm('View "'+name+'" exists. Overwrite it?'))return; ex.config=cfg; ex.shared=!!shared; }
+  else state.savedViews.push({name,config:cfg,shared:!!shared});
+  state.activeView=name; savePrefs(); pushSharedViews(); renderViewsMenu(); updateToolbar();
 }
-function updateView(){ const v=findView(state.activeView); if(!v)return; v.config=snapshot(); savePrefs(); renderViewsMenu(); updateToolbar(); }
-function deleteView(name){ state.savedViews=state.savedViews.filter(v=>v.name!==name); if(state.activeView===name)state.activeView=""; savePrefs(); renderViewsMenu(); updateToolbar(); }
+function saveViewAs(shared){ const name=prompt(shared?'Name this TEAM view (everyone will see it):':'Name this view (just for you):', state.activeView||""); if(name) saveView(name,shared); }
+function updateView(){ const v=findView(state.activeView); if(!v)return; v.config=snapshot(); savePrefs(); if(v.shared) pushSharedViews(); renderViewsMenu(); updateToolbar(); }
+function deleteView(name){ const wasShared=(findView(name)||{}).shared; state.savedViews=state.savedViews.filter(v=>v.name!==name); if(state.activeView===name)state.activeView=""; savePrefs(); if(wasShared) pushSharedViews(); renderViewsMenu(); updateToolbar(); }
 function clearView(){ state.filter.q="";state.filter.stage={};state.filter.assigned={};state.filter.payment={}; state.activeView=""; state.filterDrill=null; savePrefs(); closeMenus(); renderAll(); }
 
 // ============================================================
@@ -2173,6 +2180,15 @@ if(typeof grist!=="undefined"){
   // in-progress card edit isn't clobbered).
   try{ grist.onOptions(opts=>{
     opts=opts||{};
+    // Shared views are per-view team assets — adopted by EVERYONE, independent of
+    // the design-following toggle. Merge team views with this viewer's personal ones.
+    const incViews = Array.isArray(opts.sharedViews) ? opts.sharedViews : null;
+    if(incViews){
+      const personal=state.savedViews.filter(v=>!v.shared);
+      const merged=incViews.map(v=>({name:v.name,config:v.config,shared:true}));
+      personal.forEach(v=>{ if(!merged.some(x=>x.name===v.name)) merged.push(v); });
+      if(JSON.stringify(merged)!==JSON.stringify(state.savedViews)){ state.savedViews=merged; renderList(); updateToolbar(); }
+    }
     const shared=(typeof opts.cardTemplate==="string" && opts.cardTemplate.trim())?opts.cardTemplate:null;
     state._sharedTemplate=shared;
     if(state.templateShared==null) state.templateShared=!!shared;   // first run: follow the team design if one exists
@@ -2184,7 +2200,6 @@ if(typeof grist!=="undefined"){
     if(!editing && opts.grouping){ const g=normalizeGrouping(opts.grouping); if(J(g)!==J(state.grouping)){ state.grouping=g; changed=true; } }
     if(typeof opts.activeGrouping==="string" && opts.activeGrouping!==state.activeGrouping){ state.activeGrouping=opts.activeGrouping; changed=true; }
     if(Array.isArray(opts.savedGroupings) && J(opts.savedGroupings)!==J(state.savedGroupings)){ state.savedGroupings=opts.savedGroupings.slice(); }
-    if(Array.isArray(opts.savedViews) && J(opts.savedViews)!==J(state.savedViews)){ state.savedViews=opts.savedViews.slice(); changed=true; }
     if(Array.isArray(opts.stageOrder) && J(opts.stageOrder)!==J(state.stageOrder)){ state.stageOrder=opts.stageOrder.slice(); normalizeStageOrder(); changed=true; }
     if(typeof opts.cardFontSize==="number" && opts.cardFontSize!==state.cardFontSize){ state.cardFontSize=opts.cardFontSize; fontChanged=true; }
     if(opts.listCardFont && J(opts.listCardFont)!==J(state.listCardFont)){ state.listCardFont=Object.assign({},LIST_CARD_FONT,opts.listCardFont); fontChanged=true; }

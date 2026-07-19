@@ -753,7 +753,7 @@ const state = { jobs:[], stone:[], inst:[], clients:[], catalogue:[], selectedId
   listW:null,                           // adjustable list-pane width (drag splitter)
   assignChoices:null,                   // Assigned_To choice list (from schema / data)
   filter:{ q:"", stage:{}, assigned:{}, payment:{} },
-  sort:{ key:"input", dir:-1 }, stageOrder:STAGES.slice(), fields:defaultFields(), cardOrder:CARD_ORDER_DEFAULT.slice(),
+  sort:{ key:"input", dir:-1 }, sort2:{ key:"", dir:1 }, stageOrder:STAGES.slice(), fields:defaultFields(), cardOrder:CARD_ORDER_DEFAULT.slice(),
   cardFontSize:12.5,
   listCardFont:Object.assign({},LIST_CARD_FONT), summaryFont:Object.assign({},SUMMARY_FONT),
   cardTemplate:DEFAULT_TEMPLATE, templateShared:null, _sharedTemplate:null,
@@ -766,7 +766,7 @@ function loadPrefs(){ try{ return JSON.parse(localStorage.getItem(LSKEY))||{}; }
 function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ savedViews:state.savedViews, current:snapshot(true), stoneNoteH:state.stoneNoteH||null, listW:state.listW||null, templateShared:state.templateShared, groupCollapsed:state.groupCollapsed||{}, savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"", stoneColW:state.stoneColW||null, sumLeftPct:state.sumLeftPct||null, listCardFont:state.listCardFont, summaryFont:state.summaryFont })); }catch(e){} }
 function snapshot(withMeta){
   const s={ q:state.filter.q, stage:cleanSet(state.filter.stage), assigned:cleanSet(state.filter.assigned),
-    payment:cleanSet(state.filter.payment), sort:{key:state.sort.key,dir:state.sort.dir}, stageOrder:(state.stageOrder||STAGES).slice(), cardFontSize:state.cardFontSize||12.5, fields:Object.assign({},state.fields),
+    payment:cleanSet(state.filter.payment), sort:{key:state.sort.key,dir:state.sort.dir}, sort2:{key:state.sort2.key,dir:state.sort2.dir}, stageOrder:(state.stageOrder||STAGES).slice(), cardFontSize:state.cardFontSize||12.5, fields:Object.assign({},state.fields),
     cardOrder:(state.cardOrder||CARD_ORDER_DEFAULT).slice(), cardTemplate:state.cardTemplate||DEFAULT_TEMPLATE,
     grouping:JSON.parse(JSON.stringify(state.grouping||{by:"",rules:[],restMode:"value"})) };
   if(withMeta) s.activeView=state.activeView;
@@ -776,6 +776,7 @@ function applyConfig(c){ if(!c)return;
   state.filter.q=c.q||""; state.filter.stage=cleanSet(c.stage); state.filter.assigned=cleanSet(c.assigned);
   state.filter.payment=cleanSet(c.payment);
   state.sort=(c.sort&&c.sort.key)?{key:c.sort.key,dir:c.sort.dir}:{key:"input",dir:-1};
+  state.sort2=(c.sort2&&c.sort2.key&&c.sort2.key!==state.sort.key)?{key:c.sort2.key,dir:c.sort2.dir}:{key:"",dir:1};
   state.stageOrder=Array.isArray(c.stageOrder)?c.stageOrder.slice():STAGES.slice(); normalizeStageOrder();
   if(typeof c.cardFontSize==="number") state.cardFontSize=c.cardFontSize;
   state.fields=Object.assign(defaultFields(),c.fields||{});
@@ -785,7 +786,7 @@ function applyConfig(c){ if(!c)return;
   if("activeView" in c) state.activeView=c.activeView||""; }
 function sig(s){ return JSON.stringify({q:s.q||"",st:Object.keys(cleanSet(s.stage)).sort(),
   as:Object.keys(cleanSet(s.assigned)).sort(),py:Object.keys(cleanSet(s.payment)).sort(),
-  so:s.sort||null,fl:s.fields||null}); }
+  so:s.sort||null,so2:s.sort2||null,fl:s.fields||null}); }
 function findView(n){ return state.savedViews.find(v=>v.name===n)||null; }
 function isViewDirty(){ const v=findView(state.activeView); if(!v)return false; return sig(snapshot())!==sig(v.config); }
 function filterCount(){ return activeKeys(state.filter.stage).length+activeKeys(state.filter.assigned).length+activeKeys(state.filter.payment).length; }
@@ -1298,15 +1299,32 @@ function renderFilterMenu(){
 function renderSortMenu(){
   const host=document.getElementById("sortMenu"); host.innerHTML="";
   host.appendChild($("div","phint","Click the active option to reverse"));
+  // primary sort
   SORT_OPTS.forEach(o=>{
     const on=state.sort.key===o.key;
     const row=$("div","prow"+(on?" on":"")); row.appendChild($("span","rlabel",o.label));
     if(on) row.appendChild($("span","rarrow",state.sort.dir===1?"↑":"↓"));
     row.onclick=()=>{ if(state.sort.key===o.key)state.sort.dir=-state.sort.dir; else state.sort={key:o.key,dir:defaultDir(o.key)};
+      if(state.sort2.key===state.sort.key)state.sort2={key:"",dir:1};  // secondary can't repeat the primary
       state.activeView=""; savePrefs(); renderSortMenu(); renderList(); };
     host.appendChild(row);
   });
-  if(state.sort.key==="stage"){
+  // secondary sort (tie-breaker)
+  host.appendChild($("div","psep"));
+  host.appendChild($("div","phead","Then by (tie-breaker)"));
+  const none=$("div","prow"+(state.sort2.key?"":" on")); none.appendChild($("span","rlabel","None"));
+  none.onclick=()=>{ state.sort2={key:"",dir:1}; state.activeView=""; savePrefs(); renderSortMenu(); renderList(); };
+  host.appendChild(none);
+  SORT_OPTS.filter(o=>o.key!==state.sort.key).forEach(o=>{
+    const on=state.sort2.key===o.key;
+    const row=$("div","prow"+(on?" on":"")); row.appendChild($("span","rlabel",o.label));
+    if(on) row.appendChild($("span","rarrow",state.sort2.dir===1?"↑":"↓"));
+    row.onclick=()=>{ if(state.sort2.key===o.key)state.sort2.dir=-state.sort2.dir; else state.sort2={key:o.key,dir:defaultDir(o.key)};
+      state.activeView=""; savePrefs(); renderSortMenu(); renderList(); };
+    host.appendChild(row);
+  });
+  // stage-order editor — shown whenever stage drives either sort level
+  if(state.sort.key==="stage"||state.sort2.key==="stage"){
     host.appendChild($("div","psep"));
     host.appendChild($("div","phead","Stage order (drag to reorder)"));
     normalizeStageOrder();
@@ -1601,14 +1619,21 @@ function initFormatButton(){
   panel.onclick=e=>e.stopPropagation();
   document.addEventListener("click",()=>{ if(!panel.hidden){ panel.hidden=true; btn.classList.remove("on"); } });
 }
+// Raw comparison for a single sort key (direction applied by the caller).
+function sortCmp(key,a,b){
+  if(key==="client") return String(a.Client_Label||"").localeCompare(String(b.Client_Label||""));
+  if(key==="stage")  return stageRank(a.Stage)-stageRank(b.Stage);
+  if(key==="scope")  return (a.Scope_Qty||0)-(b.Scope_Qty||0);
+  if(key==="meas")   return (+toDate(a.Meas_Date)||8.64e15)-(+toDate(b.Meas_Date)||8.64e15);
+  if(key==="input")  return (+toDate(a.Input_Date)||0)-(+toDate(b.Input_Date)||0);
+  return 0;
+}
 function cmpJobs(a,b){
-  const {key,dir}=state.sort; let r=0;
-  if(key==="client") r=String(a.Client_Label||"").localeCompare(String(b.Client_Label||""));
-  else if(key==="stage") r=stageRank(a.Stage)-stageRank(b.Stage);
-  else if(key==="scope") r=(a.Scope_Qty||0)-(b.Scope_Qty||0);
-  else if(key==="meas") r=(+toDate(a.Meas_Date)||8.64e15)-(+toDate(b.Meas_Date)||8.64e15);
-  else r=(+toDate(a.Input_Date)||0)-(+toDate(b.Input_Date)||0);
-  return dir*r || String(a.Client_Label||"").localeCompare(String(b.Client_Label||""));
+  const s=state.sort;
+  const r1=s.dir*sortCmp(s.key,a,b); if(r1) return r1;
+  const s2=state.sort2;
+  if(s2&&s2.key&&s2.key!==s.key){ const r2=s2.dir*sortCmp(s2.key,a,b); if(r2) return r2; }
+  return String(a.Client_Label||"").localeCompare(String(b.Client_Label||""));
 }
 // Stone text per job, so a search can match a stone name/product even when the
 // user can't recall the client — folds the job's stone lines + the Stones rollup.
@@ -1641,7 +1666,7 @@ function updateToolbar(){
   const n=filterCount(), fn=document.getElementById("filterNum");
   fn.textContent=n; fn.hidden=!n;
   document.getElementById("filterBtn").classList.toggle("active", n>0);
-  const dflt=(state.sort.key==="input"&&state.sort.dir===-1);
+  const dflt=(state.sort.key==="input"&&state.sort.dir===-1&&!state.sort2.key);
   document.getElementById("sortBtn").classList.toggle("active", !dflt);
 }
 // Parse one template line: **bold**, *italic*, {field} tokens, literal text.

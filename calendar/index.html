@@ -85,6 +85,38 @@
   #stageFilter .clear { font-size:10px; color:var(--accent); cursor:pointer; padding:3px 2px 1px; align-self:flex-start; }
   #stageFilter .clear:hover { text-decoration:underline; }
 
+  /* ---- ported from Inbox: sidebar filter buttons, dropdowns, bulk + per-option actions, assignee pills ---- */
+  .sbtn { display:flex; align-items:center; gap:6px; font-size:11.5px; padding:5px 8px; border:1px solid var(--line);
+          border-radius:5px; background:var(--panel); color:var(--ink); cursor:pointer; text-align:left; min-width:0; }
+  .sbtn:hover { background:var(--line2); }
+  .sbtn.active { border-color:var(--accent); color:var(--accent-ink); background:var(--accent-soft); }
+  .sbtn .fc { margin-left:auto; color:var(--muted); transition:transform .15s; }
+  .sbtn.open .fc { transform:rotate(90deg); }
+  .sbtn .flabel { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #fsrow2 { display:flex; gap:4px; }
+  .fnum2 { flex:0 0 auto; font-size:10px; font-weight:600; background:var(--accent); color:#fff; border-radius:9px; padding:0 6px; line-height:15px; display:none; }
+  .fnum2.show { display:inline-block; }
+  .fmenu { display:none; position:absolute; top:100%; left:8px; right:8px; margin-top:4px; z-index:11;
+    flex-direction:column; gap:2px; padding:6px; background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    box-shadow:0 6px 20px rgba(0,0,0,.14); max-height:340px; overflow-y:auto; }
+  .fmenu.open { display:flex; }
+  .pbulk { display:flex; gap:6px; padding:1px 2px 5px; border-bottom:1px solid var(--line2); margin-bottom:3px; }
+  .plink { font-size:11px; font-weight:600; color:var(--accent-ink); background:none; border:0; padding:3px 6px; border-radius:6px; cursor:pointer; }
+  .plink:hover { background:var(--accent-soft); }
+  .schip .chip-acts { flex:0 0 auto; display:flex; gap:3px; margin-left:auto; }
+  .chip-acts .pmini { font-size:9px; font-weight:700; letter-spacing:.02em; text-transform:uppercase; color:var(--muted);
+    background:var(--line2); border:1px solid transparent; border-radius:5px; padding:2px 5px; cursor:pointer; }
+  .chip-acts .pmini:hover { color:var(--accent-ink); background:var(--accent-soft); }
+  .navbar { display:flex; gap:5px; padding:2px 0 2px; overflow-x:auto; scrollbar-width:none; }
+  .navbar::-webkit-scrollbar { display:none; }
+  .navbar .ntab { flex:0 0 auto; display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600;
+    color:var(--muted); background:var(--line2); border:1px solid transparent; border-radius:999px; padding:3px 9px; cursor:pointer; white-space:nowrap; }
+  .navbar .ntab:hover { color:var(--ink); }
+  .navbar .ntab.on { color:#fff; background:var(--accent); border-color:var(--accent); }
+  .navbar .ntab .ncount { background:rgba(0,0,0,.10); color:inherit; border-radius:999px; font-size:9px; padding:0 5px; font-weight:700; min-width:14px; text-align:center; }
+  .navbar .ntab.on .ncount { background:rgba(255,255,255,.25); }
+  .navbar .ntab.empty { opacity:.45; }
+
   /* ---- saved views ---- */
   #viewsBtn { display:flex; align-items:center; gap:6px; width:100%; font-size:11.5px; padding:5px 8px;
     border:1px solid var(--line); border-radius:5px; background:var(--panel); color:var(--ink); cursor:pointer; text-align:left; }
@@ -254,15 +286,20 @@
   <div id="sidebar">
     <div id="sideHead">
       <div id="sideTitle">Jobs</div>
-      <input id="jobSearch" type="text" placeholder="Search address, client, stage, staff…" autocomplete="off">
-      <button id="viewsBtn" type="button"><span class="veye">&#9673;</span><span class="vname">All jobs</span><span class="vdirty" style="display:none">&bull;</span><span id="viewsCaret">&#8250;</span></button>
+      <input id="jobSearch" type="text" placeholder="Search address, client, stone, stage, payment, staff…" autocomplete="off">
+      <div id="navTabs" class="navbar"></div>
       <div id="fsrow">
-        <button id="filterBtn" type="button"><span>&#9881; Filter</span><span id="filterCount"></span><span id="filterCaret">&#8250;</span></button>
-        <button id="sortBtn" type="button"><span>&#8645; Sort</span><span id="sortCaret">&#8250;</span></button>
+        <button id="stageBtn" class="sbtn" type="button"><span class="flabel">Stage</span><span id="stageNum" class="fnum2"></span><span class="fc">&#8250;</span></button>
+        <button id="paymentBtn" class="sbtn" type="button"><span class="flabel">Payment</span><span id="paymentNum" class="fnum2"></span><span class="fc">&#8250;</span></button>
       </div>
-      <div id="stageFilter"></div>
+      <div id="fsrow2">
+        <button id="visitsBtn" class="sbtn" type="button"><span class="flabel">Visits</span><span id="visitsNum" class="fnum2"></span><span class="fc">&#8250;</span></button>
+        <button id="sortBtn" class="sbtn" type="button"><span class="flabel">&#8645; Sort</span><span class="fc" id="sortCaret">&#8250;</span></button>
+      </div>
+      <div id="stageMenu" class="fmenu"></div>
+      <div id="paymentMenu" class="fmenu"></div>
+      <div id="visitsMenu" class="fmenu"></div>
       <div id="sortMenu"></div>
-      <div id="viewsMenu"></div>
     </div>
     <div id="jobList"></div>
   </div>
@@ -309,7 +346,7 @@
   var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   var DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   // sidebar reads these columns off the jobs table when they exist
-  var JOB_COLS = { addr:'Job_Address', client:'Client_Label', stage:'Stage', assigned:'Assigned_To', jid:'Job_ID' };
+  var JOB_COLS = { addr:'Job_Address', client:'Client_Label', stage:'Stage', assigned:'Assigned_To', jid:'Job_ID', payment:'Payment_Status' };
 
   // ---- "Edit in Inbox" navigation ----
   // Double-click a job → details popup → Edit jumps to that assignee's Inbox sub-page
@@ -348,8 +385,9 @@
   var isolatedJobKey = null;   // when set, only this job's visits stay lit
   var seqById = {};            // rec.id -> {n, total, key}
   var jobQuery = '';
-  var filters = { stage: {}, assignee: {}, visits: {} };   // visits keys: '0' | '1' | '2+'
-  var filterView = null;       // null = category list; 'stage'|'assignee'|'visits' = drilled in
+  var filters = { stage: {}, assignee: {}, payment: {}, visits: {} };   // visits keys: '0' | '1' | '2+'
+  var jobTab = 'all';          // assignee pill bar: 'all' | <person> | '__none' (unassigned)
+  var filterView = null;       // (legacy) drill state for the retired combined Filter panel
   var sortBy = { key: 'client', dir: 1 };   // dir 1 = A-Z / soonest / fewest; -1 reversed
   var SORT_OPTS = [
     { key: 'client', label: 'Client' },
@@ -479,7 +517,18 @@
   function stageOf(rec) { return mappingsCache.type ? fmtVal(rec[mappingsCache.type]) : ''; }
   function activeKeys(obj) { return Object.keys(obj).filter(function (k) { return obj[k]; }); }
   function filterCount() {
-    return activeKeys(filters.stage).length + activeKeys(filters.assignee).length + activeKeys(filters.visits).length;
+    return activeKeys(filters.stage).length + activeKeys(filters.payment).length + activeKeys(filters.visits).length;
+  }
+  // Payment_Status choiceOptions, from whichever table exposes them.
+  function paymentOpts() {
+    return (jobMetaByColId[JOB_COLS.payment] && jobMetaByColId[JOB_COLS.payment].choiceOptions)
+        || (metaByColId[JOB_COLS.payment] && metaByColId[JOB_COLS.payment].choiceOptions) || {};
+  }
+  // Assignees present across the jobs, for the pill bar (stable — derived from all jobs).
+  function navPeople() {
+    var set = {}, jobs = (jobsCache && jobsCache.length) ? jobsCache : jobsFromRecords();
+    jobs.forEach(function (j) { (j.assigned || []).forEach(function (a) { if (a) set[a] = true; }); });
+    return Object.keys(set).sort();
   }
   function assigneeColId() {
     var d = (mappingsCache && mappingsCache.details) || [];
@@ -493,11 +542,14 @@
   function recPasses(rec) {
     var st = activeKeys(filters.stage);
     if (st.length && st.indexOf(stageOf(rec)) === -1) return false;
-    var as = activeKeys(filters.assignee);
-    if (as.length) {
+    var pm = activeKeys(filters.payment);
+    if (pm.length && pm.indexOf(String(rec[JOB_COLS.payment] || '')) === -1) return false;
+    // assignee pill bar
+    if (jobTab !== 'all') {
       var ac = assigneeColId();
       var have = ac ? listVals(rec[ac]) : [];
-      if (!have.some(function (v) { return as.indexOf(v) !== -1; })) return false;
+      if (jobTab === '__none') { if (have.length) return false; }
+      else if (have.indexOf(jobTab) === -1) return false;
     }
     var vs = activeKeys(filters.visits);
     if (vs.length) {
@@ -510,8 +562,13 @@
   function jobPasses(j, counts) {
     var st = activeKeys(filters.stage);
     if (st.length && st.indexOf(j.stage) === -1) return false;
-    var as = activeKeys(filters.assignee);
-    if (as.length && !(j.assigned || []).some(function (v) { return as.indexOf(v) !== -1; })) return false;
+    var pm = activeKeys(filters.payment);
+    if (pm.length && pm.indexOf(j.payment || '') === -1) return false;
+    if (jobTab !== 'all') {
+      var have = j.assigned || [];
+      if (jobTab === '__none') { if (have.length) return false; }
+      else if (have.indexOf(jobTab) === -1) return false;
+    }
     var vs = activeKeys(filters.visits);
     if (vs.length) {
       var n = 0;
@@ -769,7 +826,8 @@
         id: id, key: k,
         addr: fmtVal(rec[mappingsCache.title]),
         client: fmtVal(rec[(mappingsCache.details || [])[0]]),
-        stage: stageOf(rec), assigned: [], jid: ''
+        stage: stageOf(rec), assigned: [], jid: '',
+        payment: rec[JOB_COLS.payment] != null ? String(rec[JOB_COLS.payment] || '') : ''
       };
     });
     return Object.keys(byKey).map(function (k) { return byKey[k]; });
@@ -783,7 +841,7 @@
     return counts;
   }
   function jobHaystack(j) {
-    return [j.addr, j.client, j.stage, j.jid, (j.assigned || []).join(' ')].join(' ').toLowerCase();
+    return [j.addr, j.client, j.stage, j.payment, j.jid, (j.assigned || []).join(' ')].join(' ').toLowerCase();
   }
   function renderSidebar() {
     var list = document.getElementById('jobList');
@@ -977,7 +1035,7 @@
     row.className = 'fclearall';
     row.textContent = 'Clear all filters';
     row.addEventListener('click', function () {
-      filters = { stage: {}, assignee: {}, visits: {} };
+      filters = { stage: {}, assignee: {}, payment: {}, visits: {} };
       render();
     });
     host.appendChild(row);
@@ -988,6 +1046,82 @@
     var btn = document.getElementById('filterBtn');
     if (badge) { badge.textContent = n; badge.classList.toggle('show', n > 0); }
     if (btn) btn.classList.toggle('active', n > 0);
+  }
+
+  // ---- ported from Inbox: assignee pill bar + Stage/Payment/Visits dropdowns ----
+  // A dropdown checklist with Select all / Deselect all and per-option only / except.
+  function renderChoiceFilter(menuId, key, values, dotFn, nameFn) {
+    var host = document.getElementById(menuId); if (!host) return;
+    host.innerHTML = '';
+    function apply() { render(); }
+    function setBucket(obj) { filters[key] = obj; apply(); }
+    if (!values.length) { var e = document.createElement('div'); e.className = 'vempty'; e.textContent = 'No options.'; host.appendChild(e); return; }
+    var bulk = document.createElement('div'); bulk.className = 'pbulk';
+    var bAll = document.createElement('button'); bAll.type = 'button'; bAll.className = 'plink'; bAll.textContent = 'Select all';
+    bAll.addEventListener('click', function () { var b = {}; values.forEach(function (v) { b[v] = true; }); setBucket(b); });
+    var bNone = document.createElement('button'); bNone.type = 'button'; bNone.className = 'plink'; bNone.textContent = 'Deselect all';
+    bNone.addEventListener('click', function () { setBucket({}); });
+    bulk.appendChild(bAll); bulk.appendChild(bNone); host.appendChild(bulk);
+    values.forEach(function (v) {
+      var chip = document.createElement('div'); chip.className = 'schip' + (filters[key][v] ? ' on' : '');
+      var sw = document.createElement('span'); sw.className = 'sw'; chip.appendChild(sw);
+      var dc = dotFn ? dotFn(v) : null;
+      if (dc !== null && dc !== undefined) { var dot = document.createElement('span'); dot.className = 'dot'; dot.style.background = dc || 'var(--line)'; chip.appendChild(dot); }
+      var sl = document.createElement('span'); sl.className = 'slabel'; sl.textContent = nameFn ? nameFn(v) : v; chip.appendChild(sl);
+      var acts = document.createElement('span'); acts.className = 'chip-acts';
+      var only = document.createElement('button'); only.type = 'button'; only.className = 'pmini'; only.textContent = 'only'; only.title = 'Show only ' + (nameFn ? nameFn(v) : v);
+      only.addEventListener('click', function (e) { e.stopPropagation(); var b = {}; b[v] = true; setBucket(b); });
+      var exc = document.createElement('button'); exc.type = 'button'; exc.className = 'pmini'; exc.textContent = 'except'; exc.title = 'Show all except ' + (nameFn ? nameFn(v) : v);
+      exc.addEventListener('click', function (e) { e.stopPropagation(); var b = {}; values.forEach(function (x) { if (x !== v) b[x] = true; }); setBucket(b); });
+      acts.appendChild(only); acts.appendChild(exc); chip.appendChild(acts);
+      chip.addEventListener('click', function () { if (filters[key][v]) delete filters[key][v]; else filters[key][v] = true; apply(); });
+      host.appendChild(chip);
+    });
+  }
+  function renderStageMenu() {
+    var stageOpts = (mappingsCache && mappingsCache.type ? colMeta(mappingsCache.type).choiceOptions : {}) || {};
+    renderChoiceFilter('stageMenu', 'stage', Object.keys(stageOpts), function (v) { return (stageOpts[v] || {}).fillColor; }, null);
+  }
+  function renderPaymentMenu() {
+    var pOpts = paymentOpts();
+    renderChoiceFilter('paymentMenu', 'payment', Object.keys(pOpts), function (v) { return (pOpts[v] || {}).fillColor; }, null);
+  }
+  function renderVisitsMenu() {
+    var vnames = { '0': 'No visits', '1': '1 visit', '2+': '2+ visits' };
+    renderChoiceFilter('visitsMenu', 'visits', ['0', '1', '2+'], null, function (v) { return vnames[v]; });
+  }
+  // assignee pill bar: All + one per person (+ Unassigned when relevant)
+  function renderTabs() {
+    var bar = document.getElementById('navTabs'); if (!bar) return;
+    var jobs = (jobsCache && jobsCache.length) ? jobsCache : jobsFromRecords();
+    var people = navPeople();
+    var anyNone = jobs.some(function (j) { return !(j.assigned || []).length; });
+    if (jobTab !== 'all' && jobTab !== '__none' && people.indexOf(jobTab) === -1) jobTab = 'all';
+    bar.innerHTML = '';
+    bar.style.display = people.length ? 'flex' : 'none';
+    var tabs = [{ key: 'all', label: 'All' }];
+    people.forEach(function (p) { tabs.push({ key: p, label: p }); });
+    if (anyNone) tabs.push({ key: '__none', label: 'Unassigned' });
+    tabs.forEach(function (t) {
+      var count = jobs.filter(function (j) {
+        var have = j.assigned || [];
+        return t.key === 'all' ? true : (t.key === '__none' ? !have.length : have.indexOf(t.key) !== -1);
+      }).length;
+      var el = document.createElement('button'); el.type = 'button';
+      el.className = 'ntab' + ((jobTab || 'all') === t.key ? ' on' : '') + (count ? '' : ' empty');
+      var lab = document.createElement('span'); lab.textContent = t.label; el.appendChild(lab);
+      var cnt = document.createElement('span'); cnt.className = 'ncount'; cnt.textContent = String(count); el.appendChild(cnt);
+      el.addEventListener('click', function () { jobTab = t.key; render(); });
+      bar.appendChild(el);
+    });
+  }
+  function updateFilterBadges() {
+    [['stage', 'stageBtn', 'stageNum'], ['payment', 'paymentBtn', 'paymentNum'], ['visits', 'visitsBtn', 'visitsNum']].forEach(function (t) {
+      var n = activeKeys(filters[t[0]]).length;
+      var badge = document.getElementById(t[2]), btn = document.getElementById(t[1]);
+      if (badge) { badge.textContent = n; badge.classList.toggle('show', n > 0); }
+      if (btn) btn.classList.toggle('active', n > 0);
+    });
   }
   function renderSortMenu() {
     var host = document.getElementById('sortMenu');
@@ -1102,8 +1236,8 @@
     grist.setOption('activeView', activeViewName || '');
   }
   function applyView(v, silent) {
-    filters = { stage: {}, assignee: {}, visits: {} };
-    ['stage', 'assignee', 'visits'].forEach(function (b) {
+    filters = { stage: {}, assignee: {}, payment: {}, visits: {} };
+    ['stage', 'assignee', 'payment', 'visits'].forEach(function (b) {
       var src = (v.filters && v.filters[b]) || {};
       Object.keys(src).forEach(function (k) { if (src[k]) filters[b][k] = true; });
     });
@@ -1150,7 +1284,7 @@
     render();
   }
   function clearActiveView() {
-    filters = { stage: {}, assignee: {}, visits: {} };
+    filters = { stage: {}, assignee: {}, payment: {}, visits: {} };
     activeViewName = null;
     filterView = null;
     persistViews();
@@ -1480,11 +1614,10 @@
       cal.appendChild(cols);
     }
     updateRangeLabel();
+    renderTabs();
     renderSidebar();
-    renderFilterPanel();
+    updateFilterBadges();
     renderSortMenu();
-    renderViewsMenu();
-    updateViewsBtn();
     // two-way highlight: bring the isolated job into view in the sidebar
     if (isolatedJobKey && isolatedJobKey !== lastScrolledKey) {
       var litItem = document.querySelector('.jobitem.lit');
@@ -1569,6 +1702,7 @@
           stage: data[JOB_COLS.stage] ? String(data[JOB_COLS.stage][i] || '') : '',
           assigned: data[JOB_COLS.assigned] ? listVals(data[JOB_COLS.assigned][i]) : [],
           jid: data[JOB_COLS.jid] ? String(data[JOB_COLS.jid][i] || '') : '',
+          payment: data[JOB_COLS.payment] ? String(data[JOB_COLS.payment][i] || '') : '',
           raw: raw
         });
       }
@@ -1589,45 +1723,30 @@
     jobQuery = e.target.value;
     renderSidebar();
   });
+  var MENUS = [
+    ['stageBtn', 'stageMenu', renderStageMenu],
+    ['paymentBtn', 'paymentMenu', renderPaymentMenu],
+    ['visitsBtn', 'visitsMenu', renderVisitsMenu],
+    ['sortBtn', 'sortMenu', renderSortMenu]
+  ];
   function closeMenus() {
-    ['stageFilter', 'sortMenu', 'viewsMenu', 'filterBtn', 'sortBtn', 'viewsBtn'].forEach(function (id) {
-      var el = document.getElementById(id);
-      if (el) el.classList.remove('open');
+    MENUS.forEach(function (m) {
+      var mn = document.getElementById(m[1]); if (mn) mn.classList.remove('open');
+      var bt = document.getElementById(m[0]); if (bt) bt.classList.remove('open');
     });
   }
-  document.getElementById('filterBtn').addEventListener('click', function (e) {
-    e.stopPropagation();
-    var willOpen = !document.getElementById('stageFilter').classList.contains('open');
-    closeMenus();
-    if (willOpen) {
-      document.getElementById('stageFilter').classList.add('open');
-      this.classList.add('open');
-      filterView = null; renderFilterPanel();   // always start at the category list
-    }
+  MENUS.forEach(function (m) {
+    var btn = document.getElementById(m[0]); if (!btn) return;
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var menu = document.getElementById(m[1]);
+      var willOpen = !menu.classList.contains('open');
+      closeMenus();
+      if (willOpen) { m[2](); menu.classList.add('open'); btn.classList.add('open'); }
+    });
+    var menu = document.getElementById(m[1]);
+    if (menu) menu.addEventListener('click', function (e) { e.stopPropagation(); });
   });
-  document.getElementById('sortBtn').addEventListener('click', function (e) {
-    e.stopPropagation();
-    var willOpen = !document.getElementById('sortMenu').classList.contains('open');
-    closeMenus();
-    if (willOpen) {
-      document.getElementById('sortMenu').classList.add('open');
-      this.classList.add('open');
-      renderSortMenu();
-    }
-  });
-  document.getElementById('viewsBtn').addEventListener('click', function (e) {
-    e.stopPropagation();
-    var willOpen = !document.getElementById('viewsMenu').classList.contains('open');
-    closeMenus();
-    if (willOpen) {
-      document.getElementById('viewsMenu').classList.add('open');
-      this.classList.add('open');
-      renderViewsMenu();
-    }
-  });
-  document.getElementById('stageFilter').addEventListener('click', function (e) { e.stopPropagation(); });
-  document.getElementById('sortMenu').addEventListener('click', function (e) { e.stopPropagation(); });
-  document.getElementById('viewsMenu').addEventListener('click', function (e) { e.stopPropagation(); });
   document.addEventListener('click', closeMenus);
 
   // ---- job details popup: close + edit controls ----

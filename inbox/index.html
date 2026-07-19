@@ -1934,8 +1934,12 @@ function renderTabs(){
   const base=baseFilteredJobs();
   const people=navPeople();
   const anyUnassigned=(state.jobs||[]).some(j=>choiceList(j.Assigned_To).length===0);
-  // Selected pill must still exist; otherwise fall back to All.
-  if(state.tab && state.tab!=="all" && state.tab!=="__none" && !people.includes(state.tab)) state.tab="all";
+  // Selected pill must still exist; otherwise fall back to All (covers a removed person AND
+  // the Unassigned pill disappearing once every job has an assignee).
+  if(state.tab && state.tab!=="all"){
+    const stillThere = state.tab==="__none" ? anyUnassigned : people.includes(state.tab);
+    if(!stillThere){ state.tab="all"; savePrefs(); }
+  }
   const tabs=[{key:"all",label:"All",count:base.length}];
   people.forEach(p=>tabs.push({key:p,label:p,count:base.filter(j=>choiceList(j.Assigned_To).includes(p)).length}));
   if(anyUnassigned) tabs.push({key:"__none",label:"Unassigned",count:base.filter(j=>choiceList(j.Assigned_To).length===0).length});

@@ -1097,7 +1097,8 @@
   function renderChoiceFilter(menuId, key, values, dotFn, nameFn) {
     var host = document.getElementById(menuId); if (!host) return;
     host.innerHTML = '';
-    function apply() { render(); }
+    // Re-render the view AND this open menu, so the toggle switches reflect the new state.
+    function apply() { render(); renderChoiceFilter(menuId, key, values, dotFn, nameFn); }
     function setBucket(obj) { filters[key] = obj; apply(); }
     if (!values.length) { var e = document.createElement('div'); e.className = 'vempty'; e.textContent = 'No options.'; host.appendChild(e); return; }
     var bulk = document.createElement('div'); bulk.className = 'pbulk';
@@ -1140,7 +1141,11 @@
     var jobs = (jobsCache && jobsCache.length) ? jobsCache : jobsFromRecords();
     var people = navPeople();
     var anyNone = jobs.some(function (j) { return !(j.assigned || []).length; });
-    if (jobTab !== 'all' && jobTab !== '__none' && people.indexOf(jobTab) === -1) jobTab = 'all';
+    // Selected pill must still exist; fall back to All if a person is gone or Unassigned emptied.
+    if (jobTab !== 'all') {
+      var stillThere = jobTab === '__none' ? anyNone : people.indexOf(jobTab) !== -1;
+      if (!stillThere) jobTab = 'all';
+    }
     bar.innerHTML = '';
     bar.style.display = people.length ? 'flex' : 'none';
     var tabs = [{ key: 'all', label: 'All' }];
@@ -1255,16 +1260,16 @@
   }
   // snapshot of everything a view remembers, with only the active filter keys kept
   function currentSnapshot() {
-    var f = { stage: {}, assignee: {}, visits: {} };
-    ['stage', 'assignee', 'visits'].forEach(function (b) {
-      Object.keys(filters[b]).forEach(function (k) { if (filters[b][k]) f[b][k] = true; });
+    var f = { stage: {}, assignee: {}, payment: {}, visits: {} };
+    ['stage', 'assignee', 'payment', 'visits'].forEach(function (b) {
+      Object.keys(filters[b] || {}).forEach(function (k) { if (filters[b][k]) f[b][k] = true; });
     });
     return { filters: f, sortBy: { key: sortBy.key, dir: sortBy.dir }, view: view };
   }
   // stable signature so we can tell whether the live state still matches a saved view
   function snapSig(s) {
     var f = {};
-    ['stage', 'assignee', 'visits'].forEach(function (b) {
+    ['stage', 'assignee', 'payment', 'visits'].forEach(function (b) {
       var ks = Object.keys(s.filters[b] || {}).filter(function (k) { return s.filters[b][k]; }).sort();
       if (ks.length) f[b] = ks;
     });
@@ -1889,7 +1894,7 @@
     }
     render();
     if (mapChanged) { loadMeta().then(loadJobs).then(render); }
-    else { loadJobs().then(renderSidebar); }
+    else { loadJobs().then(render); }   // render() (not just renderSidebar) so pills/counts refresh with the reloaded jobsCache
   }
   grist.onRecords(handleRecords);
   window._test = handleRecords;                                  // local debug hooks

@@ -39,6 +39,15 @@
   .list-head .newbtn{margin-left:auto;font:inherit;font-size:12px;font-weight:600;color:#fff;background:var(--accent);
     border:0;border-radius:8px;padding:6px 12px;cursor:pointer}
   .list-head .newbtn:hover{filter:brightness(1.06)}
+  .navbar{display:flex;gap:6px;padding:0 14px 10px;overflow-x:auto;scrollbar-width:none}
+  .navbar::-webkit-scrollbar{display:none}
+  .navbar .ntab{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:12px;font-weight:600;
+    color:var(--muted);background:var(--line2);border:1px solid transparent;border-radius:999px;padding:4px 11px;cursor:pointer;white-space:nowrap}
+  .navbar .ntab:hover{color:var(--ink)}
+  .navbar .ntab.on{color:#fff;background:var(--accent);border-color:var(--accent)}
+  .navbar .ntab .ncount{background:rgba(0,0,0,.10);color:inherit;border-radius:999px;font-size:10px;padding:0 6px;font-weight:700;min-width:16px;text-align:center}
+  .navbar .ntab.on .ncount{background:rgba(255,255,255,.25)}
+  .navbar .ntab.empty{opacity:.45}
 
   /* ---------- toolbar ---------- */
   .filters{position:relative;padding:0 12px 11px;display:flex;flex-direction:column;gap:7px;border-bottom:1px solid var(--line2)}
@@ -506,6 +515,7 @@
       <span class="t">Jobs</span><span class="count" id="jobCount">0</span>
       <button class="newbtn" id="newJob">+ New job</button>
     </div>
+    <div class="navbar" id="navTabs"></div>
     <div class="filters">
       <div class="search">
         <svg class="sic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -841,7 +851,7 @@ const state = { jobs:[], stone:[], inst:[], clients:[], catalogue:[], selectedId
   sumLeftPct:null,                      // summary card: left column width %
   listW:null,                           // adjustable list-pane width (drag splitter)
   assignChoices:null,                   // Assigned_To choice list (from schema / data)
-  filter:{ q:"", stage:{}, assigned:{}, payment:{} },
+  filter:{ q:"", stage:{}, assigned:{}, payment:{} }, tab:"all",
   sort:{ key:"input", dir:-1 }, sort2:{ key:"", dir:1 }, stageOrder:STAGES.slice(), stageOrderShared:null, fields:defaultFields(), cardOrder:CARD_ORDER_DEFAULT.slice(),
   cardFontSize:12.5,
   listCardFont:Object.assign({},LIST_CARD_FONT), summaryFont:Object.assign({},SUMMARY_FONT),
@@ -854,7 +864,7 @@ const state = { jobs:[], stone:[], inst:[], clients:[], catalogue:[], selectedId
 window._inbox = state;
 
 function loadPrefs(){ try{ return JSON.parse(localStorage.getItem(LSKEY))||{}; }catch(e){ return {}; } }
-function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ savedViews:state.savedViews.filter(v=>!v.shared), current:snapshot(true), stoneNoteH:state.stoneNoteH||null, listW:state.listW||null, templateShared:state.templateShared, groupCollapsed:state.groupCollapsed||{}, savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"", stoneColW:state.stoneColW||null, sumLeftPct:state.sumLeftPct||null, listCardFont:state.listCardFont, summaryFont:state.summaryFont, colors:state.colors, fmtCollapsed:state.fmtCollapsed, stageOrder:(state.stageOrder||STAGES).slice(), stageOrderShared:state.stageOrderShared })); }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ savedViews:state.savedViews.filter(v=>!v.shared), current:snapshot(true), stoneNoteH:state.stoneNoteH||null, listW:state.listW||null, templateShared:state.templateShared, groupCollapsed:state.groupCollapsed||{}, savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"", stoneColW:state.stoneColW||null, sumLeftPct:state.sumLeftPct||null, listCardFont:state.listCardFont, summaryFont:state.summaryFont, colors:state.colors, fmtCollapsed:state.fmtCollapsed, stageOrder:(state.stageOrder||STAGES).slice(), stageOrderShared:state.stageOrderShared, tab:state.tab||"all" })); }catch(e){} }
 function snapshot(withMeta){
   const s={ q:state.filter.q, stage:cleanSet(state.filter.stage), assigned:cleanSet(state.filter.assigned),
     payment:cleanSet(state.filter.payment), sort:{key:state.sort.key,dir:state.sort.dir}, sort2:{key:state.sort2.key,dir:state.sort2.dir}, stageOrder:(state.stageOrder||STAGES).slice(), cardFontSize:state.cardFontSize||12.5, fields:Object.assign({},state.fields),
@@ -1849,7 +1859,8 @@ function stoneTextByJob(){
     if(t) m[id]=(m[id]?m[id]+" ":"")+t; });
   return m;
 }
-function filteredJobs(){
+// All filters EXCEPT the mini-nav person pill (search, stage, payment, assigned-filter, sort).
+function baseFilteredJobs(){
   const q=state.filter.q.trim().toLowerCase();
   const st=activeKeys(state.filter.stage), as=activeKeys(state.filter.assigned), py=activeKeys(state.filter.payment);
   const stoneTxt=q?stoneTextByJob():null;
@@ -1861,6 +1872,38 @@ function filteredJobs(){
       if(!hay.includes(q)) return false; }
     return true;
   }).sort(cmpJobs);
+}
+function filteredJobs(){
+  const rows=baseFilteredJobs();
+  if(!state.tab || state.tab==="all") return rows;
+  if(state.tab==="__none") return rows.filter(j=>choiceList(j.Assigned_To).length===0);
+  return rows.filter(j=>choiceList(j.Assigned_To).includes(state.tab));
+}
+// People pills for the mini nav bar, derived from ALL jobs so the bar stays stable while filtering.
+function navPeople(){ return [...new Set((state.jobs||[]).flatMap(j=>choiceList(j.Assigned_To)))].filter(Boolean).sort(); }
+function renderTabs(){
+  const bar=document.getElementById("navTabs"); if(!bar) return;
+  const base=baseFilteredJobs();
+  const people=navPeople();
+  const anyUnassigned=(state.jobs||[]).some(j=>choiceList(j.Assigned_To).length===0);
+  // Selected pill must still exist; otherwise fall back to All.
+  if(state.tab && state.tab!=="all" && state.tab!=="__none" && !people.includes(state.tab)) state.tab="all";
+  const tabs=[{key:"all",label:"All",count:base.length}];
+  people.forEach(p=>tabs.push({key:p,label:p,count:base.filter(j=>choiceList(j.Assigned_To).includes(p)).length}));
+  if(anyUnassigned) tabs.push({key:"__none",label:"Unassigned",count:base.filter(j=>choiceList(j.Assigned_To).length===0).length});
+  bar.innerHTML="";
+  bar.hidden = people.length===0;   // no assignees at all → hide the bar entirely
+  tabs.forEach(t=>{
+    const on=(state.tab||"all")===t.key;
+    const el=$("button","ntab"+(on?" on":"")+(t.count?"":" empty"));
+    el.type="button";
+    el.appendChild($("span","nlabel",t.label));
+    el.appendChild($("span","ncount",String(t.count)));
+    el.onclick=()=>{ state.tab=t.key; savePrefs();
+      if(!filteredJobs().some(j=>j.id===state.selectedId)){ const f=filteredJobs()[0]; state.selectedId=f?f.id:state.selectedId; }
+      renderList(); renderDetail(); };
+    bar.appendChild(el);
+  });
 }
 function updateToolbar(){
   document.getElementById("viewsName").textContent = state.activeView ? state.activeView+(isViewDirty()?" •":"") : "All jobs";
@@ -1948,6 +1991,7 @@ function renderList(){
   updateToolbar(); applyCardFont();
   const se=document.getElementById("fSearch"); if(document.activeElement!==se) se.value=state.filter.q;
   const list=document.getElementById("jobList"); list.innerHTML="";
+  renderTabs();
   const rows=filteredJobs();
   document.getElementById("jobCount").textContent=rows.length;
   if(!rows.length){ list.appendChild($("div","list-empty","No jobs match.")); return; }
@@ -2367,6 +2411,7 @@ document.addEventListener("click",closeMenus);
   state.savedGroupings=p.savedGroupings||[]; state.activeGrouping=p.activeGrouping||"";
   if(Array.isArray(p.stageOrder)) state.stageOrder=p.stageOrder.slice();
   if("stageOrderShared" in p) state.stageOrderShared=(p.stageOrderShared==null?null:!!p.stageOrderShared);
+  state.tab=p.tab||"all";
   if(!state.assignChoices) state.assignChoices=["Julie","Phoebe","Nhi","a Minh","Louis"];
   if("templateShared" in p) state.templateShared=(p.templateShared==null?null:!!p.templateShared);
   if(!state.ref.client)  state.ref.client =DEMO_REF.client;

@@ -116,6 +116,9 @@
   .navbar .ntab .ncount { background:rgba(0,0,0,.10); color:inherit; border-radius:999px; font-size:9px; padding:0 5px; font-weight:700; min-width:14px; text-align:center; }
   .navbar .ntab.on .ncount { background:rgba(255,255,255,.25); }
   .navbar .ntab.empty { opacity:.45; }
+  /* pill bar lives in the top toolbar, aligned with Today / Week / Jobs */
+  #toolbar .navbar { flex:1 1 auto; min-width:0; margin:0 6px; padding:0; }
+  #toolbar #navTabs:empty { display:none; }
 
   /* ---- saved views ---- */
   #viewsBtn { display:flex; align-items:center; gap:6px; width:100%; font-size:11.5px; padding:5px 8px;
@@ -287,7 +290,6 @@
     <div id="sideHead">
       <div id="sideTitle">Jobs</div>
       <input id="jobSearch" type="text" placeholder="Search address, client, stone, stage, payment, staff…" autocomplete="off">
-      <div id="navTabs" class="navbar"></div>
       <div id="fsrow">
         <button id="stageBtn" class="sbtn" type="button"><span class="flabel">Stage</span><span id="stageNum" class="fnum2"></span><span class="fc">&#8250;</span></button>
         <button id="paymentBtn" class="sbtn" type="button"><span class="flabel">Payment</span><span id="paymentNum" class="fnum2"></span><span class="fc">&#8250;</span></button>
@@ -314,6 +316,7 @@
         <option value="month">Month</option>
       </select>
       <span id="rangeLabel"></span>
+      <div id="navTabs" class="navbar"></div>
       <button id="btnJobs" title="Show / hide the jobs panel">&#9783; Jobs</button>
     </div>
     <div id="msg"></div>
@@ -347,6 +350,27 @@
   var DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   // sidebar reads these columns off the jobs table when they exist
   var JOB_COLS = { addr:'Job_Address', client:'Client_Label', stage:'Stage', assigned:'Assigned_To', jid:'Job_ID', payment:'Payment_Status' };
+  // Stage / payment pill colours — kept in sync with the Inbox widget's palette so both match.
+  // (The Inbox stores these per-widget, so the calendar can't read them live; mirror them here.)
+  var STAGE_COLORS = {
+    'Quote':'#e9edf1', 'Live':'#98FD90', 'WIP':'#FEF47A', 'Completed':'#FCA5A5',
+    'Cancelled':'#e9edf1', 'Others':'#DCDCDC', 'Closed !':'#D0BCF4', 'On hold':'#e9edf1', 'Fix Job':'#e9edf1'
+  };
+  var PAY_COLORS = {
+    'Not Invoiced':'#e9edf1', 'Deposit Paid':'#FFFACD', 'Outstanding Bal':'#FECBCC',
+    'Fully Paid':'#E1FEDE', 'Other':'#e9edf1', 'Not Paid Yet':'#FEE7C3', 'TBC By a Minh':'#E8D0FE'
+  };
+  // Overwrite a meta map's Stage/Payment fillColors with our palette (textColor preserved).
+  function applyChoiceColorOverrides(meta) {
+    if (!meta) return;
+    [['Stage', STAGE_COLORS], ['Payment_Status', PAY_COLORS]].forEach(function (p) {
+      var m = meta[p[0]]; if (!m) return;
+      m.choiceOptions = m.choiceOptions || {};
+      Object.keys(p[1]).forEach(function (v) {
+        m.choiceOptions[v] = Object.assign({}, m.choiceOptions[v], { fillColor: p[1][v] });
+      });
+    });
+  }
 
   // ---- "Edit in Inbox" navigation ----
   // Double-click a job → details popup → Edit jumps to that assignee's Inbox sub-page
@@ -1662,6 +1686,7 @@
           m[cols.colId[i]] = { label: cols.label[i] || cols.colId[i], type: cols.type[i] || '', choiceOptions: co };
         }
         metaByColId = m;
+        applyChoiceColorOverrides(metaByColId);
       });
     }).catch(function (err) { console.warn('metadata read failed', err); });
   }
@@ -1688,6 +1713,7 @@
         jm[cols.colId[c]] = { label: cols.label[c] || cols.colId[c], type: cols.type[c] || '', choiceOptions: co };
       }
       jobMetaByColId = jm;
+      applyChoiceColorOverrides(jobMetaByColId);
       var colIds = Object.keys(data).filter(function (k) { return k !== 'id' && k !== 'manualSort'; });
       var out = [];
       var n = (data.id || []).length;
@@ -1847,9 +1873,9 @@
   }
   grist.onRecords(handleRecords);
   window._test = handleRecords;                                  // local debug hooks
-  window._setMeta = function (m) { metaByColId = m; render(); };
+  window._setMeta = function (m) { metaByColId = m; applyChoiceColorOverrides(metaByColId); render(); };
   window._setJobs = function (j) { jobsCache = j; render(); };
-  window._setJobMeta = function (m) { jobMetaByColId = m; };
+  window._setJobMeta = function (m) { jobMetaByColId = m; applyChoiceColorOverrides(jobMetaByColId); };
   window._openJob = function (j) { openJobDetails(j); };
   window._detailLayout = function () { return detailLayout; };
 

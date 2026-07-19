@@ -524,23 +524,28 @@
         <input id="fSearch" type="text" placeholder="Search address, client, stone, stage, staff…" autocomplete="off">
       </div>
       <div class="filt-row">
-        <button class="tbtn" id="groupBtn" type="button" style="flex:1" title="Group the job list">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18M3 5v4M21 5v4M6 13h12M6 13v2M18 13v2M9 19h6"/></svg>
-          <span class="tlabel" id="groupName">No grouping</span><span class="caret">&#8250;</span>
+        <button class="tbtn" id="stageBtn" type="button" style="flex:1" title="Filter by stage">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+          <span class="tlabel">Stage</span><span class="tnum" id="stageNum" hidden></span><span class="caret">&#8250;</span>
+        </button>
+        <button class="tbtn" id="paymentBtn" type="button" style="flex:1" title="Filter by payment">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <span class="tlabel">Payment</span><span class="tnum" id="paymentNum" hidden></span><span class="caret">&#8250;</span>
         </button>
       </div>
       <div class="filt-row">
-        <button class="tbtn" id="filterBtn" type="button" style="flex:1">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3H2l8 9.46V19l4 2v-8.54z"/></svg>
-          <span class="tlabel">Filter</span><span class="tnum" id="filterNum" hidden></span><span class="caret">&#8250;</span>
+        <button class="tbtn" id="groupBtn" type="button" style="flex:1" title="Group the job list">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18M3 5v4M21 5v4M6 13h12M6 13v2M18 13v2M9 19h6"/></svg>
+          <span class="tlabel" id="groupName">No grouping</span><span class="caret">&#8250;</span>
         </button>
         <button class="tbtn" id="sortBtn" type="button" style="flex:1">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M6 12h12M9 18h6"/></svg>
           <span class="tlabel">Sort</span><span class="caret">&#8250;</span>
         </button>
       </div>
+      <div class="popmenu" id="stageMenu" hidden></div>
+      <div class="popmenu" id="paymentMenu" hidden></div>
       <div class="popmenu" id="groupMenu" hidden></div>
-      <div class="popmenu" id="filterMenu" hidden></div>
       <div class="popmenu" id="sortMenu" hidden></div>
       <div class="popmenu" id="dispMenu" hidden></div>
     </div>
@@ -1320,8 +1325,8 @@ function clientTitle(j){
 // ============================================================
 //  MENUS
 // ============================================================
-const MENUS=[["groupBtn","groupMenu",renderGroupMenu],["filterBtn","filterMenu",renderFilterMenu],
-  ["sortBtn","sortMenu",renderSortMenu]];  // Views/saved-views removed from the toolbar (too confusing for the client); dispBtn opens the Customize-card modal (see boot)
+const MENUS=[["stageBtn","stageMenu",renderStageFilter],["paymentBtn","paymentMenu",renderPaymentFilter],
+  ["groupBtn","groupMenu",renderGroupMenu],["sortBtn","sortMenu",renderSortMenu]];  // Views removed + combined Filter split into Stage/Payment dropdowns; dispBtn opens the Customize-card modal (see boot)
 function closeMenus(){ MENUS.forEach(([b,m])=>{ document.getElementById(m).hidden=true; document.getElementById(b).classList.remove("open"); });
   const rm=document.getElementById("rowMenu"); if(rm)rm.hidden=true;
   const pp=document.getElementById("prodPicker"); if(pp)pp.hidden=true;
@@ -1367,8 +1372,28 @@ function renderViewsMenu(){
     const clr=$("div","paction danger","✕ Clear (show all)"); clr.onclick=()=>clearView(); host.appendChild(clr);
   }
 }
+// Stage and Payment are now their own toolbar dropdowns (see renderChoiceFilter);
+// the combined Filter menu is retired but kept guarded in case anything calls it.
+function renderChoiceFilter(menuId,key,values,colors){
+  const host=document.getElementById(menuId); if(!host) return; host.innerHTML="";
+  const bucket=state.filter[key]||(state.filter[key]={});
+  host.appendChild($("div","phead",key==="stage"?"Stage":"Payment"));
+  if(!values.length) host.appendChild($("div","pempty","No options."));
+  values.forEach(v=>{
+    const chip=$("div","pchip"+(bucket[v]?" on":"")); chip.appendChild($("span","sw"));
+    if(colors&&colors[v]){ const d=$("span","cdot"); d.style.background=colors[v]; chip.appendChild(d); }
+    chip.appendChild($("span","clabel",v));
+    chip.onclick=()=>{ bucket[v]=!bucket[v]; if(!bucket[v])delete bucket[v]; savePrefs(); renderChoiceFilter(menuId,key,values,colors); renderList(); };
+    host.appendChild(chip);
+  });
+  if(activeKeys(bucket).length){
+    const c=$("div","paction danger","Clear "+(key==="stage"?"stage":"payment")); c.onclick=()=>{ state.filter[key]={}; savePrefs(); renderChoiceFilter(menuId,key,values,colors); renderList(); }; host.appendChild(c);
+  }
+}
+function renderStageFilter(){ renderChoiceFilter("stageMenu","stage",STAGES,STAGE_C); }
+function renderPaymentFilter(){ renderChoiceFilter("paymentMenu","payment",PAYS,PAY_C); }
 function renderFilterMenu(){
-  const host=document.getElementById("filterMenu"); host.innerHTML="";
+  const host=document.getElementById("filterMenu"); if(!host) return; host.innerHTML="";
   const people=[...new Set(state.jobs.flatMap(j=>choiceList(j.Assigned_To)))].filter(Boolean).sort();
   const DEFS=[
     {key:"stage",label:"Stage",bucket:state.filter.stage,values:STAGES,dot:v=>STAGE_C[v]},
@@ -1916,9 +1941,10 @@ function updateToolbar(){
   const gn=document.getElementById("groupName");
   if(gn){ gn.textContent = state.activeGrouping ? state.activeGrouping+(isGroupingDirty()?" •":"") : (groupingActive()?"Grouped":"No grouping");
     document.getElementById("groupBtn").classList.toggle("active", groupingActive()); }
-  const n=filterCount(), fn=document.getElementById("filterNum");
-  fn.textContent=n; fn.hidden=!n;
-  document.getElementById("filterBtn").classList.toggle("active", n>0);
+  const setFilt=(key,btnId,numId)=>{ const c=activeKeys(state.filter[key]).length, el=document.getElementById(numId);
+    if(el){ el.textContent=c; el.hidden=!c; } const b=document.getElementById(btnId); if(b) b.classList.toggle("active", c>0); };
+  setFilt("stage","stageBtn","stageNum");
+  setFilt("payment","paymentBtn","paymentNum");
   const dflt=(state.sort.key==="input"&&state.sort.dir===-1&&!state.sort2.key);
   document.getElementById("sortBtn").classList.toggle("active", !dflt);
 }

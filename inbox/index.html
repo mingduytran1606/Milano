@@ -1774,7 +1774,7 @@ function renderDetail(){
       const dot=$("span","sdot"); dot.style.background=softTint(ORD_C[r.Order_Status]).dot; si.appendChild(dot);
       si.appendChild($("span","slabel", stripNo(r.Order_Status)||"—"));
       row.appendChild(si);
-      row.appendChild($("span","snm", (r.Scope_Qty!=null?r.Scope_Qty+"\u00d7 ":"")+esc([r.Product_Supplier,r.Stone].filter(Boolean).join(" ")||stoneProductLabel(r))));
+      row.appendChild($("span","snm", (r.Scope_Qty!=null?r.Scope_Qty+"\u00d7 ":"")+esc([r.Product_Supplier,r.Stone].filter(Boolean).join(" · ")||stoneProductLabel(r))));
       row.appendChild($("span","snote", esc(r.Note)));
       sl.appendChild(row);
     });

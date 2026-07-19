@@ -1484,7 +1484,14 @@ function pushSharedConfig(){
 function saveForEveryone(){ state.templateShared=true;  savePrefs(); pushSharedConfig(); }
 function saveForMyself()  { state.templateShared=false; savePrefs(); }   // local only; stop following team
 const pushSharedTemplate=function(){ if(state.templateShared) pushSharedConfig(); };  // legacy callers push only when following
-function commitGrouping(){ state.activeGrouping=""; savePrefs(); renderList(); updateToolbar(); }   // manual edit = custom; shared push on Done/close
+// Editing the rules keeps the named grouping active and marks it dirty
+// (same pattern as views): Update / Revert live in the Group menu.
+function commitGrouping(){ savePrefs(); renderList(); updateToolbar(); }
+function findGrouping(n){ return state.savedGroupings.find(x=>x.name===n)||null; }
+function isGroupingDirty(){ const g=findGrouping(state.activeGrouping); if(!g)return false;
+  return JSON.stringify(normalizeGrouping(state.grouping))!==JSON.stringify(normalizeGrouping(g.grouping)); }
+function updateGrouping(){ const g=findGrouping(state.activeGrouping); if(!g)return;
+  g.grouping=JSON.parse(JSON.stringify(normalizeGrouping(state.grouping))); savePrefs(); renderGroupMenu(); updateToolbar(); }
 function applyGrouping(g){ state.grouping=normalizeGrouping(g.grouping); state.activeGrouping=g.name; savePrefs(); closeMenus(); renderList(); updateToolbar(); }
 function saveGroupingAs(){
   const name=prompt('Name this grouping (e.g. "By client", "By stage"):', state.activeGrouping||""); if(!name)return;
@@ -1501,10 +1508,12 @@ function renderGroupMenu(){
   if(!groupingActive()) none.appendChild($("span","rtick","✓"));
   none.onclick=()=>{ state.grouping={by:"",rules:[],restMode:"value"}; state.activeGrouping=""; savePrefs(); closeMenus(); renderList(); updateToolbar(); };
   host.appendChild(none);
+  const gdirty=state.activeGrouping&&isGroupingDirty();
   state.savedGroupings.slice().sort((a,b)=>a.name.toLowerCase().localeCompare(b.name.toLowerCase())).forEach(g=>{
-    const row=$("div","prow"+(g.name===state.activeGrouping?" on":""));
-    row.appendChild($("span","rlabel",g.name));
-    if(g.name===state.activeGrouping) row.appendChild($("span","rtick","✓"));
+    const on=g.name===state.activeGrouping;
+    const row=$("div","prow"+(on?" on":""));
+    row.appendChild($("span","rlabel",g.name+(on&&gdirty?" (edited)":"")));
+    if(on) row.appendChild($("span","rtick","✓"));
     const del=$("span","rdel","×"); del.title="Delete grouping";
     del.onclick=e=>{ e.stopPropagation(); if(confirm('Delete the grouping "'+g.name+'"?')) deleteGrouping(g.name); };
     row.appendChild(del);
@@ -1513,6 +1522,10 @@ function renderGroupMenu(){
   });
   if(!state.savedGroupings.length) host.appendChild($("div","pempty","None yet — set up a grouping, then Save current as…"));
   host.appendChild($("div","psep"));
+  if(gdirty){
+    const upd=$("div","paction",'⟳ Update "'+state.activeGrouping+'" with these tweaks'); upd.onclick=()=>updateGrouping(); host.appendChild(upd);
+    const rev=$("div","paction",'↩ Revert to saved "'+state.activeGrouping+'"'); rev.onclick=()=>{ const g=findGrouping(state.activeGrouping); if(g) applyGrouping(g); }; host.appendChild(rev);
+  }
   if(groupingActive()){ const save=$("div","paction","＋ Save current grouping as…"); save.onclick=saveGroupingAs; host.appendChild(save); }
   const edit=$("div","paction","⚙ Edit grouping…"); edit.onclick=()=>{ closeMenus(); state._cardTab="group"; openCardEditor(); }; host.appendChild(edit);
 }
@@ -1822,7 +1835,7 @@ function updateToolbar(){
   document.getElementById("viewsBtn").classList.toggle("active", !!state.activeView);
   document.getElementById("viewsBtn").title = (state.activeView&&isViewDirty()) ? 'This view has unsaved tweaks — open to Update or Revert' : '';
   const gn=document.getElementById("groupName");
-  if(gn){ gn.textContent = state.activeGrouping || (groupingActive()?"Grouped":"No grouping");
+  if(gn){ gn.textContent = state.activeGrouping ? state.activeGrouping+(isGroupingDirty()?" •":"") : (groupingActive()?"Grouped":"No grouping");
     document.getElementById("groupBtn").classList.toggle("active", groupingActive()); }
   const n=filterCount(), fn=document.getElementById("filterNum");
   fn.textContent=n; fn.hidden=!n;

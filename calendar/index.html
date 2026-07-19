@@ -350,15 +350,18 @@
   var DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   // sidebar reads these columns off the jobs table when they exist
   var JOB_COLS = { addr:'Job_Address', client:'Client_Label', stage:'Stage', assigned:'Assigned_To', jid:'Job_ID', payment:'Payment_Status' };
-  // Stage / payment pill colours — kept in sync with the Inbox widget's palette so both match.
-  // (The Inbox stores these per-widget, so the calendar can't read them live; mirror them here.)
+  // Stage / payment pill colours — kept in sync with the Inbox widget.
+  // These are FALLBACK values (mirror of the Inbox's current palette); at runtime the
+  // calendar reads the Inbox widget's live "Save for everyone" colours from the doc
+  // (its section's customView.widgetOptions.colors) via loadInboxColors(), so recolours
+  // in the Inbox flow through automatically.
   var STAGE_COLORS = {
-    'Quote':'#e9edf1', 'Live':'#98FD90', 'WIP':'#FEF47A', 'Completed':'#FCA5A5',
-    'Cancelled':'#e9edf1', 'Others':'#DCDCDC', 'Closed !':'#D0BCF4', 'On hold':'#e9edf1', 'Fix Job':'#e9edf1'
+    'Quote':'#eef1f4', 'Live':'#b3f0bf', 'WIP':'#fff3b3', 'Completed':'#ffb3ba', 'Installing':'#fff3b3',
+    'Cancelled':'#eef1f4', 'Others':'#eef1f4', 'Closed !':'#c7b8f7', 'On hold':'#eef1f4', 'Fix Job':'#eef1f4'
   };
   var PAY_COLORS = {
-    'Not Invoiced':'#e9edf1', 'Deposit Paid':'#FFFACD', 'Outstanding Bal':'#FECBCC',
-    'Fully Paid':'#E1FEDE', 'Other':'#e9edf1', 'Not Paid Yet':'#FEE7C3', 'TBC By a Minh':'#E8D0FE'
+    'Not Invoiced':'#eef1f4', 'Deposit Paid':'#FFFACD', 'Outstanding Bal':'#ffb3ba',
+    'Fully Paid':'#b3f0bf', 'Other':'#eef1f4', 'Not Paid Yet':'#FEE7C3', 'TBC By a Minh':'#E8D0FE'
   };
   // Overwrite a meta map's Stage/Payment fillColors with our palette (textColor preserved).
   function applyChoiceColorOverrides(meta) {
@@ -371,29 +374,39 @@
       });
     });
   }
+  // Read the Inbox widget's live shared colours from the doc so recolours auto-sync.
+  // The Inbox publishes state.colors into its section's customView.widgetOptions.colors
+  // on "Save for everyone". We find that section by its widget URL (milano-inbox).
+  function loadInboxColors() {
+    return grist.docApi.fetchTable('_grist_Views_section').then(function (t) {
+      var n = (t.id || []).length;
+      for (var i = 0; i < n; i++) {
+        var opts; try { opts = JSON.parse(t.options[i] || '{}'); } catch (e) { continue; }
+        var cv = opts.customView; if (typeof cv === 'string') { try { cv = JSON.parse(cv || '{}'); } catch (e) { cv = {}; } }
+        if (!cv || String(cv.url || '').indexOf('milano-inbox') === -1) continue;
+        var wo = cv.widgetOptions || {}; if (typeof wo === 'string') { try { wo = JSON.parse(wo || '{}'); } catch (e) { wo = {}; } }
+        var c = wo.colors || {};
+        if (c.stage && Object.keys(c.stage).length) STAGE_COLORS = Object.assign({}, STAGE_COLORS, c.stage);
+        if (c.payment && Object.keys(c.payment).length) PAY_COLORS = Object.assign({}, PAY_COLORS, c.payment);
+        break;
+      }
+    }).catch(function (e) { console.warn('inbox colours read failed', e); });
+  }
 
   // ---- "Edit in Inbox" navigation ----
-  // Double-click a job → details popup → Edit jumps to that assignee's Inbox sub-page
-  // with the same job selected (Grist anchor link, opens in the same tab via target="_parent").
-  // If the doc's pages/sections change, update page (view id) + sec (Jobs section ref) below.
+  // Double-click a job → details popup → Edit jumps to the Inbox CUSTOM WIDGET
+  // (page "*Inbox | PRO MAX", section 158) with the same job selected. The Grist
+  // anchor moves the cursor to that section+row, and the widget's onRecord selects it.
+  // If the doc's pages/sections change, update page (view id) + sec (widget section ref).
   var INBOX = {
     base: 'https://milano.getgrist.com/ezZUgCeS6Rq1/Milano',
-    clientCol: 193,                       // Jobs_Detail.Client_Name colRef (any col works for the anchor)
-    byAssignee: {                         // Assigned_To choice value -> { page: view id, sec: Jobs section ref }
-      'Julie':  { page: 29, sec: 142 },
-      'Phoebe': { page: 30, sec: 145 },
-      'Nhi':    { page: 31, sec: 148 },
-      'a Minh': { page: 32, sec: 151 }
-    },
-    fallback: { page: 24, sec: 122 },     // *Inbox (all jobs) when the assignee has no own page
-    pageName: { 29:'Julie', 30:'Phoebe', 31:'Nhi', 32:'Anh Minh', 24:'Inbox' }
+    clientCol: 193,          // Jobs_Detail.Client_Name colRef (any Jobs_Detail col works for the anchor)
+    widget: { page: 33, sec: 158 }   // the Inbox custom widget (milano-inbox.netlify.app)
   };
   function inboxTargetFor(job) {
-    var a = (job.assigned || []).map(String), pick = null;
-    for (var i = 0; i < a.length; i++) { if (INBOX.byAssignee[a[i]]) { pick = INBOX.byAssignee[a[i]]; break; } }
-    var cfg = pick || INBOX.fallback;
+    var cfg = INBOX.widget;
     return {
-      name: INBOX.pageName[cfg.page] || 'Inbox',
+      name: 'Inbox',
       url: job.id ? (INBOX.base + '/p/' + cfg.page + '#a1.s' + cfg.sec + '.r' + job.id + '.c' + INBOX.clientCol) : null
     };
   }
@@ -1686,7 +1699,7 @@
           m[cols.colId[i]] = { label: cols.label[i] || cols.colId[i], type: cols.type[i] || '', choiceOptions: co };
         }
         metaByColId = m;
-        applyChoiceColorOverrides(metaByColId);
+        return loadInboxColors().then(function () { applyChoiceColorOverrides(metaByColId); });
       });
     }).catch(function (err) { console.warn('metadata read failed', err); });
   }

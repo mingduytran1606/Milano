@@ -1,0 +1,64 @@
+Milano — Stone Order Board widget · Deploy notes
+================================================
+
+A cross-job PROCUREMENT board (Kanban by Order_Status) for the Stone Order page.
+Complements the Inbox widget: the Inbox edits one job's stone lines; this board
+shows EVERY stone line across all jobs, grouped by where it is in the ordering
+pipeline — so whoever places orders and chases deliveries works from one screen.
+
+This folder is the deployable widget. One file matters:
+
+    index.html   ← the whole widget (self-contained; only loads
+                   grist-plugin-api.js from https://milano.getgrist.com)
+
+WHAT IT DOES
+------------
+• Columns = Order_Status, left→right in the numbered workflow order, with a
+  "To sort" column at the front for blank status. Card colours + column dots use
+  the exact Order_Status choice hex.
+• Cards show: supplier tag · status pill · product (Product_Full) · the job
+  (Job ID · client · address) · Scope/Ord/Deliv qtys · Ordered/Delivered dates ·
+  INV # · Note. Short qtys (ordered < scope, delivered < ordered) show red.
+• MOVE a line's status two ways: drag the card between columns, OR click the
+  status pill and pick from the coloured menu. Both write back to Grist.
+• Everything on a card is editable in place (qtys, dates, INV, note) and writes
+  straight back. Editing dates/qtys runs the same widget-side AUTO-STATUS rule as
+  the Inbox: Order date + Ordered qty → "2.  Placed Order"; Delivery date +
+  Delivered qty → "6. Delivered"; never overrides the manual statuses
+  (On hold / Cancelled / N/A / Return / Delivered by WF/Aboda/Client).
+• Change a line's product via the pencil / double-click (searchable Catalogue
+  picker; Product_Code + Supplier auto-follow the pick — they're formula cols).
+• SUB-GROUP toggle ("Flat" / "By supplier"): flips every column into collapsible
+  supplier sub-groups (count + slab total per supplier) — use it when you're about
+  to place orders and want each supplier's lines batched together.
+• Summary tiles (Needs ordering / On order / Awaiting pickup / Delivered) show
+  line counts + slab totals and act as quick filters. Plus a search box, a
+  supplier filter, and a "Hide done" toggle for the finished columns.
+• Per-person layout prefs (sub-group mode, collapsed columns/suppliers, hide-done)
+  persist in localStorage.
+
+DEPLOY TO NETLIFY
+-----------------
+1. https://app.netlify.com → "Add new site" → "Deploy manually".
+2. Drag THIS FOLDER (stone-order) onto the drop zone. Netlify drag-drop replaces
+   the whole site, so keep this widget on its OWN Netlify site — don't mix it with
+   the inbox/calendar sites.
+   (Once the site is linked to the milano-widgets repo with Publish directory =
+    stone-order, a push to main auto-deploys instead.)
+3. Use the site's ROOT URL (index.html). The /index.html path may 404 — use root.
+
+WIRE IT INTO GRIST
+------------------
+Stone Order page → add a CUSTOM widget → paste the Netlify root URL, then:
+  • Table    = Stone_Order
+  • Access   = Full   (it reads Jobs_Detail + Catalogue + schema metadata and
+                       writes status/qty/date/INV/note edits back)
+  • SELECT BY = leave unset — this is a whole-table board, not a linked detail.
+Hard-refresh the Grist page after each redeploy.
+
+TEST WITHOUT GRIST
+------------------
+Open the root URL directly in a browser: it renders built-in sample data (11
+lines across the statuses) so you can see the board and try dragging cards. Once
+embedded in Grist it switches to live data. A single "Unknown interface" console
+message appears only in a NON-Grist iframe (preview) — harmless.

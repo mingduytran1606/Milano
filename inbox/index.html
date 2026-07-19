@@ -521,7 +521,7 @@
     <div class="filters">
       <div class="search">
         <svg class="sic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-        <input id="fSearch" type="text" placeholder="Search address, client, stone, stage, staff…" autocomplete="off">
+        <input id="fSearch" type="text" placeholder="Search address, client, stone, stage, payment, staff…" autocomplete="off">
       </div>
       <div class="filt-row">
         <button class="tbtn" id="stageBtn" type="button" style="flex:1" title="Filter by stage">
@@ -1900,7 +1900,7 @@ function baseFilteredJobs(){
     if(st.length && !st.includes(j.Stage)) return false;
     if(py.length && !py.includes(j.Payment_Status)) return false;
     if(as.length){ const have=choiceList(j.Assigned_To); if(!have.some(v=>as.includes(v))) return false; }
-    if(q){ const hay=((j.Client_Label||"")+" "+(j.Job_Address||"")+" "+(j.Address_Formatted||"")+" "+(j.Job_ID||"")+" "+(j.Stage||"")+" "+choiceList(j.Assigned_To).join(" ")+" "+(j.Stones||"")+" "+(stoneTxt[j.id]||"")).toLowerCase();
+    if(q){ const hay=((j.Client_Label||"")+" "+(j.Job_Address||"")+" "+(j.Address_Formatted||"")+" "+(j.Job_ID||"")+" "+(j.Stage||"")+" "+(j.Payment_Status||"")+" "+choiceList(j.Assigned_To).join(" ")+" "+(j.Stones||"")+" "+(stoneTxt[j.id]||"")).toLowerCase();
       if(!qm.test(hay)) return false; }
     return true;
   }).sort(cmpJobs);

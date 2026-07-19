@@ -462,6 +462,12 @@
   .fs-btn{flex:0 0 auto;width:22px;height:22px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center}
   .fs-btn:hover{background:var(--line2);border-color:var(--accent)}
   .fs-v{flex:0 0 auto;min-width:42px;text-align:center;color:var(--muted);font-variant-numeric:tabular-nums}
+  .fmt-color-row{display:flex;align-items:center;gap:9px;padding:3px 0;font-size:12.5px}
+  .fmt-swatch{flex:0 0 auto;width:28px;height:22px;padding:0;border:1px solid var(--line);border-radius:6px;background:none;cursor:pointer}
+  .fmt-swatch::-webkit-color-swatch-wrapper{padding:2px}
+  .fmt-swatch::-webkit-color-swatch{border:none;border-radius:4px}
+  .fmt-swatch::-moz-color-swatch{border:none;border-radius:4px}
+  .fmt-cl{flex:1;min-width:0;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .fmt-reset{margin-top:14px;width:100%;background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;font-weight:600;cursor:pointer}
   .fmt-reset:hover{background:var(--line2)}
 
@@ -551,12 +557,17 @@
    ============================================================ */
 
 // ---- choice colours (from the live doc; keep in sync) ----
-const STAGE_C = {
+// Default colours (kept immutable so "Reset to defaults" can restore them).
+// STAGE_C / PAY_C are live copies that the floating panel mutates.
+const STAGE_DEFAULT = {
   "Quote":"#FEF47A","Live":"#98FD90","WIP":"#CCFEFE","Completed":"#FECC81",
   "Cancelled":"#FFFFFF","Others":"#DCDCDC","Closed !":"#f0d1ed","On hold":"#FECBCC","Fix Job":"#e9edf1"};
-const PAY_C = {
+const PAY_DEFAULT = {
   "Not Invoiced":"#e9edf1","Deposit Paid":"#FFFACD","Outstanding Bal":"#FECBCC",
   "Fully Paid":"#E1FEDE","Other":"#e9edf1","Not Paid Yet":"#FEE7C3","TBC By a Minh":"#E8D0FE"};
+const DEFAULT_AVATAR = "#8a94a0";
+const STAGE_C = Object.assign({}, STAGE_DEFAULT);
+const PAY_C   = Object.assign({}, PAY_DEFAULT);
 const ORD_C = {
   "2.  Placed Order":"#FEF47A","3. Awaiting Order":"#FED6FB","6. Delivered":"#98FD90",
   "4. Awaiting Pickup":"#75B5FC","7. Not Delivered Yet":"#CCFEFE","5. On hold":"#FEE7C3",
@@ -737,9 +748,27 @@ function openChoicePicker(anchor,cfg){
   });
   closeMenus(); m.hidden=false; positionPop(m,anchor,190);
 }
+// ---- colour customisation (floating panel) ----
+function toHex6(h){ h=String(h||"").trim();
+  if(/^#[0-9a-fA-F]{6}$/.test(h)) return h.toLowerCase();
+  if(/^#[0-9a-fA-F]{3}$/.test(h)) return ("#"+h.slice(1).split("").map(c=>c+c).join("")).toLowerCase();
+  return "#e9edf1"; }
+function normalizeColors(c){ c=c||{}; return {stage:c.stage||{}, payment:c.payment||{}, assignee:c.assignee||{}}; }
+// Push saved overrides into the live STAGE_C / PAY_C maps (reset to defaults first,
+// so calling this after a reset restores the originals).
+function applyColorOverrides(){
+  const c=state.colors||{};
+  Object.assign(STAGE_C, STAGE_DEFAULT); Object.keys(c.stage||{}).forEach(k=>{ if(k in STAGE_C && c.stage[k]) STAGE_C[k]=c.stage[k]; });
+  Object.assign(PAY_C,   PAY_DEFAULT);   Object.keys(c.payment||{}).forEach(k=>{ if(k in PAY_C && c.payment[k]) PAY_C[k]=c.payment[k]; });
+}
+function avatarColor(name){ const c=state.colors&&state.colors.assignee; return (c&&c[name])||DEFAULT_AVATAR; }
+// Black or white text depending on how light the avatar colour is.
+function contrastInk(hex){ const {r,g,b}=hexRgb(hex); return (r*299+g*587+b*114)/1000>150?"#1d2733":"#ffffff"; }
+function avatarEl(name,sm){ const a=$("div","avatar"+(sm?" sm":""),initials(name)); a.title=name;
+  const c=avatarColor(name); a.style.background=c; a.style.color=contrastInk(c); return a; }
 function avatarStack(names,sm){
   const av=$("div","avatars");
-  choiceList(names).forEach(n=>{const a=$("div","avatar"+(sm?" sm":""),initials(n)); a.title=n; av.appendChild(a);});
+  choiceList(names).forEach(n=>av.appendChild(avatarEl(n,sm)));
   return av;
 }
 
@@ -756,6 +785,7 @@ const state = { jobs:[], stone:[], inst:[], clients:[], catalogue:[], selectedId
   sort:{ key:"input", dir:-1 }, sort2:{ key:"", dir:1 }, stageOrder:STAGES.slice(), fields:defaultFields(), cardOrder:CARD_ORDER_DEFAULT.slice(),
   cardFontSize:12.5,
   listCardFont:Object.assign({},LIST_CARD_FONT), summaryFont:Object.assign({},SUMMARY_FONT),
+  colors:{stage:{},payment:{},assignee:{}},
   cardTemplate:DEFAULT_TEMPLATE, templateShared:null, _sharedTemplate:null,
   grouping:{by:"",rules:[],restMode:"value"}, groupCollapsed:{},
   savedGroupings:[], activeGrouping:"",
@@ -763,7 +793,7 @@ const state = { jobs:[], stone:[], inst:[], clients:[], catalogue:[], selectedId
 window._inbox = state;
 
 function loadPrefs(){ try{ return JSON.parse(localStorage.getItem(LSKEY))||{}; }catch(e){ return {}; } }
-function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ savedViews:state.savedViews, current:snapshot(true), stoneNoteH:state.stoneNoteH||null, listW:state.listW||null, templateShared:state.templateShared, groupCollapsed:state.groupCollapsed||{}, savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"", stoneColW:state.stoneColW||null, sumLeftPct:state.sumLeftPct||null, listCardFont:state.listCardFont, summaryFont:state.summaryFont })); }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ savedViews:state.savedViews, current:snapshot(true), stoneNoteH:state.stoneNoteH||null, listW:state.listW||null, templateShared:state.templateShared, groupCollapsed:state.groupCollapsed||{}, savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"", stoneColW:state.stoneColW||null, sumLeftPct:state.sumLeftPct||null, listCardFont:state.listCardFont, summaryFont:state.summaryFont, colors:state.colors })); }catch(e){} }
 function snapshot(withMeta){
   const s={ q:state.filter.q, stage:cleanSet(state.filter.stage), assigned:cleanSet(state.filter.assigned),
     payment:cleanSet(state.filter.payment), sort:{key:state.sort.key,dir:state.sort.dir}, sort2:{key:state.sort2.key,dir:state.sort2.dir}, stageOrder:(state.stageOrder||STAGES).slice(), cardFontSize:state.cardFontSize||12.5, fields:Object.assign({},state.fields),
@@ -1074,7 +1104,7 @@ function openAssignPicker(j,anchor){
   opts.forEach(name=>{
     const has=currentAssignees(j).includes(name);
     const row=$("div","cprow"+(has?" on":""));
-    row.appendChild($("div","avatar sm",initials(name)));
+    row.appendChild(avatarEl(name,true));
     row.appendChild($("span","rlabel",name));
     if(has) row.appendChild($("span","rtick","✓"));
     row.onmousedown=e=>{ e.preventDefault();
@@ -1598,6 +1628,15 @@ function fontStepper(labelText,obj,key,onchange){
   dec.onclick=()=>set(obj[key]-0.5); inc.onclick=()=>set(obj[key]+0.5);
   row.appendChild(dec); row.appendChild(val); row.appendChild(inc); return row;
 }
+// A swatch + label row for the colour section of the floating panel.
+function colorRow(labelText,curHex,defHex,onpick){
+  const row=$("div","fmt-color-row");
+  const sw=document.createElement("input"); sw.type="color"; sw.className="fmt-swatch"; sw.value=toHex6(curHex||defHex);
+  sw.title="Pick a colour for "+labelText;
+  sw.onchange=()=>onpick(sw.value);
+  row.appendChild(sw); row.appendChild($("span","fmt-cl",labelText));
+  return row;
+}
 function buildFormatPanel(){
   const p=document.getElementById("fmtPanel"); p.innerHTML="";
   const h=$("div","fmt-h"); h.appendChild(document.createTextNode("Formatting"));
@@ -1607,7 +1646,16 @@ function buildFormatPanel(){
   FMT_LIST_FIELDS.forEach(([k,l])=> p.appendChild(fontStepper(l,state.listCardFont,k,()=>{ if(k==="base")state.cardFontSize=state.listCardFont.base; applyCardFont(); savePrefs(); renderList(); })));
   p.appendChild($("div","fmt-sec","Summary card (details)"));
   FMT_SUM_FIELDS.forEach(([k,l])=> p.appendChild(fontStepper(l,state.summaryFont,k,()=>{ savePrefs(); renderDetail(); })));
-  const rst=$("button","fmt-reset","Reset to defaults"); rst.onclick=()=>{ state.listCardFont=Object.assign({},LIST_CARD_FONT); state.summaryFont=Object.assign({},SUMMARY_FONT); state.cardFontSize=LIST_CARD_FONT.base; applyCardFont(); savePrefs(); renderAll(); buildFormatPanel(); };
+  // ---- colour customisation ----
+  p.appendChild($("div","fmt-sec","Stage colours"));
+  STAGES.forEach(s=> p.appendChild(colorRow(s, STAGE_C[s], STAGE_DEFAULT[s], v=>{ state.colors.stage[s]=v; STAGE_C[s]=v; savePrefs(); renderAll(); })));
+  p.appendChild($("div","fmt-sec","Payment colours"));
+  PAYS.forEach(s=> p.appendChild(colorRow(s, PAY_C[s], PAY_DEFAULT[s], v=>{ state.colors.payment[s]=v; PAY_C[s]=v; savePrefs(); renderAll(); })));
+  p.appendChild($("div","fmt-sec","Assignee colours"));
+  const people=[...new Set((state.jobs||[]).flatMap(j=>choiceList(j.Assigned_To)))].filter(Boolean).sort();
+  if(people.length) people.forEach(n=> p.appendChild(colorRow(n, avatarColor(n), DEFAULT_AVATAR, v=>{ state.colors.assignee[n]=v; savePrefs(); renderAll(); })));
+  else p.appendChild($("div","fs-row","No assignees yet."));
+  const rst=$("button","fmt-reset","Reset to defaults"); rst.onclick=()=>{ state.listCardFont=Object.assign({},LIST_CARD_FONT); state.summaryFont=Object.assign({},SUMMARY_FONT); state.cardFontSize=LIST_CARD_FONT.base; state.colors={stage:{},payment:{},assignee:{}}; applyColorOverrides(); applyCardFont(); savePrefs(); renderAll(); buildFormatPanel(); };
   p.appendChild(rst);
 }
 function initFormatButton(){
@@ -2111,6 +2159,7 @@ document.addEventListener("click",closeMenus);
   state.stoneNoteH=p.stoneNoteH||null; state.listW=p.listW||null; state.groupCollapsed=p.groupCollapsed||{};
   state.stoneColW=Array.isArray(p.stoneColW)?p.stoneColW:null; state.sumLeftPct=p.sumLeftPct||null;
   state.listCardFont=Object.assign({},LIST_CARD_FONT,p.listCardFont||{}); state.summaryFont=Object.assign({},SUMMARY_FONT,p.summaryFont||{});
+  state.colors=normalizeColors(p.colors); applyColorOverrides();
   state.savedGroupings=p.savedGroupings||[]; state.activeGrouping=p.activeGrouping||"";
   if(!state.assignChoices) state.assignChoices=["Julie","Phoebe","Nhi","a Minh","Louis"];
   if("templateShared" in p) state.templateShared=(p.templateShared==null?null:!!p.templateShared);

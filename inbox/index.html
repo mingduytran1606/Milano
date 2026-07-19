@@ -36,9 +36,14 @@
   .list-head{display:flex;align-items:center;gap:8px;padding:12px 14px 10px}
   .list-head .t{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
   .list-head .count{background:var(--line2);color:var(--muted);border-radius:999px;font-size:11px;padding:1px 8px;font-weight:700}
-  .list-head .newbtn{margin-left:auto;font:inherit;font-size:12px;font-weight:600;color:#fff;background:var(--accent);
+  .list-head .head-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .list-head .newbtn{font:inherit;font-size:12px;font-weight:600;color:#fff;background:var(--accent);
     border:0;border-radius:8px;padding:6px 12px;cursor:pointer}
   .list-head .newbtn:hover{filter:brightness(1.06)}
+  .list-head .resetbtn{font:inherit;font-size:12px;font-weight:600;color:var(--muted);background:var(--panel);
+    border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+  .list-head .resetbtn:hover{background:var(--line2);color:var(--ink)}
+  .list-head .resetbtn:active{transform:scale(.97)}
   .navbar{display:flex;gap:6px;padding:0 14px 10px;overflow-x:auto;scrollbar-width:none}
   .navbar::-webkit-scrollbar{display:none}
   .navbar .ntab{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:12px;font-weight:600;
@@ -522,7 +527,13 @@
   <div class="list-pane">
     <div class="list-head">
       <span class="t">Jobs</span><span class="count" id="jobCount">0</span>
-      <button class="newbtn" id="newJob">+ New job</button>
+      <div class="head-actions">
+        <button class="resetbtn" id="hardReset" type="button" title="Reset the list — clear the search, all filters (stage / payment / assignee) and grouping">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+          <span>Reset</span>
+        </button>
+        <button class="newbtn" id="newJob">+ New job</button>
+      </div>
     </div>
     <div class="navbar" id="navTabs"></div>
     <div class="filters">
@@ -1754,6 +1765,15 @@ function saveViewAs(shared){ const name=prompt(shared?'Name this TEAM view (ever
 function updateView(){ const v=findView(state.activeView); if(!v)return; v.config=snapshot(); savePrefs(); if(v.shared) pushSharedViews(); renderViewsMenu(); updateToolbar(); }
 function deleteView(name){ const wasShared=(findView(name)||{}).shared; state.savedViews=state.savedViews.filter(v=>v.name!==name); if(state.activeView===name)state.activeView=""; savePrefs(); if(wasShared) pushSharedViews(); renderViewsMenu(); updateToolbar(); }
 function clearView(){ state.filter.q="";state.filter.stage={};state.filter.assigned={};state.filter.payment={}; state.activeView=""; state.filterDrill=null; savePrefs(); closeMenus(); renderAll(); }
+// Reset button next to "+ New job": drop search, every filter, the assignee pill and grouping.
+function hardReset(){
+  state.filter.q=""; state.filter.stage={}; state.filter.assigned={}; state.filter.payment={};
+  state.tab="all";
+  state.grouping={by:"",rules:[],restMode:"value"}; state.activeGrouping="";
+  state.activeView=""; state.filterDrill=null; state.groupCollapsed={};
+  const se=document.getElementById("fSearch"); if(se) se.value="";
+  savePrefs(); closeMenus(); renderAll();
+}
 
 // ============================================================
 //  RENDER — list
@@ -2429,6 +2449,7 @@ const SAMPLE_INST=[
 //  BOOT
 // ============================================================
 document.getElementById("newJob").onclick=newJob;
+document.getElementById("hardReset").onclick=hardReset;
 MENUS.forEach(([b,m,r])=>{ document.getElementById(b).onclick=e=>{ e.stopPropagation(); toggleMenu(b,m,r); }; document.getElementById(m).onclick=e=>e.stopPropagation(); });
 document.getElementById("fSearch").oninput=e=>{ state.filter.q=e.target.value; savePrefs(); renderList(); };
 document.getElementById("rowMenu").onclick=e=>e.stopPropagation();

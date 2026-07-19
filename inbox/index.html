@@ -328,7 +328,7 @@
   .line input[type=number]{-moz-appearance:textfield}
   .line input[type=number]::-webkit-outer-spin-button,.line input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   .line .lprice.ro{justify-content:flex-end;color:var(--ink);font-weight:500;padding-top:2px}
-  .line .lprice input{width:4em;min-width:0;flex:0 1 auto;font:inherit;color:var(--ink);background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:5px 2px;text-align:right;appearance:textfield;-moz-appearance:textfield}
+  .line .lprice input{width:3.5ch;min-width:2ch;max-width:6ch;flex:0 1 auto;font:inherit;color:var(--ink);background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:5px 1px;text-align:right;appearance:textfield;-moz-appearance:textfield}
   .line .lprice input:focus{outline:none;border-bottom-color:var(--accent)}
   .line .prod .nm{font-weight:600;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
   .line .prod .sub{font-size:12px;color:var(--muted)}
@@ -2211,6 +2211,9 @@ function renderDetail(){
     const pw=$("div","lprice"); pw.appendChild(document.createTextNode("$"));
     const pi=document.createElement("input"); pi.type="number"; pi.title="Price / slab — prefilled from the product, editable";
     pi.value=(r.Product_Price_slab!=null?r.Product_Price_slab:"");
+    // Size the box to its digits so the "$" hugs the number instead of drifting toward the Deliv column.
+    const sizePi=()=>{ const n=String(pi.value||"").length||2; pi.style.width="calc("+n+"ch + 6px)"; };
+    sizePi(); pi.oninput=sizePi;
     pi.onchange=()=>update("Stone_Order",r.id,{Product_Price_slab:pi.value===""?null:Number(pi.value)});
     pw.appendChild(pi); line.appendChild(pw);
     const nti=document.createElement("textarea"); nti.className="lnote"; nti.value=esc(r.Note); nti.placeholder="Note…";

@@ -213,6 +213,13 @@
              font-size:11px; font-weight:700; color:#fff; background:var(--muted); border:1.5px solid #fff;
              border-radius:50%; box-shadow:0 1px 2px rgba(0,0,0,.35); cursor:pointer; user-select:none; z-index:2; }
   .ev .del:hover { background:var(--danger); }
+  .ev .evmore { position:absolute; top:-7px; right:-7px; width:18px; height:18px; line-height:15px; text-align:center;
+             font-size:13px; font-weight:700; color:var(--ink); background:var(--panel); border:1px solid var(--line);
+             border-radius:50%; box-shadow:0 1px 2px rgba(0,0,0,.25); cursor:pointer; user-select:none; z-index:2; opacity:0; transition:opacity .12s; }
+  .ev:hover .evmore, .ev.selected .evmore, .ev.lit .evmore { opacity:1; }
+  .ev .cline:empty { display:none; }
+  .avwrap { display:inline-flex; gap:2px; vertical-align:middle; }
+  .jbody .cline { line-height:1.35; }
   .avatar { width:18px; height:18px; border-radius:50%; background:var(--line2); color:var(--muted); font-size:8.5px; font-weight:700;
             display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--line);
             vertical-align:middle; letter-spacing:.02em; }
@@ -282,6 +289,45 @@
   #jobModalCard:not(.editing) .jm-editdone { display:none; }
   .jm-donebtn { font-size:12.5px; font-weight:600; color:#fff; background:var(--accent); border:none; padding:7px 16px; border-radius:6px; cursor:pointer; }
   .jm-donebtn:hover { background:var(--accent); }
+
+  /* ⋯ event menu popup */
+  #evMenu { position:fixed; z-index:60; min-width:158px; background:var(--panel); border:1px solid var(--line);
+            border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.18); padding:5px; }
+  #evMenu[hidden] { display:none; }
+  #evMenu .paction { display:flex; align-items:center; gap:7px; padding:7px 8px; border-radius:6px; cursor:pointer;
+            font-size:12.5px; font-weight:600; color:var(--accent-ink); user-select:none; }
+  #evMenu .paction:hover { background:var(--accent-soft); }
+  #evMenu .paction.danger { color:var(--danger); }
+  #evMenu .paction.danger:hover { background:rgba(229,72,77,.12); }
+  #evMenu .evsep { border-top:1px solid var(--line2); margin:4px 2px; }
+
+  /* customise-cards modal */
+  #cardEditModal { position:fixed; inset:0; z-index:70; background:rgba(20,22,26,.42); display:none; align-items:center; justify-content:center; padding:16px; }
+  #cardEditModal.open { display:flex; }
+  #cardEditCard { width:100%; max-width:460px; max-height:88vh; display:flex; flex-direction:column; overflow:hidden;
+            background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:0 18px 50px rgba(0,0,0,.35); }
+  .ce-head { flex:0 0 auto; display:flex; align-items:center; padding:12px 14px; border-bottom:1px solid var(--line2); }
+  .ce-title { font-size:14px; font-weight:700; color:var(--ink); }
+  .ce-close { margin-left:auto; font-size:20px; line-height:1; color:var(--muted); cursor:pointer; padding:0 4px; }
+  .ce-close:hover { color:var(--danger); }
+  .ce-tabs { flex:0 0 auto; display:flex; gap:4px; padding:8px 12px 0; }
+  .ce-tab { font:inherit; font-size:12.5px; font-weight:600; color:var(--muted); background:transparent; border:0;
+            border-bottom:2px solid transparent; padding:6px 10px; cursor:pointer; }
+  .ce-tab:hover { color:var(--ink); }
+  .ce-tab.on { color:var(--accent-ink); border-bottom-color:var(--accent); }
+  .ce-body { flex:1; min-height:0; overflow-y:auto; padding:12px 14px 14px; }
+  .ce-note { font-size:11.5px; color:var(--muted); line-height:1.45; margin-bottom:9px; }
+  .ce-ta { width:100%; min-height:88px; resize:vertical; font:inherit; font-size:13px; line-height:1.5; color:var(--ink);
+            background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:9px 10px; }
+  .ce-ta:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft); }
+  .ce-tokens { display:flex; flex-wrap:wrap; gap:5px; margin-top:10px; }
+  .ce-tok { display:inline-flex; align-items:center; gap:5px; font:inherit; font-size:11px; color:var(--ink);
+            background:var(--line2); border:1px solid transparent; border-radius:7px; padding:3px 7px; cursor:pointer; }
+  .ce-tok:hover { border-color:var(--accent); background:var(--accent-soft); }
+  .ce-tok code { font-size:10.5px; color:var(--accent-ink); font-weight:700; }
+  .ce-tok span { color:var(--muted); }
+  .ce-reset { margin-top:12px; font-size:11.5px; font-weight:600; color:var(--accent-ink); cursor:pointer; display:inline-block; }
+  .ce-reset:hover { text-decoration:underline; }
 </style>
 </head>
 <body>
@@ -338,6 +384,22 @@
       <span class="jm-hint"></span>
       <a class="jm-edit" target="_parent" rel="noopener" href="#">&#9998; Edit in Inbox</a>
     </div>
+  </div>
+</div>
+
+<div id="evMenu" hidden></div>
+
+<div id="cardEditModal">
+  <div id="cardEditCard">
+    <div class="ce-head">
+      <div class="ce-title">Customise cards</div>
+      <span class="ce-close" title="Close">&times;</span>
+    </div>
+    <div class="ce-tabs">
+      <button class="ce-tab on" type="button" data-tab="event">Calendar card</button>
+      <button class="ce-tab" type="button" data-tab="job">Job cards</button>
+    </div>
+    <div class="ce-body"></div>
   </div>
 </div>
 
@@ -684,6 +746,165 @@
     return map;
   }
 
+  // ================= Customisable card templates =================
+  // Two independent templates (the calendar event blocks and the sidebar job cards),
+  // edited via the ⋯ menu on an event. Markdown-ish: **bold**, *italic*, {token}, \n = new line.
+  var DEFAULT_EVENT_CARD = '{title}\n{assigned} {seq}';
+  var DEFAULT_JOB_CARD = '**{client}**\n{address}\n{stage} {visits}';
+  var eventCardTpl = DEFAULT_EVENT_CARD;
+  var jobCardTpl = DEFAULT_JOB_CARD;
+  // tokens shown in the editor (label per token)
+  var EVENT_TOKENS = { title:'Title (stage-coloured)', client:'Client', stage:'Stage pill', payment:'Payment pill', assigned:'Assignee avatars', date:'Visit date', seq:'Visit n/N', note:'Note', address:'Address' };
+  var JOB_TOKENS = { client:'Client', address:'Address', jobid:'Job ID', stage:'Stage pill', payment:'Payment pill', assigned:'Assignee avatars', visits:'Visit count', nextvisit:'Next visit date' };
+
+  function renderCardTemplate(str, tokens, host) {
+    String(str == null ? '' : str).split('\n').forEach(function (lineStr) {
+      var line = document.createElement('div'); line.className = 'cline';
+      renderCardInline(lineStr, tokens, line);
+      host.appendChild(line);
+    });
+  }
+  function renderCardInline(str, tokens, host) {
+    var re = /\*\*([^*]+)\*\*|\*([^*]+)\*|\{([a-z_]+)\}|([^{*]+)|([\s\S])/g, m;
+    while ((m = re.exec(str))) {
+      if (m[1] != null) { var b = document.createElement('strong'); renderCardInline(m[1], tokens, b); host.appendChild(b); }
+      else if (m[2] != null) { var it = document.createElement('em'); renderCardInline(m[2], tokens, it); host.appendChild(it); }
+      else if (m[3] != null) { var fn = tokens[m[3]]; if (fn) { var el = fn(); if (el != null) host.appendChild(typeof el === 'string' ? document.createTextNode(el) : el); } else host.appendChild(document.createTextNode('{' + m[3] + '}')); }
+      else host.appendChild(document.createTextNode(m[4] != null ? m[4] : m[5]));
+    }
+  }
+  function txtNode(s) { return (s == null || s === '') ? null : document.createTextNode(String(s)); }
+  function avatarsEl(list) { if (!list || !list.length) return null; var w = document.createElement('span'); w.className = 'avwrap'; list.forEach(function (n) { if (n) w.appendChild(avatarSpan(n)); }); return w; }
+  // clickable visit-count span (preserves the expand toggle)
+  function visitCountEl(aliases, counts) {
+    var n = 0; aliases.forEach(function (k) { n = Math.max(n, counts[k] || 0); });
+    var expanded = !!expandedJobs[aliases[0]];
+    var cnt = document.createElement('span'); cnt.className = 'jcount';
+    cnt.textContent = n ? ((expanded ? '▾ ' : '▸ ') + n + (n === 1 ? ' visit' : ' visits')) : 'no visits';
+    if (n) { cnt.title = 'Show this job’s installation dates'; cnt.addEventListener('click', function (e) { e.stopPropagation(); expandedJobs[aliases[0]] = !expanded; render(); }); }
+    return cnt;
+  }
+  function jobCardTokens(j, aliases, counts, nextOf) {
+    return {
+      client: function () { return txtNode(j.client || j.addr || '(no client)'); },
+      address: function () { return txtNode(j.addr); },
+      jobid: function () { return txtNode(j.jid); },
+      stage: function () { return (j.stage && mappingsCache.type) ? pillSpan(j.stage, mappingsCache.type) : null; },
+      payment: function () { return j.payment ? pillSpan(j.payment, JOB_COLS.payment) : null; },
+      assigned: function () { return avatarsEl(j.assigned || []); },
+      visits: function () { return visitCountEl(aliases, counts); },
+      nextvisit: function () { var d = nextOf(j); return d ? txtNode(fmtShort(d) + ' ' + d.getFullYear()) : null; }
+    };
+  }
+  function eventCardTokens(rec, info) {
+    var j = jobForRecord(rec);
+    return {
+      title: function () {
+        var t = document.createElement('div'); t.className = 't';
+        t.textContent = fmtVal(rec[mappingsCache.title]) || '(no title)';
+        if (mappingsCache.type) { var sv = fmtVal(rec[mappingsCache.type]); var o = (colMeta(mappingsCache.type).choiceOptions || {})[sv] || {}; t.style.background = o.fillColor || 'var(--line)'; t.style.color = o.textColor || 'var(--ink)'; }
+        return t;
+      },
+      client: function () { return txtNode(j && j.client); },
+      stage: function () { var sv = fmtVal(rec[mappingsCache.type]); return (sv && mappingsCache.type) ? pillSpan(sv, mappingsCache.type) : null; },
+      payment: function () { return (j && j.payment) ? pillSpan(j.payment, JOB_COLS.payment) : null; },
+      assigned: function () { return avatarsEl((j && j.assigned) || []); },
+      date: function () { var d = gristToLocalDate(rec[mappingsCache.startDate]); return d ? txtNode(fmtShort(d)) : null; },
+      seq: function () { return (info && info.total > 1) ? txtNode(info.n + '/' + info.total) : null; },
+      note: function () { return (mappingsCache.seqNote != null) ? txtNode(fmtVal(rec[mappingsCache.seqNote])) : null; },
+      address: function () { return txtNode(j && j.addr); }
+    };
+  }
+  function persistCards() { try { grist.setOption('eventCardTpl', eventCardTpl); grist.setOption('jobCardTpl', jobCardTpl); } catch (e) {} }
+
+  // ---- Duplicate an installation: copy this visit's row (job + date + mapped fields) ----
+  function duplicateInstall(rec) {
+    var fields = {};
+    var copyCols = [mappingsCache.startDate, mappingsCache.title, mappingsCache.type, mappingsCache.groupBy, mappingsCache.seqNote]
+      .concat(mappingsCache.details || []);
+    copyCols.forEach(function (c) { if (c != null && rec[c] != null && rec[c] !== '') fields[c] = rec[c]; });
+    grist.getTable().create({ fields: fields })
+      .then(function (r) { if (r && r.id) { pendingCursor = r.id; } })
+      .catch(function (err) { console.error('duplicate failed', err); alert('Could not duplicate this installation.'); });
+  }
+
+  // ---- ⋯ menu on an event card ----
+  function openEventMenu(rec, btn) {
+    var m = document.getElementById('evMenu'); if (!m) return;
+    m.innerHTML = '';
+    var mk = function (label, cls, fn) {
+      var a = document.createElement('div'); a.className = 'paction' + (cls ? ' ' + cls : '');
+      a.textContent = label;
+      a.addEventListener('click', function (e) { e.stopPropagation(); closeMenus(); fn(); });
+      return a;
+    };
+    m.appendChild(mk('⚙ Customise card…', '', function () { openCardEditor(); }));
+    m.appendChild(mk('⧉ Duplicate', '', function () { duplicateInstall(rec); }));
+    var sep = document.createElement('div'); sep.className = 'evsep'; m.appendChild(sep);
+    m.appendChild(mk('🗑 Delete', 'danger', function () {
+      var d = gristToLocalDate(rec[mappingsCache.startDate]);
+      var what = (fmtVal(rec[mappingsCache.title]) || 'this job') + (d ? ' on ' + fmtDate(d) : '');
+      if (!confirm('Remove the installation for ' + what + '?')) return;
+      recordsCache = recordsCache.filter(function (r) { return r.id !== rec.id; });
+      if (selectedRowId === rec.id) { selectedRowId = null; isolatedJobKey = null; }
+      grist.getTable().destroy([rec.id]).catch(function (err) { console.error(err); });
+      render();
+    }));
+    closeMenus();
+    var r = btn.getBoundingClientRect();
+    m.style.left = Math.max(6, Math.min(r.left, window.innerWidth - 168)) + 'px';
+    m.style.top = (r.bottom + 4) + 'px';
+    m.hidden = false;
+  }
+
+  // ---- card editor modal (two tabs: calendar event card + sidebar job card) ----
+  var cardEditTab = 'event';
+  function openCardEditor(tab) {
+    if (tab) cardEditTab = tab;
+    var modal = document.getElementById('cardEditModal'); if (!modal) return;
+    modal.classList.add('open');
+    renderCardEditor();
+  }
+  function closeCardEditor() { var modal = document.getElementById('cardEditModal'); if (modal) modal.classList.remove('open'); }
+  function renderCardEditor() {
+    var isEvent = cardEditTab === 'event';
+    [].forEach.call(document.querySelectorAll('#cardEditModal .ce-tab'), function (b) { b.classList.toggle('on', b.dataset.tab === cardEditTab); });
+    var body = document.querySelector('#cardEditModal .ce-body'); if (!body) return;
+    body.innerHTML = '';
+    var tokens = isEvent ? EVENT_TOKENS : JOB_TOKENS;
+    var note = document.createElement('div'); note.className = 'ce-note';
+    note.textContent = isEvent
+      ? 'The coloured blocks on the calendar grid. Use **bold**, *italic*, {tokens} and line breaks. Applies to every event.'
+      : 'The job cards in the right-hand list. Use **bold**, *italic*, {tokens} and line breaks. Applies to every job.';
+    body.appendChild(note);
+    var ta = document.createElement('textarea'); ta.className = 'ce-ta'; ta.spellcheck = false;
+    ta.value = isEvent ? eventCardTpl : jobCardTpl;
+    function commit() { if (isEvent) eventCardTpl = ta.value; else jobCardTpl = ta.value; persistCards(); render(); }
+    ta.addEventListener('input', commit);
+    body.appendChild(ta);
+    var toks = document.createElement('div'); toks.className = 'ce-tokens';
+    Object.keys(tokens).forEach(function (k) {
+      var chip = document.createElement('button'); chip.type = 'button'; chip.className = 'ce-tok';
+      chip.innerHTML = '<code>{' + k + '}</code><span>' + tokens[k] + '</span>';
+      chip.title = 'Insert {' + k + '}';
+      chip.addEventListener('click', function () {
+        var s = ta.selectionStart || 0, e = ta.selectionEnd || 0;
+        ta.value = ta.value.slice(0, s) + '{' + k + '}' + ta.value.slice(e);
+        ta.focus(); ta.selectionStart = ta.selectionEnd = s + k.length + 2;
+        commit();
+      });
+      toks.appendChild(chip);
+    });
+    body.appendChild(toks);
+    var reset = document.createElement('div'); reset.className = 'ce-reset';
+    reset.textContent = '↩ Reset this card to default';
+    reset.addEventListener('click', function () {
+      if (isEvent) eventCardTpl = DEFAULT_EVENT_CARD; else jobCardTpl = DEFAULT_JOB_CARD;
+      persistCards(); render(); renderCardEditor();
+    });
+    body.appendChild(reset);
+  }
+
   // ---- event cards ----
   function makeCard(rec) {
     var card = document.createElement('div');
@@ -695,75 +916,17 @@
     card.draggable = true;
     card.dataset.rid = rec.id;
 
-    // red × in the corner: remove this installation
-    var del = document.createElement('span');
-    del.className = 'del';
-    del.textContent = '×';
-    del.title = 'Remove this installation';
-    del.addEventListener('click', function (e) {
-      e.stopPropagation();
-      var d = gristToLocalDate(rec[mappingsCache.startDate]);
-      var what = (fmtVal(rec[mappingsCache.title]) || 'this job') + (d ? ' on ' + fmtDate(d) : '');
-      if (!confirm('Remove the installation for ' + what + '?')) return;
-      recordsCache = recordsCache.filter(function (r) { return r.id !== rec.id; });  // optimistic
-      if (selectedRowId === rec.id) { selectedRowId = null; isolatedJobKey = null; }
-      grist.getTable().destroy([rec.id]).catch(function (err) { console.error(err); });
-      render();
-    });
-    card.appendChild(del);
+    // ⋯ menu in the corner: Customise card / Duplicate / Delete
+    var menuBtn = document.createElement('span');
+    menuBtn.className = 'evmore';
+    menuBtn.textContent = '⋯';
+    menuBtn.title = 'Card options';
+    menuBtn.addEventListener('click', function (e) { e.stopPropagation(); openEventMenu(rec, menuBtn); });
+    card.appendChild(menuBtn);
 
     var info = seqById[rec.id];
-
-    var t = document.createElement('div');
-    t.className = 't';
-    t.textContent = fmtVal(rec[mappingsCache.title]) || '(no title)';
-    if (mappingsCache.type) {
-      var stageVal = fmtVal(rec[mappingsCache.type]);
-      var opts = (colMeta(mappingsCache.type).choiceOptions || {})[stageVal] || {};
-      t.style.background = opts.fillColor || 'var(--line)';
-      t.style.color = opts.textColor || 'var(--ink)';
-    }
-    card.appendChild(t);
-
-    (mappingsCache.details || []).forEach(function (colId) {
-      var vals = listVals(rec[colId] instanceof Date || typeof rec[colId] === 'number'
-        ? fmtVal(rec[colId]) : rec[colId]);
-      if (!vals.length || (vals.length === 1 && vals[0] === '')) return;
-      var line = document.createElement('div');
-      line.className = 'd';
-      var lbl = document.createElement('span');
-      lbl.className = 'lbl';
-      lbl.textContent = colLabel(colId) + ': ';
-      line.appendChild(lbl);
-      var colType = colMeta(colId).type || '';
-      if (colType === 'ChoiceList') {
-        // assignees: neutral initials avatars instead of coloured pills
-        vals.forEach(function (v, i) {
-          if (i) line.appendChild(document.createTextNode(' '));
-          line.appendChild(avatarSpan(v));
-        });
-      } else if (colType === 'Choice') {
-        vals.forEach(function (v, i) {
-          if (i) line.appendChild(document.createTextNode(' '));
-          line.appendChild(pillSpan(v, colId));
-        });
-      } else {
-        line.appendChild(document.createTextNode(vals.join(', ')));
-      }
-      card.appendChild(line);
-    });
-
-    // bottom line: "Installation n/N: note" for multi-visit jobs; just the note for single visits
-    var noteVal = (mappingsCache.seqNote != null) ? fmtVal(rec[mappingsCache.seqNote]) : '';
-    var instText = '';
-    if (info && info.total > 1) instText = 'Installation ' + info.n + '/' + info.total + (noteVal ? ': ' + noteVal : '');
-    else if (noteVal) instText = noteVal;
-    if (instText) {
-      var il = document.createElement('div');
-      il.className = 'inst';
-      il.textContent = instText;
-      card.appendChild(il);
-    }
+    // content from the (customisable) event-card template
+    renderCardTemplate(eventCardTpl, eventCardTokens(rec, info), card);
 
     card.addEventListener('click', function (e) {
       e.stopPropagation();
@@ -947,37 +1110,14 @@
       item.draggable = !!j.id;
       item.title = j.id ? 'Drag onto a day to schedule an installation' : '';
 
-      // client name on top, address underneath
-      var ja = document.createElement('div');
-      ja.className = 'ja';
-      ja.textContent = j.client || j.addr || '(no client)';
-      item.appendChild(ja);
-      if (j.client && j.addr) {
-        var ad = document.createElement('div');
-        ad.className = 'jaddr';
-        ad.textContent = j.addr;
-        item.appendChild(ad);
-      }
-
-      var meta = document.createElement('div');
-      meta.className = 'jmeta';
-      if (j.stage && mappingsCache.type) meta.appendChild(pillSpan(j.stage, mappingsCache.type));
+      // n / expanded are used by the visit-list block below and by the {visits} token
       var n = 0;
       aliases.forEach(function (k) { n = Math.max(n, counts[k] || 0); });
       var expanded = !!expandedJobs[aliases[0]];
-      var cnt = document.createElement('span');
-      cnt.className = 'jcount';
-      cnt.textContent = n ? ((expanded ? '▾ ' : '▸ ') + n + (n === 1 ? ' visit' : ' visits')) : 'no visits';
-      if (n) {
-        cnt.title = 'Show this job’s installation dates';
-        cnt.addEventListener('click', function (e) {
-          e.stopPropagation();
-          expandedJobs[aliases[0]] = !expanded;
-          render();
-        });
-      }
-      meta.appendChild(cnt);
-      item.appendChild(meta);
+      // content from the (customisable) job-card template
+      var body = document.createElement('div'); body.className = 'jbody';
+      renderCardTemplate(jobCardTpl, jobCardTokens(j, aliases, counts, nextOf), body);
+      item.appendChild(body);
 
       // expanded: list every visit; click one to jump the calendar to that date
       if (expanded && n) {
@@ -1785,6 +1925,7 @@
       var mn = document.getElementById(m[1]); if (mn) mn.classList.remove('open');
       var bt = document.getElementById(m[0]); if (bt) bt.classList.remove('open');
     });
+    var ev = document.getElementById('evMenu'); if (ev) ev.hidden = true;
   }
   MENUS.forEach(function (m) {
     var btn = document.getElementById(m[0]); if (!btn) return;
@@ -1798,7 +1939,18 @@
     var menu = document.getElementById(m[1]);
     if (menu) menu.addEventListener('click', function (e) { e.stopPropagation(); });
   });
+  var evMenuEl = document.getElementById('evMenu');
+  if (evMenuEl) evMenuEl.addEventListener('click', function (e) { e.stopPropagation(); });
   document.addEventListener('click', closeMenus);
+  // card editor modal: close + tabs
+  (function () {
+    var modal = document.getElementById('cardEditModal'); if (!modal) return;
+    modal.querySelector('.ce-close').addEventListener('click', closeCardEditor);
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeCardEditor(); });
+    [].forEach.call(modal.querySelectorAll('.ce-tab'), function (b) {
+      b.addEventListener('click', function () { cardEditTab = b.dataset.tab; renderCardEditor(); });
+    });
+  })();
 
   // ---- job details popup: close + edit controls ----
   document.querySelector('#jobModal .jm-close').addEventListener('click', closeJobModal);
@@ -1861,6 +2013,8 @@
       if (window._applySidebar) window._applySidebar();
     }
     if (opts.sort && opts.sort.key) sortBy = opts.sort;
+    if (typeof opts.eventCardTpl === 'string') eventCardTpl = opts.eventCardTpl;
+    if (typeof opts.jobCardTpl === 'string') jobCardTpl = opts.jobCardTpl;
     if (opts.detailLayout && typeof opts.detailLayout === 'object') {
       detailLayout = { order: opts.detailLayout.order || [], hidden: opts.detailLayout.hidden || {} };
     }

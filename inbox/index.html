@@ -332,7 +332,10 @@
   .stone-head .col-rz::after{content:"";position:absolute;left:5px;top:0;bottom:0;width:1px;background:transparent}
   .stone-head .col-rz:hover::after{background:var(--accent)}
   .stone-head span:nth-child(3),.stone-head span:nth-child(4),.stone-head span:nth-child(5),.stone-head span:nth-child(6){text-align:right}
-  .line{display:grid;grid-template-columns:minmax(0,1.15fr) 150px 44px 44px 44px 66px minmax(0,1fr);gap:8px;align-items:start;padding:11px 0;border-top:1px solid var(--line2)}
+  .line{position:relative;display:grid;grid-template-columns:minmax(0,1.15fr) 150px 44px 44px 44px 66px minmax(0,1fr);gap:8px;align-items:start;padding:11px 0;border-top:1px solid var(--line2)}
+  .line-del{position:absolute;top:4px;right:-2px;z-index:4;color:var(--danger);cursor:pointer;opacity:0;font-weight:700;font-size:14px;line-height:1;padding:1px 4px}
+  .line:hover .line-del{opacity:.45}
+  .line .line-del:hover{opacity:1}
   .line .lnote{width:100%;margin-top:5px;font:inherit;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:8px;padding:5px 6px}
   .line textarea.lnote{resize:vertical;overflow:auto;line-height:1.4;min-height:32px;display:block}
   .line textarea.lnote:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
@@ -480,7 +483,7 @@
   .inst .idate{font-size:var(--fs-instDate,14px);font-weight:700}
   .inst-del{margin-left:auto;color:var(--danger);cursor:pointer;opacity:.45;font-weight:700;padding:0 3px}
   .inst-del:hover{opacity:1}
-  .inst-note{font:inherit;font-size:var(--fs-instNote,12px);color:var(--muted);background:transparent;border:1px solid transparent;border-radius:7px;padding:3px 6px;width:100%;margin-top:2px}
+  .inst-note{font:inherit;font-size:var(--fs-instNote,12px);color:var(--muted);background:transparent;border:1px solid transparent;border-radius:7px;padding:3px 6px;flex:1;min-width:0}
   .inst-note:hover,.inst-note:focus{border-color:var(--line);color:var(--ink)}
   .inst-note:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
   .sumcard .efield{display:inline-flex;align-items:center;gap:5px;border-radius:6px;padding:1px 4px;margin:-1px -4px;cursor:pointer}
@@ -2253,12 +2256,12 @@ function renderDetail(){
       di.onchange=()=>update("Inst_",r.id,{Installation_date:toEpochSec(di.value)}); di.onblur=()=>renderDetail();
       idr.replaceChild(di,de); di.focus(); if(di.showPicker){ try{di.showPicker();}catch(e){} } };
     idr.appendChild(de);
+    const ni=document.createElement("input"); ni.className="inst-note uline"; ni.value=esc(r.Installation_Detail); ni.placeholder="Add a note…";
+    ni.onblur=()=>{ if(ni.value!==esc(r.Installation_Detail)) update("Inst_",r.id,{Installation_Detail:ni.value}); };
+    idr.appendChild(ni);
     const del=$("span","inst-del","×"); del.title="Delete visit";
     del.onclick=()=>{ if(confirm("Delete this installation visit?")) removeRecord("Inst_",r.id); };
     idr.appendChild(del); iv.appendChild(idr);
-    const ni=document.createElement("input"); ni.className="inst-note uline"; ni.value=esc(r.Installation_Detail); ni.placeholder="Add a note…";
-    ni.onblur=()=>{ if(ni.value!==esc(r.Installation_Detail)) update("Inst_",r.id,{Installation_Detail:ni.value}); };
-    iv.appendChild(ni);
     colR.appendChild(iv);
   });
   cols.appendChild(colR);
@@ -2282,8 +2285,12 @@ function renderDetail(){
         document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up); };
       cell.appendChild(h); });
     sb.appendChild(hd); }
-  stone.forEach(r=>{
+  const stoneSorted=[...stone].sort((a,b)=>(b.id||0)-(a.id||0));   // newest line on top
+  stoneSorted.forEach(r=>{
     const line=$("div","line");
+    const sdel=$("span","line-del","×"); sdel.title="Delete this stone line";
+    sdel.onclick=e=>{ e.stopPropagation(); if(confirm("Delete this stone line?")) removeRecord("Stone_Order",r.id); };
+    line.appendChild(sdel);
     const prod=$("div","prod");
     const nmrow=$("div","nmrow");
     const nm = stoneProductLabel(r);

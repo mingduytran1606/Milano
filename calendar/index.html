@@ -916,6 +916,7 @@
       a.addEventListener('click', function (e) { e.stopPropagation(); closeMenus(); fn(); });
       return a;
     };
+    m.appendChild(mk('🔍 View job details', '', function () { openJobDetails(jobForRecord(rec)); }));
     m.appendChild(mk('⚙ Customise card…', '', function () { openCardEditor(); }));
     m.appendChild(mk('⧉ Duplicate', '', function () { duplicateInstall(rec); }));
     var sep = document.createElement('div'); sep.className = 'evsep'; m.appendChild(sep);

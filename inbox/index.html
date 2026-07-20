@@ -1615,14 +1615,18 @@ function renderGroupMenu(){
     row.onclick=()=>applyGrouping(g);
     host.appendChild(row);
   });
-  if(!state.savedGroupings.length) host.appendChild($("div","pempty","None yet — tap Create grouping below to build one."));
+  if(!state.savedGroupings.length) host.appendChild($("div","pempty","None yet — tap Create new grouping below to build one."));
   host.appendChild($("div","psep"));
   if(gdirty){
     const upd=$("div","paction",'⟳ Update "'+state.activeGrouping+'" with these tweaks'); upd.onclick=()=>updateGrouping(); host.appendChild(upd);
     const rev=$("div","paction",'↩ Revert to saved "'+state.activeGrouping+'"'); rev.onclick=()=>{ const g=findGrouping(state.activeGrouping); if(g) applyGrouping(g); }; host.appendChild(rev);
   }
-  if(groupingActive()){ const save=$("div","paction","＋ Save current grouping as…"); save.onclick=saveGroupingAs; host.appendChild(save); }
-  const create=$("div","paction primary",groupingActive()?"⚙ Edit grouping…":"＋ Create grouping…"); create.onclick=()=>{ closeMenus(); state._cardTab="group"; openCardEditor(); }; host.appendChild(create);
+  if(groupingActive()){
+    const save=$("div","paction","＋ Save current grouping as…"); save.onclick=saveGroupingAs; host.appendChild(save);
+    const edit=$("div","paction","⚙ Edit the current grouping…"); edit.onclick=()=>{ closeMenus(); state._cardTab="group"; openCardEditor(); }; host.appendChild(edit);
+  }
+  // Always offer a fresh start — clears the working grouping so the editor opens blank.
+  const create=$("div","paction primary","＋ Create new grouping…"); create.onclick=()=>{ state.grouping={by:"",rules:[],restMode:"value"}; state.activeGrouping=""; savePrefs(); closeMenus(); state._cardTab="group"; openCardEditor(); }; host.appendChild(create);
 }
 function renderGroupingEditor(host){
   host.innerHTML="";

@@ -223,6 +223,7 @@
   .jbody .cline { font-size:var(--job-card-font,12.5px); line-height:1.4; }
   .jbody .cline + .cline { margin-top:2px; }
   .jbody .cline:empty { display:none; }
+  .cdivider { border-top:1px solid var(--line2); margin:5px 0 4px; }
   .avwrap { display:inline-flex; gap:2px; vertical-align:middle; }
   .avatar { width:18px; height:18px; border-radius:50%; background:var(--line2); color:var(--muted); font-size:8.5px; font-weight:700;
             display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--line);
@@ -767,7 +768,7 @@
   // ================= Customisable card templates =================
   // Two independent templates (the calendar event blocks and the sidebar job cards),
   // edited via the ⋯ menu on an event. Markdown-ish: **bold**, *italic*, {token}, \n = new line.
-  var DEFAULT_EVENT_CARD = '{title}\n{assigned} {seq}';
+  var DEFAULT_EVENT_CARD = '{title}\n{assigned} {seq}\n---\n{note}';
   var DEFAULT_JOB_CARD = '**{client}**\n{address}\n{stage} {visits}';
   var eventCardTpl = DEFAULT_EVENT_CARD;
   var jobCardTpl = DEFAULT_JOB_CARD;
@@ -798,10 +799,25 @@
   var JOB_TOKENS = { client:'Client', address:'Address', jobid:'Job ID', stage:'Stage pill', payment:'Payment pill', assigned:'Assignee avatars', visits:'Visit count', nextvisit:'Next visit date' };
 
   function renderCardTemplate(str, tokens, host) {
+    var added = [];
     String(str == null ? '' : str).split('\n').forEach(function (lineStr) {
+      if (/^\s*(-{3,}|—+|\*{3,})\s*$/.test(lineStr)) {   // a line of --- (or ———) = section divider
+        var hr = document.createElement('div'); hr.className = 'cdivider'; host.appendChild(hr); added.push(hr); return;
+      }
       var line = document.createElement('div'); line.className = 'cline';
       renderCardInline(lineStr, tokens, line);
-      host.appendChild(line);
+      host.appendChild(line); added.push(line);
+    });
+    // drop dividers that have no real content after them (e.g. an empty {note}), so no stray lines
+    added.forEach(function (el, i) {
+      if (!el.classList.contains('cdivider')) return;
+      var hasAfter = false;
+      for (var k = i + 1; k < added.length; k++) {
+        var n = added[k];
+        if (n.classList.contains('cdivider')) break;
+        if (n.textContent.trim() || n.children.length) { hasAfter = true; break; }
+      }
+      if (!hasAfter && el.parentNode) el.parentNode.removeChild(el);
     });
   }
   function renderCardInline(str, tokens, host) {
@@ -914,8 +930,8 @@
     var tokens = isEvent ? EVENT_TOKENS : JOB_TOKENS;
     var note = document.createElement('div'); note.className = 'ce-note';
     note.textContent = isEvent
-      ? 'The coloured blocks on the calendar grid. Use **bold**, *italic*, {tokens} and line breaks. Applies to every event.'
-      : 'The job cards in the right-hand list. Use **bold**, *italic*, {tokens} and line breaks. Applies to every job.';
+      ? 'The coloured blocks on the calendar grid. Use **bold**, *italic*, {tokens}, line breaks, and --- for a section divider. Applies to every event.'
+      : 'The job cards in the right-hand list. Use **bold**, *italic*, {tokens}, line breaks, and --- for a section divider. Applies to every job.';
     body.appendChild(note);
     var ta = document.createElement('textarea'); ta.className = 'ce-ta'; ta.spellcheck = false;
     ta.value = isEvent ? eventCardTpl : jobCardTpl;
@@ -936,6 +952,18 @@
       });
       toks.appendChild(chip);
     });
+    // divider chip: inserts a "---" line = a section separator (auto-hidden if nothing follows it)
+    var divChip = document.createElement('button'); divChip.type = 'button'; divChip.className = 'ce-tok';
+    divChip.innerHTML = '<code>---</code><span>Section divider</span>'; divChip.title = 'Insert a divider line to start a new section';
+    divChip.addEventListener('click', function () {
+      var s = ta.selectionStart || 0, e = ta.selectionEnd || 0;
+      var pre = (s > 0 && ta.value[s - 1] !== '\n') ? '\n' : '';
+      var ins = pre + '---\n';
+      ta.value = ta.value.slice(0, s) + ins + ta.value.slice(e);
+      ta.focus(); ta.selectionStart = ta.selectionEnd = s + ins.length;
+      commit();
+    });
+    toks.appendChild(divChip);
     body.appendChild(toks);
     var reset = document.createElement('div'); reset.className = 'ce-reset';
     reset.textContent = '↩ Reset this card to default';

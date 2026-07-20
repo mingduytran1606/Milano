@@ -217,9 +217,13 @@
              font-size:13px; font-weight:700; color:var(--ink); background:var(--panel); border:1px solid var(--line);
              border-radius:50%; box-shadow:0 1px 2px rgba(0,0,0,.25); cursor:pointer; user-select:none; z-index:2; opacity:0; transition:opacity .12s; }
   .ev:hover .evmore, .ev.selected .evmore, .ev.lit .evmore { opacity:1; }
+  .ev .cline { font-size:var(--ev-card-font,11.5px); line-height:1.4; white-space:normal; }
+  .ev .cline + .cline { margin-top:2px; }
   .ev .cline:empty { display:none; }
+  .jbody .cline { font-size:var(--job-card-font,12.5px); line-height:1.4; }
+  .jbody .cline + .cline { margin-top:2px; }
+  .jbody .cline:empty { display:none; }
   .avwrap { display:inline-flex; gap:2px; vertical-align:middle; }
-  .jbody .cline { line-height:1.35; }
   .avatar { width:18px; height:18px; border-radius:50%; background:var(--line2); color:var(--muted); font-size:8.5px; font-weight:700;
             display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--line);
             vertical-align:middle; letter-spacing:.02em; }
@@ -227,8 +231,8 @@
   .ev.dim { opacity:.22; }
   .ev .inst { margin-top:4px; padding-top:3px; border-top:1px solid var(--line2);
               font-size:10.5px; font-weight:600; color:var(--ink); line-height:1.35; white-space:normal; }
-  .ev .t { font-size:11.5px; font-weight:600; line-height:1.35; white-space:normal;
-           display:inline-block; max-width:100%; border-radius:8px; padding:2px 8px; }
+  .ev .t { font-size:1em; font-weight:600; line-height:1.35; white-space:normal;
+           display:inline-block; max-width:100%; border-radius:6px; padding:1px 6px; }
   .ev .d { font-size:10.5px; line-height:1.4; color:var(--muted); margin-top:3px; white-space:normal; }
   .ev .lbl { color:var(--muted); }
   .pill { border-radius:8px; padding:0 7px; display:inline-block; line-height:1.5; }
@@ -328,6 +332,12 @@
   .ce-tok span { color:var(--muted); }
   .ce-reset { margin-top:12px; font-size:11.5px; font-weight:600; color:var(--accent-ink); cursor:pointer; display:inline-block; }
   .ce-reset:hover { text-decoration:underline; }
+  .ce-fontrow { display:flex; align-items:center; gap:8px; margin-top:12px; }
+  .ce-flabel { font-size:12px; font-weight:600; color:var(--ink); margin-right:auto; }
+  .ce-fbtn { width:28px; height:28px; font-size:16px; font-weight:700; line-height:1; color:var(--ink);
+             background:var(--panel); border:1px solid var(--line); border-radius:7px; cursor:pointer; }
+  .ce-fbtn:hover { background:var(--line2); }
+  .ce-fval { min-width:44px; text-align:center; font-size:12.5px; font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
   .ce-foot { margin-top:14px; padding-top:12px; border-top:1px solid var(--line2); }
   .ce-scope { font-size:11px; color:var(--muted); margin-bottom:8px; }
   .ce-btnrow { display:flex; gap:8px; justify-content:flex-end; }
@@ -765,13 +775,23 @@
   // section options). cardScope='everyone' follows the shared design; 'me' keeps the local one.
   var CARD_LS = 'milano_cal_cards';
   var cardScope = 'everyone';
+  var eventCardFont = 11.5, jobCardFont = 12.5;
+  function applyCardFonts() {
+    try {
+      document.documentElement.style.setProperty('--ev-card-font', eventCardFont + 'px');
+      document.documentElement.style.setProperty('--job-card-font', jobCardFont + 'px');
+    } catch (e) {}
+  }
   function loadLocalCards() { try { return JSON.parse(localStorage.getItem(CARD_LS) || '{}') || {}; } catch (e) { return {}; } }
-  function saveLocalCards() { try { localStorage.setItem(CARD_LS, JSON.stringify({ event: eventCardTpl, job: jobCardTpl, scope: cardScope })); } catch (e) {} }
+  function saveLocalCards() { try { localStorage.setItem(CARD_LS, JSON.stringify({ event: eventCardTpl, job: jobCardTpl, scope: cardScope, ef: eventCardFont, jf: jobCardFont })); } catch (e) {} }
   (function () {
     var lc = loadLocalCards();
     if (typeof lc.event === 'string') eventCardTpl = lc.event;
     if (typeof lc.job === 'string') jobCardTpl = lc.job;
     if (lc.scope === 'me' || lc.scope === 'everyone') cardScope = lc.scope;
+    if (typeof lc.ef === 'number') eventCardFont = lc.ef;
+    if (typeof lc.jf === 'number') jobCardFont = lc.jf;
+    applyCardFonts();
   })();
   // tokens shown in the editor (label per token)
   var EVENT_TOKENS = { title:'Title (stage-coloured)', client:'Client', stage:'Stage pill', payment:'Payment pill', assigned:'Assignee avatars', date:'Visit date', seq:'Visit n/N', note:'Note', address:'Address' };
@@ -835,7 +855,7 @@
       address: function () { return txtNode(j && j.addr); }
     };
   }
-  function publishCards() { try { grist.setOption('eventCardTpl', eventCardTpl); grist.setOption('jobCardTpl', jobCardTpl); } catch (e) {} }
+  function publishCards() { try { grist.setOption('eventCardTpl', eventCardTpl); grist.setOption('jobCardTpl', jobCardTpl); grist.setOption('eventCardFont', eventCardFont); grist.setOption('jobCardFont', jobCardFont); } catch (e) {} }
 
   // ---- Duplicate an installation: copy this visit's row (job + date + mapped fields) ----
   function duplicateInstall(rec) {
@@ -924,6 +944,24 @@
       saveLocalCards(); render(); renderCardEditor();
     });
     body.appendChild(reset);
+    // ---- text size for this card type ----
+    var fRow = document.createElement('div'); fRow.className = 'ce-fontrow';
+    var fLbl = document.createElement('span'); fLbl.className = 'ce-flabel'; fLbl.textContent = 'Text size'; fRow.appendChild(fLbl);
+    var fVal = document.createElement('span'); fVal.className = 'ce-fval';
+    var showF = function () { fVal.textContent = (isEvent ? eventCardFont : jobCardFont) + 'px'; };
+    var stepF = function (delta) {
+      var cur = isEvent ? eventCardFont : jobCardFont;
+      cur = Math.max(9, Math.min(20, Math.round((cur + delta) * 10) / 10));
+      if (isEvent) eventCardFont = cur; else jobCardFont = cur;
+      applyCardFonts(); saveLocalCards(); showF(); render();
+    };
+    var fMinus = document.createElement('button'); fMinus.type = 'button'; fMinus.className = 'ce-fbtn'; fMinus.textContent = '−';
+    fMinus.addEventListener('click', function () { stepF(-0.5); });
+    var fPlus = document.createElement('button'); fPlus.type = 'button'; fPlus.className = 'ce-fbtn'; fPlus.textContent = '+';
+    fPlus.addEventListener('click', function () { stepF(0.5); });
+    showF();
+    fRow.appendChild(fMinus); fRow.appendChild(fVal); fRow.appendChild(fPlus);
+    body.appendChild(fRow);
     // ---- save scope: just for me vs for everyone ----
     var foot = document.createElement('div'); foot.className = 'ce-foot';
     var scopeNote = document.createElement('div'); scopeNote.className = 'ce-scope';
@@ -2055,6 +2093,9 @@
     if (cardScope !== 'me' && !editing) {
       if (typeof opts.eventCardTpl === 'string') eventCardTpl = opts.eventCardTpl;
       if (typeof opts.jobCardTpl === 'string') jobCardTpl = opts.jobCardTpl;
+      if (typeof opts.eventCardFont === 'number') eventCardFont = opts.eventCardFont;
+      if (typeof opts.jobCardFont === 'number') jobCardFont = opts.jobCardFont;
+      applyCardFonts();
     }
     if (opts.detailLayout && typeof opts.detailLayout === 'object') {
       detailLayout = { order: opts.detailLayout.order || [], hidden: opts.detailLayout.hidden || {} };

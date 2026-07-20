@@ -806,7 +806,14 @@
         var hr = document.createElement('div'); hr.className = 'cdivider'; host.appendChild(hr); added.push(hr); return;
       }
       var line = document.createElement('div'); line.className = 'cline';
-      renderCardInline(lineStr, tokens, line, ctx);
+      var stats = { tokens: 0, filled: 0 };
+      renderCardInline(lineStr, tokens, line, ctx, stats);
+      // A line whose tokens ALL came back empty (e.g. "Note: {note}" on a job with no note)
+      // is dropped entirely, so labels/characters don't strand on their own.
+      if (stats.tokens > 0 && stats.filled === 0) return;
+      // trim whitespace-only edge text nodes (e.g. the space left by an empty {seq})
+      while (line.firstChild && line.firstChild.nodeType === 3 && !line.firstChild.textContent.trim()) line.removeChild(line.firstChild);
+      while (line.lastChild && line.lastChild.nodeType === 3 && !line.lastChild.textContent.trim()) line.removeChild(line.lastChild);
       host.appendChild(line); added.push(line);
     });
     // drop dividers that have no real content after them (e.g. an empty {note}), so no stray lines
@@ -821,17 +828,22 @@
       if (!hasAfter && el.parentNode) el.parentNode.removeChild(el);
     });
   }
-  function renderCardInline(str, tokens, host, ctx) {
+  function renderCardInline(str, tokens, host, ctx, stats) {
     var re = /\*\*([^*]+)\*\*|\*([^*]+)\*|==([^=]+)==|\{([a-z_]+)\}|([^{*=]+)|([\s\S])/g, m;
+    var hasContent = function (el) { return el.textContent.trim() || el.children.length; };
     while ((m = re.exec(str))) {
-      if (m[1] != null) { var b = document.createElement('strong'); renderCardInline(m[1], tokens, b, ctx); host.appendChild(b); }
-      else if (m[2] != null) { var it = document.createElement('em'); renderCardInline(m[2], tokens, it, ctx); host.appendChild(it); }
+      if (m[1] != null) { var b = document.createElement('strong'); renderCardInline(m[1], tokens, b, ctx, stats); if (hasContent(b)) host.appendChild(b); }
+      else if (m[2] != null) { var it = document.createElement('em'); renderCardInline(m[2], tokens, it, ctx, stats); if (hasContent(it)) host.appendChild(it); }
       else if (m[3] != null) {   // ==...== = stage-coloured bar around any content
         var bar = document.createElement('span'); bar.className = 'cbar';
         if (ctx && ctx.bar) { bar.style.background = ctx.bar.fill || 'var(--line)'; bar.style.color = ctx.bar.text || 'var(--ink)'; }
-        renderCardInline(m[3], tokens, bar, ctx); host.appendChild(bar);
+        renderCardInline(m[3], tokens, bar, ctx, stats); if (hasContent(bar)) host.appendChild(bar);   // skip an empty bar
       }
-      else if (m[4] != null) { var fn = tokens[m[4]]; if (fn) { var el = fn(); if (el != null) host.appendChild(typeof el === 'string' ? document.createTextNode(el) : el); } else host.appendChild(document.createTextNode('{' + m[4] + '}')); }
+      else if (m[4] != null) {   // {token}
+        var fn = tokens[m[4]];
+        if (fn) { if (stats) stats.tokens++; var el = fn(); if (el != null) { if (stats) stats.filled++; host.appendChild(typeof el === 'string' ? document.createTextNode(el) : el); } }
+        else host.appendChild(document.createTextNode('{' + m[4] + '}'));   // unknown token → literal
+      }
       else host.appendChild(document.createTextNode(m[5] != null ? m[5] : m[6]));
     }
   }

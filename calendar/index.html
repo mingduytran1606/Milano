@@ -361,7 +361,7 @@
         <button id="paymentBtn" class="sbtn" type="button"><span class="flabel">Payment</span><span id="paymentNum" class="fnum2"></span><span class="fc">&#8250;</span></button>
       </div>
       <div id="fsrow2">
-        <button id="visitsBtn" class="sbtn" type="button"><span class="flabel">Visits</span><span id="visitsNum" class="fnum2"></span><span class="fc">&#8250;</span></button>
+        <button id="visitsBtn" class="sbtn" type="button"><span class="flabel">Installs</span><span id="visitsNum" class="fnum2"></span><span class="fc">&#8250;</span></button>
         <button id="sortBtn" class="sbtn" type="button"><span class="flabel">&#8645; Sort</span><span class="fc" id="sortCaret">&#8250;</span></button>
       </div>
       <div id="stageMenu" class="fmenu"></div>
@@ -512,8 +512,8 @@
     { key: 'client', label: 'Client' },
     { key: 'addr',   label: 'Job address' },
     { key: 'stage',  label: 'Stage' },
-    { key: 'next',   label: 'Next visit date' },
-    { key: 'visits', label: 'Visit count' }
+    { key: 'next',   label: 'Next install date' },
+    { key: 'visits', label: 'Install count' }
   ];
   var expandedJobs = {};       // sidebar job key -> true when its visit list is open
   var detailLayout = { order: [], hidden: {} };  // details-popup field arrangement (persisted)
@@ -796,8 +796,8 @@
     applyCardFonts();
   })();
   // tokens shown in the editor (label per token)
-  var EVENT_TOKENS = { title:'Title (stage-coloured)', client:'Client', stage:'Stage pill', payment:'Payment pill', assigned:'Assignee avatars', date:'Visit date', seq:'Visit n/N', note:'Note', address:'Address' };
-  var JOB_TOKENS = { client:'Client', address:'Address', jobid:'Job ID', stage:'Stage pill', payment:'Payment pill', assigned:'Assignee avatars', visits:'Visit count', nextvisit:'Next visit date' };
+  var EVENT_TOKENS = { title:'Title (stage-coloured)', client:'Client', stage:'Stage pill', payment:'Payment pill', assigned:'Assignee avatars', date:'Install date', seq:'Install n/N', note:'Note', address:'Address' };
+  var JOB_TOKENS = { client:'Client', address:'Address', jobid:'Job ID', stage:'Stage pill', payment:'Payment pill', assigned:'Assignee avatars', visits:'Install count', nextvisit:'Next install date' };
 
   function renderCardTemplate(str, tokens, host, ctx) {
     var added = [];
@@ -858,7 +858,7 @@
     var n = 0; aliases.forEach(function (k) { n = Math.max(n, counts[k] || 0); });
     var expanded = !!expandedJobs[aliases[0]];
     var cnt = document.createElement('span'); cnt.className = 'jcount';
-    cnt.textContent = n ? ((expanded ? '▾ ' : '▸ ') + n + (n === 1 ? ' visit' : ' visits')) : 'no visits';
+    cnt.textContent = n ? ((expanded ? '▾ ' : '▸ ') + n + (n === 1 ? ' install' : ' installs')) : 'no installs';
     if (n) { cnt.title = 'Show this job’s installation dates'; cnt.addEventListener('click', function (e) { e.stopPropagation(); expandedJobs[aliases[0]] = !expanded; render(); }); }
     return cnt;
   }
@@ -1276,7 +1276,7 @@
           vd.textContent = (i + 1) + '/' + visits.length + ' · ' + fmtShort(d) + ' ' + d.getFullYear();
           row.appendChild(vd);
           if (note) row.appendChild(document.createTextNode(' — ' + note));
-          row.title = 'Show this visit on the calendar';
+          row.title = 'Show this install on the calendar';
           row.addEventListener('click', function (e) {
             e.stopPropagation();
             refDate = new Date(d);
@@ -1346,8 +1346,8 @@
       defs.push({ key: 'assignee', label: colLabel(ac), values: Object.keys(aOpts),
         dot: function () { return null; }, name: function (v) { return v; } });   // no colour for assignees
     }
-    var vnames = { '0': 'No visits', '1': '1 visit', '2+': '2+ visits' };
-    defs.push({ key: 'visits', label: 'Visits', values: ['0', '1', '2+'],
+    var vnames = { '0': 'No installs', '1': '1 install', '2+': '2+ installs' };
+    defs.push({ key: 'visits', label: 'Installs', values: ['0', '1', '2+'],
       dot: function () { return null; }, name: function (v) { return vnames[v]; } });
     return defs;
   }
@@ -1410,7 +1410,7 @@
     renderChoiceFilter('paymentMenu', 'payment', Object.keys(pOpts), function (v) { return (pOpts[v] || {}).fillColor; }, null);
   }
   function renderVisitsMenu() {
-    var vnames = { '0': 'No visits', '1': '1 visit', '2+': '2+ visits' };
+    var vnames = { '0': 'No installs', '1': '1 install', '2+': '2+ installs' };
     renderChoiceFilter('visitsMenu', 'visits', ['0', '1', '2+'], null, function (v) { return vnames[v]; });
   }
   // assignee pill bar: All + one per person (+ Unassigned when relevant)
@@ -2129,12 +2129,12 @@
   grist.ready({
     requiredAccess: 'full',
     columns: [
-      { name: 'startDate', title: 'Installation date', type: 'Date,DateTime', description: 'Day the visit is shown on' },
+      { name: 'startDate', title: 'Installation date', type: 'Date,DateTime', description: 'Day the install is shown on' },
       { name: 'title', title: 'Title', type: 'Text', description: 'Bold text shown on the card' },
       { name: 'type', title: 'Colour by', optional: true, description: 'Choice column used for the title colour + stage filter (e.g. Stage)' },
       { name: 'details', title: 'Detail lines', optional: true, allowMultiple: true, description: 'Extra fields shown under the title' },
-      { name: 'seqNote', title: 'Visit note', optional: true, description: 'Per-visit note shown in the bottom "Installation n/N: note" line' },
-      { name: 'groupBy', title: 'Group by (job)', optional: true, description: 'Reference to the job — links visits together and powers the jobs sidebar' },
+      { name: 'seqNote', title: 'Install note', optional: true, description: 'Per-install note shown in the bottom "Installation n/N: note" line' },
+      { name: 'groupBy', title: 'Group by (job)', optional: true, description: 'Reference to the job — links installs together and powers the jobs sidebar' },
       { name: 'orderBy', title: 'Manual order', type: 'Numeric', optional: true, description: 'Numeric column that stores the hand-arranged order of cards within a day' }
     ],
     allowSelectBy: true

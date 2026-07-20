@@ -224,6 +224,7 @@
   .jbody .cline + .cline { margin-top:2px; }
   .jbody .cline:empty { display:none; }
   .cdivider { border-top:1px solid var(--line2); margin:5px 0 4px; }
+  .cbar { font-weight:600; line-height:1.35; display:inline-block; max-width:100%; border-radius:6px; padding:1px 6px; }
   .avwrap { display:inline-flex; gap:2px; vertical-align:middle; }
   .avatar { width:18px; height:18px; border-radius:50%; background:var(--line2); color:var(--muted); font-size:8.5px; font-weight:700;
             display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--line);
@@ -798,14 +799,14 @@
   var EVENT_TOKENS = { title:'Title (stage-coloured)', client:'Client', stage:'Stage pill', payment:'Payment pill', assigned:'Assignee avatars', date:'Visit date', seq:'Visit n/N', note:'Note', address:'Address' };
   var JOB_TOKENS = { client:'Client', address:'Address', jobid:'Job ID', stage:'Stage pill', payment:'Payment pill', assigned:'Assignee avatars', visits:'Visit count', nextvisit:'Next visit date' };
 
-  function renderCardTemplate(str, tokens, host) {
+  function renderCardTemplate(str, tokens, host, ctx) {
     var added = [];
     String(str == null ? '' : str).split('\n').forEach(function (lineStr) {
       if (/^\s*(-{3,}|—+|\*{3,})\s*$/.test(lineStr)) {   // a line of --- (or ———) = section divider
         var hr = document.createElement('div'); hr.className = 'cdivider'; host.appendChild(hr); added.push(hr); return;
       }
       var line = document.createElement('div'); line.className = 'cline';
-      renderCardInline(lineStr, tokens, line);
+      renderCardInline(lineStr, tokens, line, ctx);
       host.appendChild(line); added.push(line);
     });
     // drop dividers that have no real content after them (e.g. an empty {note}), so no stray lines
@@ -820,14 +821,23 @@
       if (!hasAfter && el.parentNode) el.parentNode.removeChild(el);
     });
   }
-  function renderCardInline(str, tokens, host) {
-    var re = /\*\*([^*]+)\*\*|\*([^*]+)\*|\{([a-z_]+)\}|([^{*]+)|([\s\S])/g, m;
+  function renderCardInline(str, tokens, host, ctx) {
+    var re = /\*\*([^*]+)\*\*|\*([^*]+)\*|==([^=]+)==|\{([a-z_]+)\}|([^{*=]+)|([\s\S])/g, m;
     while ((m = re.exec(str))) {
-      if (m[1] != null) { var b = document.createElement('strong'); renderCardInline(m[1], tokens, b); host.appendChild(b); }
-      else if (m[2] != null) { var it = document.createElement('em'); renderCardInline(m[2], tokens, it); host.appendChild(it); }
-      else if (m[3] != null) { var fn = tokens[m[3]]; if (fn) { var el = fn(); if (el != null) host.appendChild(typeof el === 'string' ? document.createTextNode(el) : el); } else host.appendChild(document.createTextNode('{' + m[3] + '}')); }
-      else host.appendChild(document.createTextNode(m[4] != null ? m[4] : m[5]));
+      if (m[1] != null) { var b = document.createElement('strong'); renderCardInline(m[1], tokens, b, ctx); host.appendChild(b); }
+      else if (m[2] != null) { var it = document.createElement('em'); renderCardInline(m[2], tokens, it, ctx); host.appendChild(it); }
+      else if (m[3] != null) {   // ==...== = stage-coloured bar around any content
+        var bar = document.createElement('span'); bar.className = 'cbar';
+        if (ctx && ctx.bar) { bar.style.background = ctx.bar.fill || 'var(--line)'; bar.style.color = ctx.bar.text || 'var(--ink)'; }
+        renderCardInline(m[3], tokens, bar, ctx); host.appendChild(bar);
+      }
+      else if (m[4] != null) { var fn = tokens[m[4]]; if (fn) { var el = fn(); if (el != null) host.appendChild(typeof el === 'string' ? document.createTextNode(el) : el); } else host.appendChild(document.createTextNode('{' + m[4] + '}')); }
+      else host.appendChild(document.createTextNode(m[5] != null ? m[5] : m[6]));
     }
+  }
+  function barColorsFor(stageVal) {
+    var o = (mappingsCache && mappingsCache.type ? (colMeta(mappingsCache.type).choiceOptions || {}) : {})[stageVal] || {};
+    return { fill: o.fillColor || 'var(--line)', text: o.textColor || 'var(--ink)' };
   }
   function txtNode(s) { return (s == null || s === '') ? null : document.createTextNode(String(s)); }
   function avatarsEl(list) { if (!list || !list.length) return null; var w = document.createElement('span'); w.className = 'avwrap'; list.forEach(function (n) { if (n) w.appendChild(avatarSpan(n)); }); return w; }
@@ -929,9 +939,10 @@
     body.innerHTML = '';
     var tokens = isEvent ? EVENT_TOKENS : JOB_TOKENS;
     var note = document.createElement('div'); note.className = 'ce-note';
-    note.textContent = isEvent
-      ? 'The coloured blocks on the calendar grid. Use **bold**, *italic*, {tokens}, line breaks, and --- for a section divider. Applies to every event.'
-      : 'The job cards in the right-hand list. Use **bold**, *italic*, {tokens}, line breaks, and --- for a section divider. Applies to every job.';
+    note.textContent = (isEvent
+      ? 'The coloured blocks on the calendar grid. '
+      : 'The job cards in the right-hand list. ')
+      + 'Use **bold**, *italic*, {tokens}, line breaks, --- for a divider, and ==wrap== to put anything in the stage-coloured bar. Applies to every ' + (isEvent ? 'event.' : 'job.');
     body.appendChild(note);
     var ta = document.createElement('textarea'); ta.className = 'ce-ta'; ta.spellcheck = false;
     ta.value = isEvent ? eventCardTpl : jobCardTpl;
@@ -964,6 +975,17 @@
       commit();
     });
     toks.appendChild(divChip);
+    // highlight chip: wraps the selection (or inserts a placeholder) in a stage-coloured bar
+    var barChip = document.createElement('button'); barChip.type = 'button'; barChip.className = 'ce-tok';
+    barChip.innerHTML = '<code>== ==</code><span>Coloured bar</span>'; barChip.title = 'Wrap text/tokens in the stage-coloured bar';
+    barChip.addEventListener('click', function () {
+      var s = ta.selectionStart || 0, e = ta.selectionEnd || 0;
+      var inner = ta.value.slice(s, e) || '{client}';
+      ta.value = ta.value.slice(0, s) + '==' + inner + '==' + ta.value.slice(e);
+      ta.focus(); ta.selectionStart = s + 2; ta.selectionEnd = s + 2 + inner.length;
+      commit();
+    });
+    toks.appendChild(barChip);
     body.appendChild(toks);
     var reset = document.createElement('div'); reset.className = 'ce-reset';
     reset.textContent = '↩ Reset this card to default';
@@ -1029,7 +1051,7 @@
 
     var info = seqById[rec.id];
     // content from the (customisable) event-card template
-    renderCardTemplate(eventCardTpl, eventCardTokens(rec, info), card);
+    renderCardTemplate(eventCardTpl, eventCardTokens(rec, info), card, { bar: barColorsFor(fmtVal(rec[mappingsCache.type])) });
 
     card.addEventListener('click', function (e) {
       e.stopPropagation();
@@ -1219,7 +1241,7 @@
       var expanded = !!expandedJobs[aliases[0]];
       // content from the (customisable) job-card template
       var body = document.createElement('div'); body.className = 'jbody';
-      renderCardTemplate(jobCardTpl, jobCardTokens(j, aliases, counts, nextOf), body);
+      renderCardTemplate(jobCardTpl, jobCardTokens(j, aliases, counts, nextOf), body, { bar: barColorsFor(j.stage) });
       item.appendChild(body);
 
       // expanded: list every visit; click one to jump the calendar to that date

@@ -328,6 +328,14 @@
   .ce-tok span { color:var(--muted); }
   .ce-reset { margin-top:12px; font-size:11.5px; font-weight:600; color:var(--accent-ink); cursor:pointer; display:inline-block; }
   .ce-reset:hover { text-decoration:underline; }
+  .ce-foot { margin-top:14px; padding-top:12px; border-top:1px solid var(--line2); }
+  .ce-scope { font-size:11px; color:var(--muted); margin-bottom:8px; }
+  .ce-btnrow { display:flex; gap:8px; justify-content:flex-end; }
+  .ce-save { font:inherit; font-size:12.5px; font-weight:600; border-radius:8px; padding:7px 14px; cursor:pointer; }
+  .ce-save.ghost { color:var(--ink); background:var(--panel); border:1px solid var(--line); }
+  .ce-save.ghost:hover { background:var(--line2); }
+  .ce-save.primary { color:#fff; background:var(--accent); border:1px solid var(--accent); }
+  .ce-save.primary:hover { filter:brightness(1.06); }
 </style>
 </head>
 <body>
@@ -753,6 +761,18 @@
   var DEFAULT_JOB_CARD = '**{client}**\n{address}\n{stage} {visits}';
   var eventCardTpl = DEFAULT_EVENT_CARD;
   var jobCardTpl = DEFAULT_JOB_CARD;
+  // Card design can be personal ("just for me", localStorage) or shared ("for everyone",
+  // section options). cardScope='everyone' follows the shared design; 'me' keeps the local one.
+  var CARD_LS = 'milano_cal_cards';
+  var cardScope = 'everyone';
+  function loadLocalCards() { try { return JSON.parse(localStorage.getItem(CARD_LS) || '{}') || {}; } catch (e) { return {}; } }
+  function saveLocalCards() { try { localStorage.setItem(CARD_LS, JSON.stringify({ event: eventCardTpl, job: jobCardTpl, scope: cardScope })); } catch (e) {} }
+  (function () {
+    var lc = loadLocalCards();
+    if (typeof lc.event === 'string') eventCardTpl = lc.event;
+    if (typeof lc.job === 'string') jobCardTpl = lc.job;
+    if (lc.scope === 'me' || lc.scope === 'everyone') cardScope = lc.scope;
+  })();
   // tokens shown in the editor (label per token)
   var EVENT_TOKENS = { title:'Title (stage-coloured)', client:'Client', stage:'Stage pill', payment:'Payment pill', assigned:'Assignee avatars', date:'Visit date', seq:'Visit n/N', note:'Note', address:'Address' };
   var JOB_TOKENS = { client:'Client', address:'Address', jobid:'Job ID', stage:'Stage pill', payment:'Payment pill', assigned:'Assignee avatars', visits:'Visit count', nextvisit:'Next visit date' };
@@ -815,7 +835,7 @@
       address: function () { return txtNode(j && j.addr); }
     };
   }
-  function persistCards() { try { grist.setOption('eventCardTpl', eventCardTpl); grist.setOption('jobCardTpl', jobCardTpl); } catch (e) {} }
+  function publishCards() { try { grist.setOption('eventCardTpl', eventCardTpl); grist.setOption('jobCardTpl', jobCardTpl); } catch (e) {} }
 
   // ---- Duplicate an installation: copy this visit's row (job + date + mapped fields) ----
   function duplicateInstall(rec) {
@@ -879,7 +899,8 @@
     body.appendChild(note);
     var ta = document.createElement('textarea'); ta.className = 'ce-ta'; ta.spellcheck = false;
     ta.value = isEvent ? eventCardTpl : jobCardTpl;
-    function commit() { if (isEvent) eventCardTpl = ta.value; else jobCardTpl = ta.value; persistCards(); render(); }
+    // editing updates the local (personal) copy + live preview; the buttons below decide sharing
+    function commit() { if (isEvent) eventCardTpl = ta.value; else jobCardTpl = ta.value; saveLocalCards(); render(); }
     ta.addEventListener('input', commit);
     body.appendChild(ta);
     var toks = document.createElement('div'); toks.className = 'ce-tokens';
@@ -900,9 +921,25 @@
     reset.textContent = '↩ Reset this card to default';
     reset.addEventListener('click', function () {
       if (isEvent) eventCardTpl = DEFAULT_EVENT_CARD; else jobCardTpl = DEFAULT_JOB_CARD;
-      persistCards(); render(); renderCardEditor();
+      saveLocalCards(); render(); renderCardEditor();
     });
     body.appendChild(reset);
+    // ---- save scope: just for me vs for everyone ----
+    var foot = document.createElement('div'); foot.className = 'ce-foot';
+    var scopeNote = document.createElement('div'); scopeNote.className = 'ce-scope';
+    var setScopeNote = function (msg) { scopeNote.textContent = msg || (cardScope === 'me' ? 'Using your own card design (just for you).' : 'Following the shared design (everyone sees it).'); };
+    setScopeNote();
+    foot.appendChild(scopeNote);
+    var row = document.createElement('div'); row.className = 'ce-btnrow';
+    var bMe = document.createElement('button'); bMe.type = 'button'; bMe.className = 'ce-save ghost'; bMe.textContent = 'Save just for me';
+    bMe.title = 'Keep this design on your device only';
+    bMe.addEventListener('click', function () { cardScope = 'me'; saveLocalCards(); setScopeNote('Saved — just for you.'); });
+    var bAll = document.createElement('button'); bAll.type = 'button'; bAll.className = 'ce-save primary'; bAll.textContent = 'Save for everyone';
+    bAll.title = 'Share this design with everyone on the doc';
+    bAll.addEventListener('click', function () { cardScope = 'everyone'; publishCards(); saveLocalCards(); setScopeNote('Saved — shared with everyone.'); });
+    row.appendChild(bMe); row.appendChild(bAll);
+    foot.appendChild(row);
+    body.appendChild(foot);
   }
 
   // ---- event cards ----
@@ -2013,8 +2050,12 @@
       if (window._applySidebar) window._applySidebar();
     }
     if (opts.sort && opts.sort.key) sortBy = opts.sort;
-    if (typeof opts.eventCardTpl === 'string') eventCardTpl = opts.eventCardTpl;
-    if (typeof opts.jobCardTpl === 'string') jobCardTpl = opts.jobCardTpl;
+    // adopt the shared card design only when following it ("for everyone") and not mid-edit
+    var editing = (document.getElementById('cardEditModal') || {}).classList && document.getElementById('cardEditModal').classList.contains('open');
+    if (cardScope !== 'me' && !editing) {
+      if (typeof opts.eventCardTpl === 'string') eventCardTpl = opts.eventCardTpl;
+      if (typeof opts.jobCardTpl === 'string') jobCardTpl = opts.jobCardTpl;
+    }
     if (opts.detailLayout && typeof opts.detailLayout === 'object') {
       detailLayout = { order: opts.detailLayout.order || [], hidden: opts.detailLayout.hidden || {} };
     }

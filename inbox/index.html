@@ -1728,7 +1728,7 @@ function closeCardModal(){ document.getElementById("cardModal").hidden=true; }
 const HFIELD={ Client_Label:"Client", Client_Name:"Client", Job_Address:"Address", Stage:"Stage",
   Payment_Status:"Payment", Assigned_To:"Assigned", Meas_Date:"Meas. date", Note:"Note", Cash:"Cash",
   Product:"Product", Order_Status:"Order status", Scope_Qty:"Scope qty", Ordered_Qty:"Ordered qty", Installation_date:"Install date",
-  Installation_Detail:"Visit note", Input_Date:"Input date" };
+  Installation_Detail:"Install note", Input_Date:"Input date" };
 const HTABLE={ Jobs_Detail:"Job", Stone_Order:"Stone line", Inst_:"Installation" };
 function hVal(k,v){
   if(v==null||v==="") return "—";
@@ -2245,7 +2245,7 @@ function renderDetail(){
   const iadd=$("span","sum-add","+ Add"); iadd.onclick=()=>addRecord("Inst_",{Job:j.id}); ih.appendChild(iadd);
   colR.appendChild(ih);
   const sorted=[...inst].sort((a,b)=>(+toDate(a.Installation_date)||0)-(+toDate(b.Installation_date)||0));
-  if(!sorted.length){ colR.appendChild($("div","empty","No visits scheduled.")); }
+  if(!sorted.length){ colR.appendChild($("div","empty","No installs scheduled.")); }
   sorted.forEach(r=>{
     const iv=$("div","inst");
     const idr=$("div","inst-drow");
@@ -2259,8 +2259,8 @@ function renderDetail(){
     const ni=document.createElement("input"); ni.className="inst-note uline"; ni.value=esc(r.Installation_Detail); ni.placeholder="Add a note…";
     ni.onblur=()=>{ if(ni.value!==esc(r.Installation_Detail)) update("Inst_",r.id,{Installation_Detail:ni.value}); };
     idr.appendChild(ni);
-    const del=$("span","inst-del","×"); del.title="Delete visit";
-    del.onclick=()=>{ if(confirm("Delete this installation visit?")) removeRecord("Inst_",r.id); };
+    const del=$("span","inst-del","×"); del.title="Delete install";
+    del.onclick=()=>{ if(confirm("Delete this install?")) removeRecord("Inst_",r.id); };
     idr.appendChild(del); iv.appendChild(idr);
     colR.appendChild(iv);
   });

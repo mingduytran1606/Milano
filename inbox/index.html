@@ -61,7 +61,10 @@
     border:1px solid var(--line);border-radius:9px;padding:8px 10px 8px 31px}
   .search input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
   .search .sic{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--muted)}
-  .filt-row{display:flex;gap:7px}
+  .filt-row{display:flex;gap:6px}
+  /* four controls share one row on the narrow list pane, so keep them compact */
+  .filt-row .tbtn{padding:8px 8px;gap:5px}
+  .filt-row .tbtn .caret{display:none}
   .tbtn{display:flex;align-items:center;gap:7px;font:inherit;font-size:12px;font-weight:600;
     padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink);
     cursor:pointer;text-align:left;min-width:0}
@@ -556,11 +559,9 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
           <span class="tlabel">Payment</span><span class="tnum" id="paymentNum" hidden></span><span class="caret">&#8250;</span>
         </button>
-      </div>
-      <div class="filt-row">
         <button class="tbtn" id="groupBtn" type="button" style="flex:1" title="Group the job list">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18M3 5v4M21 5v4M6 13h12M6 13v2M18 13v2M9 19h6"/></svg>
-          <span class="tlabel" id="groupName">No grouping</span><span class="caret">&#8250;</span>
+          <span class="tlabel" id="groupName">Group</span><span class="caret">&#8250;</span>
         </button>
         <button class="tbtn" id="sortBtn" type="button" style="flex:1">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M6 12h12M9 18h6"/></svg>
@@ -1985,7 +1986,7 @@ function renderTabs(){
 }
 function updateToolbar(){
   const gn=document.getElementById("groupName");
-  if(gn){ gn.textContent = state.activeGrouping ? state.activeGrouping+(isGroupingDirty()?" •":"") : (groupingActive()?"Grouped":"No grouping");
+  if(gn){ gn.textContent = state.activeGrouping ? state.activeGrouping+(isGroupingDirty()?" •":"") : (groupingActive()?"Grouped":"Group");
     document.getElementById("groupBtn").classList.toggle("active", groupingActive()); }
   const setFilt=(key,btnId,numId)=>{ const c=activeKeys(state.filter[key]).length, el=document.getElementById(numId);
     if(el){ el.textContent=c; el.hidden=!c; } const b=document.getElementById(btnId); if(b) b.classList.toggle("active", c>0); };

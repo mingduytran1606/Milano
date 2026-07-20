@@ -167,6 +167,7 @@
   .grp-if{font-size:12px;color:var(--muted);font-weight:600}
   .job .jbody{display:flex;flex-direction:column;gap:3px;min-width:0}
   .tline{display:flex;flex-wrap:wrap;align-items:center;gap:5px;min-width:0;font-size:var(--card-fs,12.5px);color:var(--muted);line-height:1.35}
+  .tline .tspacer{flex:1 1 8px;min-width:8px}
   .tline strong{font-weight:600;color:var(--ink);font-size:var(--lcf-client,13px)}
   .job .tline .pill.xs{font-size:var(--lcf-pill,10px)}
   .job .tline .avatar.sm{font-size:var(--lcf-avatar,10px)}
@@ -440,24 +441,29 @@
   .scope-n{display:flex;align-items:baseline;gap:6px}
   .scope-n b{font-size:var(--fs-scopeNum,24px);font-weight:800;letter-spacing:-.02em;line-height:1}
   .scope-n span{font-size:var(--fs-scopeUnit,12px);color:var(--muted);font-weight:600}
-  .stones{display:flex;flex-direction:column;gap:3px;margin-top:10px}
+  .stones{display:flex;flex-direction:column;gap:3px;margin-top:6px}
+  /* per-status headings: each is a "N slabs <status>" line reusing .scope-n */
+  .stones .scope-n{margin-top:14px}
+  .stones .scope-n:first-child{margin-top:0}
+  .stones .scope-n + .stone{margin-top:4px}
   .stone{display:grid;grid-template-columns:auto minmax(0,1.6fr) minmax(0,1fr);align-items:center;gap:8px;padding-left:16px}
   .stone .snm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-stone,13px);font-weight:600}
-  .stone .snote{justify-self:stretch;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-stoneNote,12px);color:var(--muted);cursor:default}
+  .stone .snote{justify-self:stretch;text-align:left;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-stoneNote,12px);color:var(--muted);cursor:default}
   .sdot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.14) inset}
-  /* stones grouped under a status heading */
-  .stgrp-head{display:flex;align-items:center;gap:7px;margin-top:11px;font-size:var(--fs-stoneStatus,11.5px)}
+  /* per-status sub-heading (only used when a job spans multiple statuses) */
+  .stgrp-head{display:flex;align-items:baseline;gap:5px;margin-top:14px;font-size:var(--fs-stoneStatus,14px)}
   .stgrp-head:first-child{margin-top:0}
   .stgrp-n{font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
-  .stgrp-l{font-weight:700;color:var(--muted)}
+  .stgrp-l{font-weight:600;color:var(--muted)}
+  .stones .stgrp-head + .stone{margin-top:4px}
   .stone .sbul{justify-self:center;width:4px;height:4px;border-radius:50%;background:var(--muted);opacity:.5}
   .spill{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-pill,12px);font-weight:600;color:var(--ink);border-radius:999px;padding:3px 10px 3px 9px;cursor:pointer}
   .spill .pcaret{font-size:8px;opacity:.5;margin-left:1px;line-height:1}
   .sum-note{font:inherit;font-size:var(--fs-note,13px);line-height:1.5;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 11px;width:100%;resize:vertical;min-height:46px}
   .sum-note:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
-  .sum-r .drow{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:0 0 8px}
+  .sum-r .drow{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:0 0 8px}
   .sum-r .dl{font-size:var(--fs-dateLabel,11px);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700}
-  .sum-r .dv{font-size:var(--fs-dateValue,14px);font-weight:700;text-align:right}
+  .sum-r .dv{font-size:var(--fs-dateValue,14px);font-weight:700;text-align:left}
   .inst-h2{display:flex;align-items:center;gap:8px;font-size:var(--fs-dateLabel,11px);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;margin:2px 0 2px;padding-top:10px;border-top:1px solid var(--line2)}
   .sum-add{margin-left:auto;color:var(--accent-ink);font-weight:600;cursor:pointer;text-transform:none;letter-spacing:0;font-size:12px}
   .sum-r .inst{padding:8px 0 0}
@@ -1688,7 +1694,7 @@ function openCardEditor(){
   panelCard.appendChild(toks);
   panelCard.appendChild($("div","tpl-sec","Formatting"));
   const help=$("div","tpl-help");
-  help.innerHTML="<code>**bold**</code> bold &nbsp;·&nbsp; <code>*italic*</code> italic &nbsp;·&nbsp; each new line = a new row on the card &nbsp;·&nbsp; type any literal text or separators, e.g. <code>Scope: {scope}</code> or <code>{assigned} · {payment}</code>.";
+  help.innerHTML="<code>**bold**</code> bold &nbsp;·&nbsp; <code>*italic*</code> italic &nbsp;·&nbsp; <code>&gt;&gt;</code> pushes the rest of the row to the right &nbsp;·&nbsp; each new line = a new row on the card &nbsp;·&nbsp; type any literal text or separators, e.g. <code>{client} &gt;&gt; {stage}</code> or <code>Scope: {scope}</code>.";
   panelCard.appendChild(help);
 
   // ---- Grouping panel ----
@@ -1988,16 +1994,18 @@ function updateToolbar(){
   const dflt=(state.sort.key==="input"&&state.sort.dir===-1&&!state.sort2.key);
   document.getElementById("sortBtn").classList.toggle("active", !dflt);
 }
-// Parse one template line: **bold**, *italic*, {field} tokens, literal text.
+// Parse one template line: **bold**, *italic*, {field} tokens, ">>" split
+// marker (pushes the rest of the row to the right edge), literal text.
 function renderInline(str,j,wrap){
-  const re=/\*\*([^*]+)\*\*|\*([^*]+)\*|\{([a-z_]+)\}|([^{*]+)|([\s\S])/gi;
+  const re=/\*\*([^*]+)\*\*|\*([^*]+)\*|\{([a-z_]+)\}|(>>)|([^{*>]+)|([\s\S])/gi;
   let m;
   while((m=re.exec(str))){
     if(m[1]!=null){ const s=document.createElement("strong"); renderInline(m[1],j,s); wrap.appendChild(s); }
     else if(m[2]!=null){ const s=document.createElement("em"); renderInline(m[2],j,s); wrap.appendChild(s); }
     else if(m[3]!=null){ const t=TOKENS[m[3]]; if(t){ const el=t.el(j); if(el)wrap.appendChild(el); } else wrap.appendChild(txt("{"+m[3]+"}")); }
-    else if(m[4]!=null){ wrap.appendChild(txt(m[4])); }
+    else if(m[4]!=null){ wrap.appendChild($("span","tspacer")); }   // ">>" → flex spacer that right-aligns the remainder
     else if(m[5]!=null){ wrap.appendChild(txt(m[5])); }
+    else if(m[6]!=null){ wrap.appendChild(txt(m[6])); }
   }
 }
 function renderCardBody(j,tplOverride){
@@ -2126,31 +2134,58 @@ function renderDetail(){
   const colL=$("div","sum-l");
   const scopeBlk=$("div","sum-blk");
   scopeBlk.appendChild($("span","sum-lbl","Scope"));
-  const scn=$("div","scope-n"); scn.appendChild($("b",null, j.Scope_Qty!=null?String(j.Scope_Qty):"0")); scn.appendChild($("span",null,"slabs")); scopeBlk.appendChild(scn);
   if(stone.length){
-    // group stone lines by status: a heading (total slabs + status) with its
-    // stones listed beneath, groups ordered by total slabs descending
+    // Group stone lines by order status, groups ordered by total slabs desc.
+    // Rendering depends on how many statuses/colours are present (see below).
     const groups=new Map();
     stone.forEach(r=>{ const s=r.Order_Status||"—"; if(!groups.has(s)) groups.set(s,[]); groups.get(s).push(r); });
     const qtyOf=rows=>rows.reduce((m,r)=>m+(Number(r.Scope_Qty)||0),0);
+    const total=qtyOf(stone);
+    const multiStatus=groups.size>1;
+    // Multiple statuses: show one big overall total on top; each status then
+    // renders as a smaller sub-heading below. Single status: the status line
+    // itself is the big heading, so no separate total.
+    if(multiStatus){
+      const tot=$("div","scope-n");
+      tot.appendChild($("b",null,String(total)));
+      tot.appendChild($("span",null,total===1?"slab":"slabs"));
+      scopeBlk.appendChild(tot);
+    }
     const sl=$("div","stones");
     [...groups.entries()]
       .sort((a,b)=> (qtyOf(b[1])-qtyOf(a[1])) || ((ORDS.indexOf(a[0])+1||99)-(ORDS.indexOf(b[0])+1||99)))
       .forEach(([s,rows])=>{
-        const head=$("div","stgrp-head"); head.title=s;
-        const d=$("span","sdot"); d.style.background=softTint(ORD_C[s]).dot; head.appendChild(d);
-        head.appendChild($("span","stgrp-n", String(qtyOf(rows))));
-        head.appendChild($("span","stgrp-l", stripNo(s)||"—"));
+        const n=qtyOf(rows);
+        const head=$("div", multiStatus?"stgrp-head":"scope-n"); head.title=s;
+        head.appendChild($(multiStatus?"span":"b", multiStatus?"stgrp-n":null, String(n)));
+        head.appendChild($("span", multiStatus?"stgrp-l":null, (n===1?"slab ":"slabs ")+(stripNo(s)||"—").toLowerCase()));
         sl.appendChild(head);
-        rows.forEach(r=>{
+        // Merge identical stone lines within this status group: same product
+        // label collapses to one bulleted row; notes are combined (de-duped).
+        const byLabel=new Map();
+        rows.forEach(r=>{ const lbl=stoneProductLabel(r);
+          if(!byLabel.has(lbl)) byLabel.set(lbl,{label:lbl,qty:0,hasQty:false,notes:[]});
+          const g=byLabel.get(lbl);
+          if(r.Scope_Qty!=null){ g.hasQty=true; g.qty+=(Number(r.Scope_Qty)||0); }
+          if(r.Note && !g.notes.includes(r.Note)) g.notes.push(r.Note);
+        });
+        // Per-colour count is shown whenever a group has 2+ colours. It's hidden
+        // for a single-colour group because the heading total already states it.
+        const singleColour = byLabel.size===1;
+        [...byLabel.values()].forEach(g=>{
           const row=$("div","stone");
           row.appendChild($("span","sbul"));
-          row.appendChild($("span","snm", (r.Scope_Qty!=null?r.Scope_Qty+"\u00d7 ":"")+esc(stoneProductLabel(r))));
-          const sn=$("span","snote", esc(r.Note)); if(r.Note) sn.title=esc(r.Note); row.appendChild(sn);
+          const showQty = !singleColour && g.hasQty;
+          row.appendChild($("span","snm", (showQty ? g.qty+"× " : "")+esc(g.label)));
+          const noteTxt=g.notes.join(" \u00b7 ");
+          const sn=$("span","snote", esc(noteTxt)); if(noteTxt) sn.title=esc(noteTxt); row.appendChild(sn);
           sl.appendChild(row);
         });
       });
     scopeBlk.appendChild(sl);
+  } else {
+    // No stone lines yet -- fall back to the job's plain scope total.
+    const scn=$("div","scope-n"); scn.appendChild($("b",null, j.Scope_Qty!=null?String(j.Scope_Qty):"0")); scn.appendChild($("span",null,"slabs")); scopeBlk.appendChild(scn);
   }
   colL.appendChild(scopeBlk);
   const noteBlk=$("div","sum-blk");

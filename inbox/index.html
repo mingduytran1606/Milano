@@ -171,6 +171,12 @@
   .job .jbody{display:flex;flex-direction:column;gap:3px;min-width:0}
   .tline{display:flex;flex-wrap:wrap;align-items:center;gap:5px;min-width:0;font-size:var(--card-fs,12.5px);color:var(--muted);line-height:1.35}
   .tline .tspacer{flex:1 1 8px;min-width:8px}
+  /* ">>" split: left side grows/truncates, right side hugs the edge on one line */
+  .tline.split{flex-wrap:nowrap;gap:8px}
+  .tline .tside{display:flex;align-items:center;gap:5px;min-width:0}
+  .tline .tleft{flex:1 1 auto;overflow:hidden}
+  .tline .tright{flex:0 0 auto;margin-left:auto}
+  .tline .tright:first-child{margin-left:0}
   .tline strong{font-weight:600;color:var(--ink);font-size:var(--lcf-client,13px)}
   .job .tline .pill.xs{font-size:var(--lcf-pill,10px)}
   .job .tline .avatar.sm{font-size:var(--lcf-avatar,10px)}
@@ -2014,7 +2020,19 @@ function renderCardBody(j,tplOverride){
   const tpl=(tplOverride!=null?tplOverride:(state.cardTemplate||DEFAULT_TEMPLATE));
   tpl.split(/\r?\n/).forEach(line=>{
     if(line.trim()==="") return;
-    const el=$("div","tline"); renderInline(line,j,el);
+    const el=$("div","tline");
+    const gt=line.indexOf(">>");
+    if(gt>=0){
+      // ">>" splits the row into two columns: everything before it stays left
+      // (grows, truncates if long); everything after is pinned to the right edge
+      // on a single line — a clean split, no wrapping or floating.
+      el.classList.add("split");
+      const left=$("span","tside tleft"); renderInline(line.slice(0,gt),j,left);
+      const right=$("span","tside tright"); renderInline(line.slice(gt+2),j,right);
+      el.appendChild(left); el.appendChild(right);
+    } else {
+      renderInline(line,j,el);
+    }
     if(el.textContent.trim()==="" && !el.querySelector(".pill,.avatar")) return;   // line rendered to nothing → skip
     body.appendChild(el);
   });

@@ -1573,10 +1573,17 @@ function sharedConfigObj(){
     colors:state.colors, fields:state.fields,
     savedGroupings:state.savedGroupings||[] };   // the grouping LIBRARY is shared; the active grouping stays personal
 }
-function pushSharedConfig(){
+async function pushSharedConfig(){
   if(!state.grist) return;
   const o=sharedConfigObj(); _sharedSig=JSON.stringify(o);
-  try{ if(grist.setOptions) grist.setOptions(o); else for(const k in o) grist.setOption(k,o[k]); }catch(e){}
+  // Read-merge-write: setOptions() REPLACES the whole options blob, so writing
+  // just the design bundle would wipe the sibling shared keys other "Save for
+  // everyone" actions store on their own (sharedViews, sharedStageOrder). Merge
+  // the bundle onto the current options so every shared setting survives.
+  try{
+    const cur=(grist.getOptions ? await grist.getOptions() : null)||{};
+    await grist.setOptions(Object.assign({},cur,o));
+  }catch(e){}
 }
 // The two save choices offered wherever the design is edited.
 function saveForEveryone(){ state.templateShared=true;  savePrefs(); pushSharedConfig(); }

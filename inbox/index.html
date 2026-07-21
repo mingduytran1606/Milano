@@ -1573,10 +1573,17 @@ function sharedConfigObj(){
     colors:state.colors, fields:state.fields,
     savedGroupings:state.savedGroupings||[] };   // the grouping LIBRARY is shared; the active grouping stays personal
 }
-function pushSharedConfig(){
+async function pushSharedConfig(){
   if(!state.grist) return;
   const o=sharedConfigObj(); _sharedSig=JSON.stringify(o);
-  try{ if(grist.setOptions) grist.setOptions(o); else for(const k in o) grist.setOption(k,o[k]); }catch(e){}
+  // Read-merge-write: setOptions() REPLACES the whole options blob, so writing
+  // just the design bundle would wipe the sibling shared keys other "Save for
+  // everyone" actions store on their own (sharedViews, sharedStageOrder). Merge
+  // the bundle onto the current options so every shared setting survives.
+  try{
+    const cur=(grist.getOptions ? await grist.getOptions() : null)||{};
+    await grist.setOptions(Object.assign({},cur,o));
+  }catch(e){}
 }
 // The two save choices offered wherever the design is edited.
 function saveForEveryone(){ state.templateShared=true;  savePrefs(); pushSharedConfig(); }
@@ -1597,12 +1604,14 @@ function isGroupingDirty(){ const g=findGrouping(state.activeGrouping); if(!g)re
 function updateGrouping(){ const g=findGrouping(state.activeGrouping); if(!g)return;
   g.grouping=JSON.parse(JSON.stringify(normalizeGrouping(state.grouping))); savePrefs(); pushSharedGroupings(); renderGroupMenu(); updateToolbar(); }
 function applyGrouping(g){ state.grouping=normalizeGrouping(g.grouping); state.activeGrouping=g.name; savePrefs(); closeMenus(); renderList(); updateToolbar(); }
+// Returns true once the grouping is actually stored in the library, false if the
+// user cancelled — callers (e.g. the card editor) use this to know whether to close.
 function saveGroupingAs(){
-  const name=prompt('Name this grouping (e.g. "By client", "By stage"):', state.activeGrouping||""); if(!name)return;
+  const name=prompt('Name this grouping (e.g. "By client", "By stage"):', state.activeGrouping||""); if(!name)return false;
   const cfg=JSON.parse(JSON.stringify(state.grouping||{by:"",rules:[],restMode:"value"}));
   const ex=state.savedGroupings.find(x=>x.name===name);
-  if(ex){ if(!confirm('Grouping "'+name+'" exists. Overwrite?'))return; ex.grouping=cfg; } else state.savedGroupings.push({name,grouping:cfg});
-  state.activeGrouping=name; savePrefs(); pushSharedGroupings(); renderGroupMenu(); updateToolbar();
+  if(ex){ if(!confirm('Grouping "'+name+'" exists. Overwrite?'))return false; ex.grouping=cfg; } else state.savedGroupings.push({name,grouping:cfg});
+  state.activeGrouping=name; savePrefs(); pushSharedGroupings(); renderGroupMenu(); updateToolbar(); return true;
 }
 function deleteGrouping(name){ state.savedGroupings=state.savedGroupings.filter(x=>x.name!==name); if(state.activeGrouping===name)state.activeGrouping=""; savePrefs(); pushSharedGroupings(); renderGroupMenu(); updateToolbar(); }
 function renderGroupMenu(){
@@ -1684,6 +1693,13 @@ function openCardEditor(){
     tCard.classList.toggle("on",w==="card"); tGroup.classList.toggle("on",w==="group");
     panelCard.hidden=w!=="card"; panelGroup.hidden=w!=="group";
     if(sub) sub.textContent = w==="group" ? "Group the list by one column, with custom buckets" : "Design how each job card looks";
+    // The footer's "Save just for me / for everyone" store the CARD DESIGN only.
+    // On the Grouping tab they don't apply (the grouping has its own Save button
+    // in the panel), so hide them there to avoid the "I saved but nothing showed"
+    // trap. Reset stays — it's tab-aware and clears the grouping on this tab.
+    const dm=w!=="card"?"none":"";
+    const bMe=document.getElementById("cardSaveMe"), bAll=document.getElementById("cardSaveAll");
+    if(bMe) bMe.style.display=dm; if(bAll) bAll.style.display=dm;
   }
   tCard.onclick=()=>showTab("card"); tGroup.onclick=()=>showTab("group");
 
@@ -1720,6 +1736,16 @@ function openCardEditor(){
   // ---- Grouping panel ----
   const gwrap=$("div","grp-editor"); panelGroup.appendChild(gwrap); renderGroupingEditor(gwrap);
   panelGroup.appendChild($("div","tpl-help","Pick one column to group by. Add custom rules to bucket its values (first match wins) — handy when a column like Client has too many values."));
+  // Save the grouping to the library right here. The footer's design-save
+  // buttons do NOT store the grouping, so without this a freshly-built grouping
+  // was never named or added to the Group menu — it just vanished on close.
+  const gsaveRow=$("div","grp-saverow"); gsaveRow.style.cssText="margin-top:12px;display:flex;gap:8px;align-items:center;";
+  const gsave=$("button","btn-primary","＋ Save this grouping…"); gsave.type="button";
+  gsave.title="Name it and add it to the Group menu (shared with everyone)";
+  gsave.onclick=()=>{ if(!groupingActive()){ alert("Pick a column to group by first, then save."); return; } if(saveGroupingAs()) closeCardModal(); };
+  gsaveRow.appendChild(gsave);
+  gsaveRow.appendChild($("span","tpl-help","Saved groupings appear in the Group menu for you and everyone else."));
+  panelGroup.appendChild(gsaveRow);
 
   showTab(state._cardTab); refresh();
   document.getElementById("cardModal").hidden=false;

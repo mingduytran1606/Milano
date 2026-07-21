@@ -133,6 +133,9 @@
   .job.sel{background:var(--accent-soft)}
   .job.sel::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
   .job .jmain{flex:1;min-width:0}
+  .job .newbadge{position:absolute;top:9px;right:11px;z-index:2;font-size:9px;font-weight:800;letter-spacing:.06em;
+    color:#fff;background:var(--accent);border-radius:999px;padding:2px 7px;transition:opacity .12s;pointer-events:none}
+  .job:hover .newbadge,.job.sel .newbadge{opacity:0}   /* step aside for the ⋯ menu when hovered/selected */
   .job .jtop{display:flex;align-items:center;gap:7px;min-width:0}
   .job .jnmtext{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;font-size:var(--lcf-client,13px)}
   .job .jtop .pill{flex:0 0 auto}
@@ -919,11 +922,18 @@ const state = { jobs:[], stone:[], inst:[], clients:[], catalogue:[], selectedId
   grouping:{by:"",rules:[],restMode:"value"}, groupCollapsed:{},
   savedGroupings:[], activeGrouping:"",
   savedViews:[], activeView:"", filterDrill:null,
-  dirty:false, draftBase:null, pinnedNew:[] };   // draft buffer + pinned new-job ids (session only)
+  dirty:false, draftBase:null, pinnedNew:[],      // draft buffer + pinned new-job ids (session only)
+  recentJobs:{} };                                // jobId -> creation ts (ms); drives the "NEW" badge, shared with the team
 window._inbox = state;
 
+// A job created through this widget shows a "NEW" badge for this long, for everyone.
+const NEW_BADGE_MS=10*60*1000;   // 10 minutes
+function isRecentJob(id){ const ts=state.recentJobs&&state.recentJobs[id]; return !!ts && (Date.now()-ts)<NEW_BADGE_MS; }
+function pruneRecent(){ let changed=false; const now=Date.now(); for(const k in state.recentJobs){ if(now-state.recentJobs[k]>=NEW_BADGE_MS){ delete state.recentJobs[k]; changed=true; } } return changed; }
+function pushRecentJobs(){ if(!state.grist) return; try{ grist.setOption("recentJobs", state.recentJobs); }catch(e){} }
+
 function loadPrefs(){ try{ return JSON.parse(localStorage.getItem(LSKEY))||{}; }catch(e){ return {}; } }
-function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ savedViews:state.savedViews.filter(v=>!v.shared), current:snapshot(true), stoneNoteH:state.stoneNoteH||null, listW:state.listW||null, templateShared:state.templateShared, groupCollapsed:state.groupCollapsed||{}, savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"", stoneColW:state.stoneColW||null, sumLeftPct:state.sumLeftPct||null, listCardFont:state.listCardFont, summaryFont:state.summaryFont, colors:state.colors, fmtCollapsed:state.fmtCollapsed, stageOrder:(state.stageOrder||STAGES).slice(), stageOrderShared:state.stageOrderShared, tab:state.tab||"all" })); }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ savedViews:state.savedViews.filter(v=>!v.shared), current:snapshot(true), stoneNoteH:state.stoneNoteH||null, listW:state.listW||null, templateShared:state.templateShared, groupCollapsed:state.groupCollapsed||{}, savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"", stoneColW:state.stoneColW||null, sumLeftPct:state.sumLeftPct||null, listCardFont:state.listCardFont, summaryFont:state.summaryFont, colors:state.colors, fmtCollapsed:state.fmtCollapsed, stageOrder:(state.stageOrder||STAGES).slice(), stageOrderShared:state.stageOrderShared, tab:state.tab||"all", recentJobs:state.recentJobs||{} })); }catch(e){} }
 function snapshot(withMeta){
   const s={ q:state.filter.q, stage:cleanSet(state.filter.stage), assigned:cleanSet(state.filter.assigned),
     payment:cleanSet(state.filter.payment), sort:{key:state.sort.key,dir:state.sort.dir}, sort2:{key:state.sort2.key,dir:state.sort2.dir}, stageOrder:(state.stageOrder||STAGES).slice(), cardFontSize:state.cardFontSize||12.5, fields:Object.assign({},state.fields),
@@ -1078,6 +1088,9 @@ async function saveDraft(){
       const idMap=await flushDraftToGrist();
       if(idMap[state.selectedId]!=null) state.selectedId=idMap[state.selectedId];
       state.pinnedNew=(state.pinnedNew||[]).map(id=>idMap[id]!=null?idMap[id]:id);
+      // remap the "NEW" badge timestamps from temp ids to the real ones, then share with the team
+      const rj={}; for(const k in state.recentJobs){ const nk=(idMap[k]!=null)?idMap[k]:k; rj[nk]=state.recentJobs[k]; }
+      state.recentJobs=rj; pruneRecent(); pushRecentJobs();
       await pullTables();
     }catch(e){ console.error("save failed",e); alert("Couldn't save to Grist — your changes are kept here so you can try again.\n\n"+((e&&e.message)||e)); return; }
   }
@@ -1090,6 +1103,8 @@ function discardDraft(){
   if(b){ state.jobs=b.jobs; state.stone=b.stone; state.inst=b.inst; state.clients=b.clients; state.catalogue=b.catalogue; }
   state.dirty=false; state.draftBase=null;
   state.pinnedNew=(state.pinnedNew||[]).filter(id=>state.jobs.some(j=>j.id===id));
+  // drop "NEW" stamps for unsaved (temp) jobs that were just discarded
+  Object.keys(state.recentJobs||{}).forEach(k=>{ if(isTempId(Number(k)) && !state.jobs.some(j=>String(j.id)===k)) delete state.recentJobs[k]; });
   if(state.selectedId!=null && !selectedJob()) state.selectedId=state.jobs[0]?state.jobs[0].id:null;
   renderAll(); updateSaveBar();
 }
@@ -1109,6 +1124,7 @@ function duplicateJob(j){
   addRecord("Jobs_Detail",fields,id=>{
     state.selectedId=id;
     state.pinnedNew=[id,...(state.pinnedNew||[]).filter(x=>x!==id)];
+    state.recentJobs[id]=Date.now();
     savePrefs(); renderAll();
   });
 }
@@ -1122,6 +1138,7 @@ function newJob(){
   addRecord("Jobs_Detail",f,id=>{
     state.selectedId=id;
     state.pinnedNew=[id,...(state.pinnedNew||[]).filter(x=>x!==id)];
+    state.recentJobs[id]=Date.now();
     savePrefs(); renderAll();
   });
 }
@@ -2249,6 +2266,7 @@ function groupInfo(j){
 function jobRow(j){
   const row=$("div","job"+(j.id===state.selectedId?" sel":""));
   const main=$("div","jmain"); main.appendChild(renderCardBody(j)); row.appendChild(main);
+  if(isRecentJob(j.id)){ row.classList.add("isnew"); const nb=$("span","newbadge","NEW"); nb.title="Added in the last 10 minutes"; row.appendChild(nb); }
   const kb=$("button","kebab","\u22EF"); kb.title="More actions";
   kb.onclick=e=>{ e.stopPropagation(); openRowMenu(j,kb); };
   row.appendChild(kb); row.onclick=()=>select(j.id);
@@ -2581,6 +2599,12 @@ if(typeof grist!=="undefined"){
     if(Array.isArray(opts.savedGroupings) && JSON.stringify(opts.savedGroupings)!==JSON.stringify(state.savedGroupings)){
       state.savedGroupings=opts.savedGroupings.slice(); renderGroupMenu(); updateToolbar();
     }
+    // "NEW" badge stamps — a team-shared, self-expiring map of recently-created jobs.
+    if(opts.recentJobs && typeof opts.recentJobs==="object"){
+      const merged=Object.assign({},opts.recentJobs);
+      for(const k in state.recentJobs){ if(isTempId(Number(k))) merged[k]=state.recentJobs[k]; }  // keep my own unsaved stamps
+      if(JSON.stringify(merged)!==JSON.stringify(state.recentJobs)){ state.recentJobs=merged; pruneRecent(); renderList(); }
+    }
     // Stage order — a team ordering adopted by everyone following it (also independent of the design toggle).
     if(Array.isArray(opts.sharedStageOrder) && opts.sharedStageOrder.length){
       if(state.stageOrderShared==null) state.stageOrderShared=true;   // first run: follow the team order if one exists
@@ -2749,6 +2773,7 @@ document.addEventListener("click",closeMenus);
   if(Array.isArray(p.stageOrder)) state.stageOrder=p.stageOrder.slice();
   if("stageOrderShared" in p) state.stageOrderShared=(p.stageOrderShared==null?null:!!p.stageOrderShared);
   state.tab=p.tab||"all";
+  state.recentJobs=(p.recentJobs&&typeof p.recentJobs==="object")?p.recentJobs:{}; pruneRecent();
   if(!state.assignChoices) state.assignChoices=["Julie","Phoebe","Nhi","a Minh","Louis"];
   if("templateShared" in p) state.templateShared=(p.templateShared==null?null:!!p.templateShared);
   if(!state.ref.client)  state.ref.client =DEMO_REF.client;
@@ -2758,6 +2783,8 @@ document.addEventListener("click",closeMenus);
 }
 initSplitter();
 initFormatButton();
+// Expire "NEW" badges: prune every 30s and refresh the list only when one drops off.
+setInterval(function(){ if(pruneRecent()){ savePrefs(); renderList(); } }, 30000);
 </script>
 </body>
 </html>

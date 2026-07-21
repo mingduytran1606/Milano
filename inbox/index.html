@@ -1011,7 +1011,13 @@ function isReadonlyCol(role,col){
 function tableRole(table){ return table==="Jobs_Detail"?"job" : table==="Stone_Order"?"stone" : table==="Inst_"?"visit" : "other"; }
 function cloneColl(a){ return (a||[]).map(r=>{ const o={}; for(const k in r){ const v=r[k]; o[k]=Array.isArray(v)?v.slice():v; } return o; }); }
 function snapshotData(){ return { jobs:cloneColl(state.jobs), stone:cloneColl(state.stone), inst:cloneColl(state.inst), clients:cloneColl(state.clients), catalogue:cloneColl(state.catalogue) }; }
-function ensureDraft(){ if(!state.dirty){ state.draftBase=snapshotData(); state.dirty=true; } }
+// The clean baseline is captured whenever data is (re)loaded from Grist / demo,
+// BEFORE any edit. The field editors mutate the record inline (e.g. j.Stage=v)
+// *before* calling update(), so a base captured lazily on first edit would already
+// include that change and the save diff would miss it (edit wouldn't stick).
+// ensureDraft therefore only flips the dirty flag; the base is kept clean elsewhere.
+function snapshotClean(){ state.draftBase=snapshotData(); state.dirty=false; }
+function ensureDraft(){ if(!state.draftBase) state.draftBase=snapshotData(); state.dirty=true; }
 function updateSaveBar(){ const b=document.getElementById("saveBar"); if(b) b.hidden=!state.dirty; }
 function normVal(v){ return JSON.stringify(v===undefined?null:v); }
 
@@ -1094,14 +1100,14 @@ async function saveDraft(){
       await pullTables();
     }catch(e){ console.error("save failed",e); alert("Couldn't save to Grist — your changes are kept here so you can try again.\n\n"+((e&&e.message)||e)); return; }
   }
-  state.dirty=false; state.draftBase=null;
+  snapshotClean();   // fresh clean baseline (grist: freshly-pulled data; demo: the edits are now committed locally)
   renderAll(); updateSaveBar();
 }
 function discardDraft(){
   if(!state.dirty) return;
   const b=state.draftBase;
   if(b){ state.jobs=b.jobs; state.stone=b.stone; state.inst=b.inst; state.clients=b.clients; state.catalogue=b.catalogue; }
-  state.dirty=false; state.draftBase=null;
+  snapshotClean();
   state.pinnedNew=(state.pinnedNew||[]).filter(id=>state.jobs.some(j=>j.id===id));
   // drop "NEW" stamps for unsaved (temp) jobs that were just discarded
   Object.keys(state.recentJobs||{}).forEach(k=>{ if(isTempId(Number(k)) && !state.jobs.some(j=>String(j.id)===k)) delete state.recentJobs[k]; });
@@ -2539,6 +2545,7 @@ async function pullTables(){
   ]);
   syncChoiceMaps();   // pick up any stage/payment values present in freshly-pulled data
   if((state.selectedId==null || !selectedJob()) && state.jobs.length){ const f=filteredJobs()[0]; state.selectedId=f?f.id:state.jobs[0].id; }
+  snapshotClean();    // capture the clean baseline the save diff compares against
 }
 // Re-pull after an edit. Guarded so demo-mode callers never touch Grist.
 async function refetch(){
@@ -2658,6 +2665,7 @@ window._test=function(jobs,stone,inst,clients,catalogue){
   state.jobs=jobs||[]; state.stone=stone||[]; state.inst=inst||[];
   if(clients)state.clients=clients; if(catalogue)state.catalogue=catalogue;
   if(!selectedJob()){ const f=filteredJobs()[0]; state.selectedId=f?f.id:null; }
+  snapshotClean();   // clean baseline for the draft/save diff
   renderAll();
 };
 // Demo schema — mirrors what loadGristSchema() produces, so the lookup/picker/

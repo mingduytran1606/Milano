@@ -133,6 +133,9 @@
   .job.sel{background:var(--accent-soft)}
   .job.sel::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
   .job .jmain{flex:1;min-width:0}
+  .job .newbadge{position:absolute;top:9px;right:11px;z-index:2;font-size:9px;font-weight:800;letter-spacing:.06em;
+    color:#fff;background:var(--accent);border-radius:999px;padding:2px 7px;transition:opacity .12s;pointer-events:none}
+  .job:hover .newbadge,.job.sel .newbadge{opacity:0}   /* step aside for the ⋯ menu when hovered/selected */
   .job .jtop{display:flex;align-items:center;gap:7px;min-width:0}
   .job .jnmtext{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;font-size:var(--lcf-client,13px)}
   .job .jtop .pill{flex:0 0 auto}
@@ -418,6 +421,16 @@
   .btn-primary:disabled{opacity:.5;cursor:default;filter:none}
   .btn-ghost{background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 15px;font:inherit;font-weight:600;cursor:pointer}
   .btn-ghost:hover{background:var(--line2)}
+  /* ---------- unsaved-changes save bar ---------- */
+  .savebar{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:70;
+    display:flex;align-items:center;gap:10px;padding:8px 10px 8px 16px;
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 6px 20px rgba(16,24,40,.16);
+    animation:savebar-in .16s ease-out}
+  .savebar[hidden]{display:none}
+  .savebar-msg{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--ink)}
+  .savebar-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .savebar .btn-ghost,.savebar .btn-primary{padding:6px 13px}
+  @keyframes savebar-in{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
   .form-field{display:flex;flex-direction:column;gap:5px;margin:11px 0}
   .form-field label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
   .form-field input,.form-field select{font:inherit;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:9px;padding:8px 10px;width:100%}
@@ -587,6 +600,18 @@
   </div>
   <div class="splitter" id="splitter" title="Drag to resize"></div>
   <div class="detail-pane" id="detail"></div>
+</div>
+<div class="savebar" id="saveBar" hidden>
+  <span class="savebar-msg"><span class="savebar-dot"></span>Unsaved changes</span>
+  <button class="btn-ghost" id="discardBtn" type="button">Discard</button>
+  <button class="btn-primary" id="saveBtn" type="button">Save</button>
+</div>
+<div class="modal" id="unsavedModal" hidden>
+  <div class="modal-card" style="max-width:400px">
+    <div class="modal-head"><span class="modal-title">Unsaved changes</span></div>
+    <div class="modal-body"><p style="margin:8px 0 2px;font-size:13px;line-height:1.5;color:var(--muted)">You've made changes to this job that haven't been saved yet. Would you like to save them or discard them?</p></div>
+    <div class="modal-foot"><button class="btn-ghost" id="unsavedCancel" type="button">Cancel</button><button class="btn-ghost" id="unsavedDiscard" type="button">Discard</button><button class="btn-primary" id="unsavedSave" type="button">Save</button></div>
+  </div>
 </div>
 <div class="popmenu rowmenu" id="rowMenu" hidden></div>
 <div class="popmenu prodpick" id="prodPicker" hidden></div>
@@ -896,11 +921,19 @@ const state = { jobs:[], stone:[], inst:[], clients:[], catalogue:[], selectedId
   cardTemplate:DEFAULT_TEMPLATE, templateShared:null, _sharedTemplate:null,
   grouping:{by:"",rules:[],restMode:"value"}, groupCollapsed:{},
   savedGroupings:[], activeGrouping:"",
-  savedViews:[], activeView:"", filterDrill:null };
+  savedViews:[], activeView:"", filterDrill:null,
+  dirty:false, draftBase:null, pinnedNew:[],      // draft buffer + pinned new-job ids (session only)
+  recentJobs:{} };                                // jobId -> creation ts (ms); drives the "NEW" badge, shared with the team
 window._inbox = state;
 
+// A job created through this widget shows a "NEW" badge for this long, for everyone.
+const NEW_BADGE_MS=10*60*1000;   // 10 minutes
+function isRecentJob(id){ const ts=state.recentJobs&&state.recentJobs[id]; return !!ts && (Date.now()-ts)<NEW_BADGE_MS; }
+function pruneRecent(){ let changed=false; const now=Date.now(); for(const k in state.recentJobs){ if(now-state.recentJobs[k]>=NEW_BADGE_MS){ delete state.recentJobs[k]; changed=true; } } return changed; }
+function pushRecentJobs(){ if(!state.grist) return; try{ grist.setOption("recentJobs", state.recentJobs); }catch(e){} }
+
 function loadPrefs(){ try{ return JSON.parse(localStorage.getItem(LSKEY))||{}; }catch(e){ return {}; } }
-function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ savedViews:state.savedViews.filter(v=>!v.shared), current:snapshot(true), stoneNoteH:state.stoneNoteH||null, listW:state.listW||null, templateShared:state.templateShared, groupCollapsed:state.groupCollapsed||{}, savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"", stoneColW:state.stoneColW||null, sumLeftPct:state.sumLeftPct||null, listCardFont:state.listCardFont, summaryFont:state.summaryFont, colors:state.colors, fmtCollapsed:state.fmtCollapsed, stageOrder:(state.stageOrder||STAGES).slice(), stageOrderShared:state.stageOrderShared, tab:state.tab||"all" })); }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ savedViews:state.savedViews.filter(v=>!v.shared), current:snapshot(true), stoneNoteH:state.stoneNoteH||null, listW:state.listW||null, templateShared:state.templateShared, groupCollapsed:state.groupCollapsed||{}, savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"", stoneColW:state.stoneColW||null, sumLeftPct:state.sumLeftPct||null, listCardFont:state.listCardFont, summaryFont:state.summaryFont, colors:state.colors, fmtCollapsed:state.fmtCollapsed, stageOrder:(state.stageOrder||STAGES).slice(), stageOrderShared:state.stageOrderShared, tab:state.tab||"all", recentJobs:state.recentJobs||{} })); }catch(e){} }
 function snapshot(withMeta){
   const s={ q:state.filter.q, stage:cleanSet(state.filter.stage), assigned:cleanSet(state.filter.assigned),
     payment:cleanSet(state.filter.payment), sort:{key:state.sort.key,dir:state.sort.dir}, sort2:{key:state.sort2.key,dir:state.sort2.dir}, stageOrder:(state.stageOrder||STAGES).slice(), cardFontSize:state.cardFontSize||12.5, fields:Object.assign({},state.fields),
@@ -957,33 +990,129 @@ function collFor(t){
   if(state.ref.product && t===state.ref.product.targetTableId)return state.catalogue;
   return state.inst;
 }
+// ---- draft buffer -------------------------------------------------------
+// Every edit made in the detail pane is held locally (never written straight to
+// Grist) so an accidental change is easy to undo. `Save` flushes the whole batch
+// to Grist; `Discard` restores the snapshot taken when the draft began. The
+// standalone/demo path behaves the same minus the Grist round-trip.
+const TMP_BASE=1e9;                                   // temp row-ids for unsaved adds (never collide with real ids)
+let _tmpSeq=TMP_BASE;
+function nextTmpId(){ return ++_tmpSeq; }
+function isTempId(id){ return typeof id==="number" && id>=TMP_BASE; }
+// Columns that are Grist formulas/rollups (or locally-mirrored ref labels) — never write these
+// back. This is TABLE-AWARE: Scope_Qty / Ordered_Qty are read-only rollups on Jobs_Detail but
+// EDITABLE columns on Stone_Order, so they must only be blocked for the job, not the stone line.
+function isReadonlyCol(role,col){
+  if(col==="id"||col==="manualSort"||col==="Job_ID"||col==="Client_Label"||col==="Stones"||col==="Inst_Dates") return true;
+  if(role==="job"   && (col==="Scope_Qty"||col==="Ordered_Qty"||col==="In_WH_Qty")) return true;
+  if(role==="stone" && (col==="Product_Code"||col==="Product_Supplier"||col==="Stone")) return true;
+  return false;
+}
+function tableRole(table){ return table==="Jobs_Detail"?"job" : table==="Stone_Order"?"stone" : table==="Inst_"?"visit" : "other"; }
+function cloneColl(a){ return (a||[]).map(r=>{ const o={}; for(const k in r){ const v=r[k]; o[k]=Array.isArray(v)?v.slice():v; } return o; }); }
+function snapshotData(){ return { jobs:cloneColl(state.jobs), stone:cloneColl(state.stone), inst:cloneColl(state.inst), clients:cloneColl(state.clients), catalogue:cloneColl(state.catalogue) }; }
+function ensureDraft(){ if(!state.dirty){ state.draftBase=snapshotData(); state.dirty=true; } }
+function updateSaveBar(){ const b=document.getElementById("saveBar"); if(b) b.hidden=!state.dirty; }
+function normVal(v){ return JSON.stringify(v===undefined?null:v); }
+
 function update(table,rowId,fields){
   logChange(table,"update",rowId,fields);
-  if(!state.grist){ const r=collFor(table).find(x=>x.id===rowId); if(r)Object.assign(r,fields); renderAll(); return; }
-  grist.docApi.applyUserActions([["UpdateRecord",table,rowId,fields]]).then(refetch);
+  ensureDraft();
+  const r=collFor(table).find(x=>x.id===rowId); if(r)Object.assign(r,fields);
+  renderAll(); updateSaveBar();
 }
 function addRecord(table,fields,onNew){
-  if(!state.grist){
-    const coll=collFor(table); const id=coll.reduce((m,r)=>Math.max(m,r.id||0),0)+1;
-    coll.push(Object.assign({id},fields));
-    logChange(table,"add",id,fields, table==="Jobs_Detail"?id:refId(fields.Job));
-    if(onNew)onNew(id); renderAll(); return;
-  }
-  grist.docApi.applyUserActions([["AddRecord",table,null,fields]]).then(res=>{
-    const id=res&&res.retValues&&res.retValues[0];
-    logChange(table,"add",id,fields, table==="Jobs_Detail"?id:refId(fields.Job));
-    refetch().then(()=>{ if(onNew&&id!=null)onNew(id); });
-  });
+  ensureDraft();
+  const coll=collFor(table);
+  const id=state.grist ? nextTmpId() : (coll.reduce((m,r)=>Math.max(m,r.id||0),0)+1);
+  coll.push(Object.assign({id},fields));
+  logChange(table,"add",id,fields, table==="Jobs_Detail"?id:refId(fields.Job));
+  if(onNew)onNew(id);
+  renderAll(); updateSaveBar();
 }
 function removeRecord(table,rowId){
   logChange(table,"remove",rowId,null,jobIdFor(table,rowId));
-  if(!state.grist){
-    const coll=collFor(table); const i=coll.findIndex(x=>x.id===rowId); if(i>=0)coll.splice(i,1);
-    if(table==="Jobs_Detail"&&state.selectedId===rowId) state.selectedId=state.jobs[0]?state.jobs[0].id:null;
-    renderAll(); return;
-  }
-  grist.docApi.applyUserActions([["RemoveRecord",table,rowId]]).then(refetch);
+  ensureDraft();
+  const coll=collFor(table); const i=coll.findIndex(x=>x.id===rowId); if(i>=0)coll.splice(i,1);
+  if(table==="Jobs_Detail"){ state.pinnedNew=(state.pinnedNew||[]).filter(x=>x!==rowId);
+    if(state.selectedId===rowId) state.selectedId=state.jobs[0]?state.jobs[0].id:null; }
+  renderAll(); updateSaveBar();
 }
+
+// Diff the draft against its base snapshot and push the minimal set of actions.
+// Adds run parent-first (Client/Catalogue → Jobs_Detail → Stone/Inst) so child
+// refs to a brand-new parent resolve via the returned real ids. Returns tempId→realId.
+async function flushDraftToGrist(){
+  const base=state.draftBase||{}; const idMap={};
+  const clientT=state.ref.client&&state.ref.client.targetTableId;
+  const productT=state.ref.product&&state.ref.product.targetTableId;
+  const T=[["Jobs_Detail","jobs"],["Stone_Order","stone"],["Inst_","inst"]];
+  if(clientT)  T.push([clientT,"clients"]);
+  if(productT) T.push([productT,"catalogue"]);
+  const rank=t=> (t===clientT||t===productT)?0 : t==="Jobs_Detail"?1 : 2;
+  const resolve=v=>(typeof v==="number"&&isTempId(v)&&idMap[v]!=null)?idMap[v]:v;
+  const resolveFields=f=>{ const o={}; for(const k in f) o[k]=resolve(f[k]); return o; };
+  const writable=(rec,role)=>{ const o={}; for(const k in rec){ if(isReadonlyCol(role,k)) continue; if(rec[k]===undefined) continue; o[k]=rec[k]; } return o; };
+  const adds=[],updates=[],removes=[];
+  T.forEach(([table,key])=>{
+    const role=tableRole(table);
+    const cur=state[key]||[], bse=base[key]||[];
+    const baseById=new Map(bse.map(r=>[r.id,r])), curById=new Map(cur.map(r=>[r.id,r]));
+    cur.forEach(r=>{ if(isTempId(r.id)){ adds.push({table,role,rec:r}); return; }
+      const b=baseById.get(r.id); if(!b) return;
+      const chg={}; const keys=new Set([...Object.keys(b),...Object.keys(r)]);
+      keys.forEach(k=>{ if(isReadonlyCol(role,k))return; if(normVal(r[k])!==normVal(b[k])) chg[k]=(k in r)?r[k]:null; });
+      if(Object.keys(chg).length) updates.push({table,id:r.id,fields:chg}); });
+    bse.forEach(r=>{ if(!isTempId(r.id)&&!curById.has(r.id)) removes.push({table,id:r.id}); });
+  });
+  adds.sort((a,b)=>rank(a.table)-rank(b.table));
+  let i=0;
+  while(i<adds.length){
+    const r0=rank(adds[i].table), group=[];
+    while(i<adds.length && rank(adds[i].table)===r0){ group.push(adds[i]); i++; }
+    const acts=group.map(g=>["AddRecord",g.table,null,resolveFields(writable(g.rec,g.role))]);
+    const res=await grist.docApi.applyUserActions(acts);
+    const rv=(res&&res.retValues)||[];
+    group.forEach((g,k)=>{ if(rv[k]!=null) idMap[g.rec.id]=rv[k]; });
+  }
+  const tail=[];
+  updates.forEach(u=>tail.push(["UpdateRecord",u.table,resolve(u.id),resolveFields(u.fields)]));
+  removes.forEach(u=>tail.push(["RemoveRecord",u.table,resolve(u.id)]));
+  if(tail.length) await grist.docApi.applyUserActions(tail);
+  return idMap;
+}
+async function saveDraft(){
+  if(!state.dirty) return;
+  if(state.grist){
+    try{
+      const idMap=await flushDraftToGrist();
+      if(idMap[state.selectedId]!=null) state.selectedId=idMap[state.selectedId];
+      state.pinnedNew=(state.pinnedNew||[]).map(id=>idMap[id]!=null?idMap[id]:id);
+      // remap the "NEW" badge timestamps from temp ids to the real ones, then share with the team
+      const rj={}; for(const k in state.recentJobs){ const nk=(idMap[k]!=null)?idMap[k]:k; rj[nk]=state.recentJobs[k]; }
+      state.recentJobs=rj; pruneRecent(); pushRecentJobs();
+      await pullTables();
+    }catch(e){ console.error("save failed",e); alert("Couldn't save to Grist — your changes are kept here so you can try again.\n\n"+((e&&e.message)||e)); return; }
+  }
+  state.dirty=false; state.draftBase=null;
+  renderAll(); updateSaveBar();
+}
+function discardDraft(){
+  if(!state.dirty) return;
+  const b=state.draftBase;
+  if(b){ state.jobs=b.jobs; state.stone=b.stone; state.inst=b.inst; state.clients=b.clients; state.catalogue=b.catalogue; }
+  state.dirty=false; state.draftBase=null;
+  state.pinnedNew=(state.pinnedNew||[]).filter(id=>state.jobs.some(j=>j.id===id));
+  // drop "NEW" stamps for unsaved (temp) jobs that were just discarded
+  Object.keys(state.recentJobs||{}).forEach(k=>{ if(isTempId(Number(k)) && !state.jobs.some(j=>String(j.id)===k)) delete state.recentJobs[k]; });
+  if(state.selectedId!=null && !selectedJob()) state.selectedId=state.jobs[0]?state.jobs[0].id:null;
+  renderAll(); updateSaveBar();
+}
+// "Unsaved changes" prompt shown before leaving an edited job. Resolves save|discard|cancel.
+let _unsavedResolve=null;
+function confirmUnsaved(){ return new Promise(res=>{ _unsavedResolve=res; const m=document.getElementById("unsavedModal"); if(m) m.hidden=false; else res("discard"); }); }
+function closeUnsaved(v){ const m=document.getElementById("unsavedModal"); if(m) m.hidden=true; const r=_unsavedResolve; _unsavedResolve=null; if(r)r(v); }
+
 function duplicateJob(j){
   const fields={};
   const keys = state.grist
@@ -994,14 +1123,22 @@ function duplicateJob(j){
   if(!state.grist) fields.Job_ID="(copy)";
   addRecord("Jobs_Detail",fields,id=>{
     state.selectedId=id;
-    state.filter.q=""; state.filter.stage={}; state.filter.assigned={}; state.filter.payment={}; state.activeView="";
+    state.pinnedNew=[id,...(state.pinnedNew||[]).filter(x=>x!==id)];
+    state.recentJobs[id]=Date.now();
     savePrefs(); renderAll();
   });
 }
+// New job: keep the current filters and PRE-FILL the matching fields so the job
+// stays visible in the filtered view, and pin it to the top regardless of sort.
 function newJob(){
-  addRecord("Jobs_Detail",{Stage:"Quote",Input_Date:toEpochSec(dateInput(new Date()))},id=>{
+  const f={Stage:"Quote",Input_Date:toEpochSec(dateInput(new Date()))};
+  const st=activeKeys(state.filter.stage);     if(st.length===1) f.Stage=st[0];
+  const py=activeKeys(state.filter.payment);   if(py.length===1) f.Payment_Status=py[0];
+  const as=activeKeys(state.filter.assigned);  if(as.length) f.Assigned_To=["L",...as];
+  addRecord("Jobs_Detail",f,id=>{
     state.selectedId=id;
-    state.filter.q=""; state.filter.stage={}; state.filter.assigned={}; state.filter.payment={}; state.activeView="";
+    state.pinnedNew=[id,...(state.pinnedNew||[]).filter(x=>x!==id)];
+    state.recentJobs[id]=Date.now();
     savePrefs(); renderAll();
   });
 }
@@ -1130,7 +1267,7 @@ async function loadGristSchema(){
 // ---- assigning / creating referenced records ----
 function setClient(j,row){
   const R=state.ref.client; if(!R)return;
-  if(!state.grist) j.Client_Label=row[R.labelCol];   // the Client_Label formula does this server-side in Grist
+  j.Client_Label=row[R.labelCol];   // mirror locally so the draft shows it now (Grist's formula redoes it on save)
   j.Client_Name=row.id;
   update("Jobs_Detail",j.id,{Client_Name:row.id});
   renderList();
@@ -1141,7 +1278,7 @@ function createClientAndSet(j,name){
 }
 function setProduct(r,cat){
   const R=state.ref.product; if(!R)return;
-  if(!state.grist){                                   // mirror the read-only formula cols so the line updates now
+  {                                                   // mirror the read-only formula cols so the line updates now
     const c=R.cols||{};
     if(c.code) r.Product_Code=cat[c.code];
     if(c.supplier) r.Product_Supplier=cat[c.supplier];
@@ -1994,10 +2131,21 @@ function baseFilteredJobs(){
   }).sort(cmpJobs);
 }
 function filteredJobs(){
-  const rows=baseFilteredJobs();
-  if(!state.tab || state.tab==="all") return rows;
-  if(state.tab==="__none") return rows.filter(j=>choiceList(j.Assigned_To).length===0);
-  return rows.filter(j=>choiceList(j.Assigned_To).includes(state.tab));
+  let rows=baseFilteredJobs();
+  if(state.tab && state.tab!=="all"){
+    if(state.tab==="__none") rows=rows.filter(j=>choiceList(j.Assigned_To).length===0);
+    else rows=rows.filter(j=>choiceList(j.Assigned_To).includes(state.tab));
+  }
+  return withPinned(rows);
+}
+// Newly-added jobs sit at the very top regardless of sort/filter until the page
+// reloads, so a job you just created never gets lost below the fold.
+function withPinned(rows){
+  const pins=(state.pinnedNew||[]).filter(id=>state.jobs.some(j=>j.id===id));
+  if(!pins.length) return rows;
+  const pinSet=new Set(pins);
+  const pinnedJobs=pins.map(id=>state.jobs.find(j=>j.id===id)).filter(Boolean);
+  return [...pinnedJobs, ...rows.filter(j=>!pinSet.has(j.id))];
 }
 // People pills for the mini nav bar, derived from ALL jobs so the bar stays stable while filtering.
 function navPeople(){ return [...new Set((state.jobs||[]).flatMap(j=>choiceList(j.Assigned_To)))].filter(Boolean).sort(); }
@@ -2118,6 +2266,7 @@ function groupInfo(j){
 function jobRow(j){
   const row=$("div","job"+(j.id===state.selectedId?" sel":""));
   const main=$("div","jmain"); main.appendChild(renderCardBody(j)); row.appendChild(main);
+  if(isRecentJob(j.id)){ row.classList.add("isnew"); const nb=$("span","newbadge","NEW"); nb.title="Added in the last 10 minutes"; row.appendChild(nb); }
   const kb=$("button","kebab","\u22EF"); kb.title="More actions";
   kb.onclick=e=>{ e.stopPropagation(); openRowMenu(j,kb); };
   row.appendChild(kb); row.onclick=()=>select(j.id);
@@ -2147,9 +2296,16 @@ function renderList(){
   });
 }
 function select(id){
-  state.selectedId=id;
-  if(state.grist){ try{ grist.setCursorPos({rowId:id}); }catch(e){} }
-  renderList(); renderDetail();
+  if(id===state.selectedId){ renderList(); renderDetail(); return; }
+  const go=()=>{ state.selectedId=id; if(state.grist){ try{ grist.setCursorPos({rowId:id}); }catch(e){} } renderList(); renderDetail(); };
+  if(state.dirty){
+    confirmUnsaved().then(choice=>{
+      if(choice==="cancel") return;
+      if(choice==="save") saveDraft().then(go); else { discardDraft(); go(); }
+    });
+    return;
+  }
+  go();
 }
 
 // ============================================================
@@ -2172,7 +2328,7 @@ function renderDetail(){
   ai.onblur=()=>{ const cur=esc(j.Job_Address||j.Address_Formatted); if(ai.value!==cur){ j.Job_Address=ai.value; update("Jobs_Detail",j.id,{Job_Address:ai.value}); renderList(); } };
   const addrTop=$("div","sum-addr-top"); addrTop.appendChild(ai); titleRow.appendChild(addrTop);
   top.appendChild(titleRow);
-  top.appendChild($("span","jobid sum-jobid",esc(j.Job_ID)));
+  top.appendChild($("span","jobid sum-jobid",j.Job_ID?esc(j.Job_ID):(isTempId(j.id)?"NEW":"")));
   // avatar + stage + payment pills move down to the second row (swapped with the address)
   const pillsRow=$("div","sum-pills");
   const asg=$("div","sum-assign");
@@ -2404,7 +2560,21 @@ function goLive(){ if(!state.grist) state.grist=true; }
 if(typeof grist!=="undefined"){
   try{ grist.ready({ requiredAccess:"full" }); }catch(e){}
   // Remember the cursor selection; only render live once we've actually flipped.
-  try{ grist.onRecord(rec=>{ if(rec && rec.id!=null) state.selectedId=rec.id; if(state.grist){ renderList(); renderDetail(); } }); }catch(e){}
+  try{ grist.onRecord(rec=>{
+    if(rec && rec.id!=null){
+      if(state.grist && state.dirty && rec.id!==state.selectedId){
+        // cursor moved elsewhere while this job has unsaved edits — ask first
+        confirmUnsaved().then(choice=>{
+          if(choice==="cancel"){ try{ grist.setCursorPos({rowId:state.selectedId}); }catch(e){} return; }
+          const apply=()=>{ state.selectedId=rec.id; renderList(); renderDetail(); };
+          if(choice==="save") saveDraft().then(apply); else { discardDraft(); apply(); }
+        });
+        return;
+      }
+      state.selectedId=rec.id;
+    }
+    if(state.grist){ renderList(); renderDetail(); }
+  }); }catch(e){}
   // Shared card template — stored in the widget's doc options so it applies to EVERY viewer.
   // Team design lives in the widget's doc options. It is adopted only while this
   // viewer is "following" it (templateShared): saving "for everyone" turns that
@@ -2428,6 +2598,12 @@ if(typeof grist!=="undefined"){
     // still see team groupings in their menu.
     if(Array.isArray(opts.savedGroupings) && JSON.stringify(opts.savedGroupings)!==JSON.stringify(state.savedGroupings)){
       state.savedGroupings=opts.savedGroupings.slice(); renderGroupMenu(); updateToolbar();
+    }
+    // "NEW" badge stamps — a team-shared, self-expiring map of recently-created jobs.
+    if(opts.recentJobs && typeof opts.recentJobs==="object"){
+      const merged=Object.assign({},opts.recentJobs);
+      for(const k in state.recentJobs){ if(isTempId(Number(k))) merged[k]=state.recentJobs[k]; }  // keep my own unsaved stamps
+      if(JSON.stringify(merged)!==JSON.stringify(state.recentJobs)){ state.recentJobs=merged; pruneRecent(); renderList(); }
     }
     // Stage order — a team ordering adopted by everyone following it (also independent of the design toggle).
     if(Array.isArray(opts.sharedStageOrder) && opts.sharedStageOrder.length){
@@ -2554,6 +2730,13 @@ const SAMPLE_INST=[
 // ============================================================
 document.getElementById("newJob").onclick=newJob;
 document.getElementById("hardReset").onclick=hardReset;
+document.getElementById("saveBtn").onclick=saveDraft;
+document.getElementById("discardBtn").onclick=discardDraft;
+document.getElementById("unsavedSave").onclick=()=>closeUnsaved("save");
+document.getElementById("unsavedDiscard").onclick=()=>closeUnsaved("discard");
+document.getElementById("unsavedCancel").onclick=()=>closeUnsaved("cancel");
+document.getElementById("unsavedModal").onclick=e=>{ if(e.target.id==="unsavedModal") closeUnsaved("cancel"); };
+window.addEventListener("beforeunload",e=>{ if(state.dirty){ e.preventDefault(); e.returnValue=""; } });
 MENUS.forEach(([b,m,r])=>{ document.getElementById(b).onclick=e=>{ e.stopPropagation(); toggleMenu(b,m,r); }; document.getElementById(m).onclick=e=>e.stopPropagation(); });
 document.getElementById("fSearch").oninput=e=>{ state.filter.q=e.target.value; savePrefs(); renderList(); };
 document.getElementById("rowMenu").onclick=e=>e.stopPropagation();
@@ -2573,7 +2756,7 @@ document.getElementById("cardSaveMe").onclick =()=>{ saveForMyself();  closeCard
 document.getElementById("cardReset").onclick=resetActivePanel;
 document.getElementById("cardModal").onclick=e=>{ if(e.target.id==="cardModal") closeCardModal(); };
 document.querySelector("#cardModal .modal-card").onclick=e=>e.stopPropagation();
-document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ closeCardModal(); closeForm(); closeHistory(); closeMenus(); } });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ if(!document.getElementById("unsavedModal").hidden){ closeUnsaved("cancel"); return; } closeCardModal(); closeForm(); closeHistory(); closeMenus(); } });
 document.addEventListener("click",closeMenus);
 
 // Render sample data immediately so the widget is never blank (brief §5.6).
@@ -2590,6 +2773,7 @@ document.addEventListener("click",closeMenus);
   if(Array.isArray(p.stageOrder)) state.stageOrder=p.stageOrder.slice();
   if("stageOrderShared" in p) state.stageOrderShared=(p.stageOrderShared==null?null:!!p.stageOrderShared);
   state.tab=p.tab||"all";
+  state.recentJobs=(p.recentJobs&&typeof p.recentJobs==="object")?p.recentJobs:{}; pruneRecent();
   if(!state.assignChoices) state.assignChoices=["Julie","Phoebe","Nhi","a Minh","Louis"];
   if("templateShared" in p) state.templateShared=(p.templateShared==null?null:!!p.templateShared);
   if(!state.ref.client)  state.ref.client =DEMO_REF.client;
@@ -2599,6 +2783,8 @@ document.addEventListener("click",closeMenus);
 }
 initSplitter();
 initFormatButton();
+// Expire "NEW" badges: prune every 30s and refresh the list only when one drops off.
+setInterval(function(){ if(pruneRecent()){ savePrefs(); renderList(); } }, 30000);
 </script>
 </body>
 </html>

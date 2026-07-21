@@ -248,7 +248,7 @@
     align-items:center; justify-content:center; padding:20px; }
   #jobModal.open { display:flex; }
   #jobModalCard { background:var(--panel); width:100%; max-width:440px; max-height:86vh; display:flex; flex-direction:column;
-    border-radius:10px; box-shadow:0 18px 50px rgba(0,0,0,.3); overflow:hidden; }
+    border-radius:10px; box-shadow:0 18px 50px rgba(0,0,0,.3); overflow:hidden; position:relative; }
   .jm-head { flex:0 0 auto; display:flex; align-items:flex-start; gap:8px; padding:14px 16px 10px; border-bottom:1px solid var(--line2); }
   .jm-title { flex:1; min-width:0; font-size:15px; font-weight:700; color:var(--ink); line-height:1.3; overflow-wrap:break-word; }
   .jm-close { flex:0 0 auto; font-size:20px; line-height:1; color:var(--muted); cursor:pointer; padding:0 2px; }
@@ -295,6 +295,70 @@
   #jobModalCard:not(.editing) .jm-editdone { display:none; }
   .jm-donebtn { font-size:12.5px; font-weight:600; color:#fff; background:var(--accent); border:none; padding:7px 16px; border-radius:6px; cursor:pointer; }
   .jm-donebtn:hover { background:var(--accent); }
+
+  /* ---------- editable job detail ---------- */
+  .je-idrow { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .je-jobid { font-size:10.5px; font-weight:700; color:var(--muted); background:var(--line2); border-radius:999px; padding:2px 9px; letter-spacing:.03em; }
+  .je-addr { width:100%; font:inherit; font-size:13px; color:var(--ink); background:var(--bg); border:1px solid var(--line2); border-radius:7px; padding:7px 9px; }
+  .je-addr:focus { outline:none; border-color:var(--accent); background:var(--panel); }
+  .je-pills { display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin:10px 0; }
+  .je-pill { font-size:12px; font-weight:600; border-radius:999px; padding:4px 12px; cursor:pointer; white-space:nowrap; user-select:none; }
+  .je-pill:hover { filter:brightness(.97); }
+  .je-assign { display:inline-flex; align-items:center; gap:2px; cursor:pointer; padding:2px 4px; border-radius:7px; }
+  .je-assign:hover { background:var(--line2); }
+  .je-assign-add { font-size:11.5px; font-weight:600; color:var(--muted); border:1px dashed var(--line); border-radius:999px; padding:3px 10px; }
+  .je-drow { display:flex; align-items:center; gap:10px; padding:5px 0; font-size:12.5px; }
+  .je-dl { flex:0 0 92px; color:var(--muted); font-weight:600; }
+  .je-scope { font-weight:700; color:var(--ink); }
+  .je-date { font:inherit; font-size:12.5px; color:var(--ink); background:var(--bg); border:1px solid var(--line2); border-radius:6px; padding:5px 7px; }
+  .je-date:focus { outline:none; border-color:var(--accent); }
+  .je-note { width:100%; min-height:54px; resize:vertical; font:inherit; font-size:12.5px; color:var(--ink); background:var(--bg); border:1px solid var(--line2); border-radius:7px; padding:7px 9px; }
+  .je-note:focus { outline:none; border-color:var(--accent); background:var(--panel); }
+  .je-sec-add { display:flex; align-items:center; justify-content:space-between; }
+  .je-add { font-size:11.5px; font-weight:700; color:var(--accent); cursor:pointer; letter-spacing:0; text-transform:none; }
+  .je-add:hover { text-decoration:underline; }
+  .je-inst { display:flex; align-items:center; gap:7px; margin-bottom:6px; }
+  .je-inst .je-date { flex:0 0 auto; }
+  .je-inst-note { flex:1; min-width:0; font:inherit; font-size:12px; color:var(--ink); background:var(--bg); border:1px solid var(--line2); border-radius:6px; padding:5px 8px; }
+  .je-inst-note:focus { outline:none; border-color:var(--accent); background:var(--panel); }
+  .je-del { flex:0 0 auto; color:var(--muted); font-size:16px; line-height:1; cursor:pointer; padding:0 3px; }
+  .je-del:hover { color:var(--danger); }
+  .je-stone { border:1px solid var(--line2); border-radius:9px; padding:9px 10px; margin-bottom:8px; background:var(--bg); }
+  .je-stone-top { display:flex; align-items:flex-start; gap:8px; }
+  .je-prodname { flex:1; min-width:0; font-size:12.5px; font-weight:600; color:var(--ink); overflow-wrap:break-word; }
+  .je-prodname.pick { cursor:pointer; } .je-prodname.pick:hover { color:var(--accent); }
+  .je-stone-row { margin:8px 0 6px; }
+  .je-qrow { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px; }
+  .je-q { display:flex; flex-direction:column; gap:2px; }
+  .je-qlbl { font-size:9.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+  .je-qin { width:62px; font:inherit; font-size:12.5px; color:var(--ink); background:var(--panel); border:1px solid var(--line2); border-radius:6px; padding:4px 6px; }
+  .je-qin:focus { outline:none; border-color:var(--accent); }
+  /* floating menus (pill dropdown / assignee / product picker) */
+  .je-menu { position:fixed; z-index:70; min-width:150px; max-width:300px; max-height:280px; overflow-y:auto; background:var(--panel);
+    border:1px solid var(--line); border-radius:9px; box-shadow:0 10px 30px rgba(0,0,0,.22); padding:5px; }
+  .je-menu-item { display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--ink); padding:7px 9px; border-radius:6px; cursor:pointer; }
+  .je-menu-item:hover { background:var(--line2); }
+  .je-menu-empty { font-size:12px; color:var(--muted); padding:8px 9px; }
+  .je-dot { flex:0 0 auto; width:11px; height:11px; border-radius:3px; }
+  .je-check { flex:0 0 14px; color:var(--accent); font-weight:700; }
+  .je-prodmenu { min-width:240px; }
+  .je-search { width:100%; font:inherit; font-size:12.5px; padding:6px 8px; margin-bottom:5px; border:1px solid var(--line2); border-radius:6px; background:var(--bg); color:var(--ink); }
+  .je-search:focus { outline:none; border-color:var(--accent); }
+  .je-prodlist { max-height:220px; overflow-y:auto; }
+  /* footer save/discard */
+  .je-btn { font:inherit; font-size:12.5px; font-weight:600; border-radius:6px; padding:7px 14px; cursor:pointer; }
+  .je-btn.primary { color:#fff; background:var(--accent); border:none; }
+  .je-btn.primary:hover { filter:brightness(1.06); }
+  .je-btn.ghost { color:var(--ink); background:transparent; border:1px solid var(--line); }
+  .je-btn.ghost:hover { background:var(--line2); }
+  #jobModal.has-edit .jm-foot { background:var(--panel); }
+  .je-dirtydot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--accent); margin-right:6px; vertical-align:middle; }
+  /* unsaved-changes confirm overlay */
+  .jm-confirm { display:none; position:absolute; inset:0; z-index:65; background:rgba(20,22,26,.5); align-items:center; justify-content:center; padding:18px; }
+  .jm-confirm-card { background:var(--panel); border-radius:10px; box-shadow:0 14px 40px rgba(0,0,0,.3); padding:16px 18px; max-width:320px; }
+  .jm-confirm-t { font-size:14px; font-weight:700; color:var(--ink); margin-bottom:6px; }
+  .jm-confirm-b { font-size:12.5px; color:var(--muted); line-height:1.5; margin-bottom:14px; }
+  .jm-confirm-f { display:flex; justify-content:flex-end; gap:8px; }
 
   /* ⋯ event menu popup */
   #evMenu { position:fixed; z-index:60; min-width:158px; background:var(--panel); border:1px solid var(--line);
@@ -525,6 +589,31 @@
   var savedViews = [];         // [{name, filters, sortBy, view}] persisted per-widget
   var activeViewName = null;   // name of the currently applied saved view (null = All jobs)
   var viewsLoaded = false;     // apply the persisted active view only once, on first load
+
+  // ---- editable job detail (mirrors the Inbox) ----
+  var jobsTableId = null;      // resolved Jobs_Detail table name (from the groupBy Ref)
+  var mappedTableId = null;    // the visits table this widget is attached to (Inst_)
+  var stoneCache = null;       // Stone_Order rows for the whole doc (lazy-loaded on first open)
+  var catalogueCache = null;   // Catalogue rows (product labels + picker)
+  var stoneMetaByColId = {};   // Stone_Order col meta (Order_Status choices + colours)
+  var catLabelCol = 'Product_Full';
+  var stoneLoad = null;        // in-flight/So-far ensureStoneLoaded() promise
+  // Stone_Order / Catalogue col ids (match the brief + Inbox widget)
+  var STONE = { table:'Stone_Order', catalogue:'Catalogue', job:'Job', product:'Product', status:'Order_Status',
+    scope:'Scope_Qty', order:'Ordered_Qty', deliv:'Delivery_Qty', price:'Product_Price_slab',
+    note:'Note', orderDate:'Order_Date', delivDate:'Delivery_Date' };
+  // Never write these back — Grist formulas / rollups / locally-mirrored ref labels. TABLE-AWARE:
+  // Scope_Qty / Ordered_Qty are read-only rollups on Jobs_Detail but EDITABLE on Stone_Order.
+  function isReadonlyCol(role, col){
+    if (col === 'id' || col === 'manualSort' || col === 'Job_ID' || col === 'Client_Label' || col === 'Stones' || col === 'Inst_Dates') return true;
+    if (role === 'job'   && (col === 'Scope_Qty' || col === 'Ordered_Qty' || col === 'In_WH_Qty')) return true;
+    if (role === 'stone' && (col === 'Product_Code' || col === 'Product_Supplier' || col === 'Stone')) return true;
+    return false;
+  }
+  var TMP_BASE = 1e9, _tmpSeq = 1e9;
+  function nextTmp(){ return ++_tmpSeq; }
+  function isTemp(id){ return typeof id === 'number' && id >= TMP_BASE; }
+  var edit = { dirty:false, base:null };   // draft buffer for the detail popup
 
   // ---- date helpers ----
   function gristToLocalDate(v) {
@@ -1763,55 +1852,373 @@
     fields.forEach(function (f) { if (!seen[f.id] && !detailLayout.hidden[f.id]) out.push(f); });
     return out;
   }
-  function openJobDetails(job) {
-    currentDetailJob = job;
-    var modal = document.getElementById('jobModal');
-    document.getElementById('jobModalCard').classList.remove('editing');
-    var body = modal.querySelector('.jm-body');
-    modal.querySelector('.jm-title').textContent = job.client || job.addr || (job.jid ? 'Job ' + job.jid : 'Job details');
+  // ---- lazy-load Stone_Order + Catalogue the first time a job is opened ----
+  function columnarRows(t){ if(!t||!t.id) return []; var n=t.id.length, out=[]; for(var i=0;i<n;i++){ var o={id:t.id[i]}; for(var k in t){ if(k==='id') continue; o[k]=t[k][i]; } out.push(o); } return out; }
+  function ensureStoneLoaded() {
+    if (stoneCache !== null) return Promise.resolve();
+    if (stoneLoad) return stoneLoad;
+    stoneLoad = Promise.all([
+      grist.docApi.fetchTable(STONE.table),
+      grist.docApi.fetchTable('_grist_Tables'),
+      grist.docApi.fetchTable('_grist_Tables_column')
+    ]).then(function (res) {
+      var data = res[0], tables = res[1], cols = res[2];
+      stoneCache = columnarRows(data);
+      var tref = tables.id[tables.tableId.indexOf(STONE.table)];
+      var catTable = STONE.catalogue, catVisRef = null, sm = {};
+      for (var i = 0; i < cols.id.length; i++) {
+        if (cols.parentId[i] !== tref) continue;
+        var wo = {}; try { wo = JSON.parse(cols.widgetOptions[i] || '{}'); } catch (e) {}
+        sm[cols.colId[i]] = { label: cols.label[i] || cols.colId[i], type: cols.type[i] || '',
+          choices: wo.choices || null, choiceOptions: wo.choiceOptions || {} };
+        if (cols.colId[i] === STONE.product) {
+          var mm = /^Ref:(.+)$/.exec(cols.type[i] || ''); if (mm) catTable = mm[1];
+          catVisRef = cols.visibleCol && cols.visibleCol[i];
+        }
+      }
+      stoneMetaByColId = sm; applyChoiceColorOverrides(stoneMetaByColId);
+      if (catVisRef) { var vi = cols.id.indexOf(catVisRef); if (vi !== -1 && cols.colId[vi]) catLabelCol = cols.colId[vi]; }
+      return grist.docApi.fetchTable(catTable).then(function (ct) { catalogueCache = columnarRows(ct); })
+        .catch(function () { catalogueCache = []; });
+    }).catch(function (e) { console.warn('stone/catalogue load failed', e); stoneCache = []; catalogueCache = []; });
+    return stoneLoad;
+  }
+  function reloadStone(){ stoneCache = null; stoneLoad = null; return ensureStoneLoaded(); }
+  function jobStone(job){ return (stoneCache || []).filter(function (r) { return refId(r[STONE.job]) === job.id; }); }
+  function productLabelFor(r){
+    var pid = refId(r[STONE.product]);
+    if (pid != null && catalogueCache) { var c = catalogueCache.find(function (x) { return x.id === pid; }); if (c && c[catLabelCol]) return String(c[catLabelCol]); }
+    if (r.Product_Code) return String(r.Product_Code);
+    if (r.Product_Supplier) return String(r.Product_Supplier);
+    return '—';
+  }
+
+  // ---- draft buffer: every edit is held here until Save (Discard restores) ----
+  function cloneVal(v){ if (v instanceof Date) return new Date(v.getTime()); if (Array.isArray(v)) return v.map(cloneVal); if (v && typeof v === 'object') { var o = {}; for (var k in v) o[k] = cloneVal(v[k]); return o; } return v; }
+  function cloneRows(a){ return (a || []).map(function (r) { return cloneVal(r); }); }
+  function ensureEdit(){ if (!edit.dirty) { edit.base = { jobs: cloneRows(jobsCache), stone: cloneRows(stoneCache), visits: cloneRows(recordsCache) }; edit.dirty = true; } }
+  function updateEditBar(){ var m = document.getElementById('jobModal'); if (m) m.classList.toggle('has-edit', !!edit.dirty); renderFooter(currentDetailJob); }
+  function refreshDetail(job){ if (job && document.getElementById('jobModal').classList.contains('open')) renderJobEditor(job); updateEditBar(); }
+  function syncJobDerived(job){
+    if (!job.raw) return;
+    if (job.raw[JOB_COLS.stage] != null)    job.stage = String(job.raw[JOB_COLS.stage] || '');
+    if (job.raw[JOB_COLS.payment] != null)  job.payment = String(job.raw[JOB_COLS.payment] || '');
+    if (job.raw[JOB_COLS.addr] != null)     job.addr = String(job.raw[JOB_COLS.addr] || '');
+    if (job.raw[JOB_COLS.assigned] != null) job.assigned = listVals(job.raw[JOB_COLS.assigned]);
+  }
+  function setJobField(job, col, val){ ensureEdit(); job.raw = job.raw || {}; job.raw[col] = val; syncJobDerived(job); refreshDetail(job); render(); }
+  function setStoneField(r, col, val){ ensureEdit(); r[col] = val; refreshDetail(currentDetailJob); }
+  function setVisitField(rec, col, val){ ensureEdit(); rec[col] = val; refreshDetail(currentDetailJob); render(); }
+  function addStoneLine(job){ ensureEdit(); var r = { id: nextTmp() }; r[STONE.job] = job.id; stoneCache.push(r); refreshDetail(job); }
+  function removeStoneLine(job, r){ ensureEdit(); var i = stoneCache.indexOf(r); if (i >= 0) stoneCache.splice(i, 1); refreshDetail(job); }
+  function addVisit(job){ ensureEdit(); var rec = { id: nextTmp() }; if (mappingsCache && mappingsCache.groupBy != null) rec[mappingsCache.groupBy] = job.id; recordsCache.push(rec); refreshDetail(job); render(); }
+  function removeVisit(job, rec){ ensureEdit(); var i = recordsCache.indexOf(rec); if (i >= 0) recordsCache.splice(i, 1); refreshDetail(job); render(); }
+  function jobVisitsAll(job){
+    var aliases = job.id ? jobAliases(job) : [job.key];
+    return recordsCache.filter(function (r) { return aliases.indexOf(jobKey(r)) !== -1; })
+      .sort(function (a, b) { return (gristToLocalDate(a[mappingsCache.startDate]) || 0) - (gristToLocalDate(b[mappingsCache.startDate]) || 0); });
+  }
+
+  // ---- flush the draft to Grist (diff base → minimal actions) ----
+  function mapById(a){ var m = {}; (a || []).forEach(function (r) { m[r.id] = r; }); return m; }
+  function hasKeys(o){ for (var k in o) return true; return false; }
+  function normJ(v){ return JSON.stringify(v === undefined ? null : v); }
+  function diffRow(b, r, role){ var o = {}, keys = {}, k; for (k in b) keys[k] = 1; for (k in r) keys[k] = 1;
+    Object.keys(keys).forEach(function (k) { if (isReadonlyCol(role, k)) return; if (normJ(r[k]) !== normJ(b[k])) o[k] = (k in r) ? r[k] : null; }); return o; }
+  function writableRow(r, role){ var o = {}; for (var k in r) { if (isReadonlyCol(role, k)) continue; if (r[k] === undefined) continue; o[k] = r[k]; } return o; }
+  function flushEdit(){
+    var base = edit.base || {}, idMap = {};
+    var resolve = function (v) { return (typeof v === 'number' && isTemp(v) && idMap[v] != null) ? idMap[v] : v; };
+    var resolveFields = function (f) { var o = {}; for (var k in f) o[k] = resolve(f[k]); return o; };
+    var jobUpd = [], stoneAdds = [], stoneUpd = [], stoneRem = [], visAdds = [], visUpd = [], visRem = [];
+    (jobsCache || []).forEach(function (j) {
+      if (isTemp(j.id) || !j.raw) return;
+      var b = (base.jobs || []).find(function (x) { return x.id === j.id; }); if (!b || !b.raw) return;
+      var chg = diffRow(b.raw, j.raw, 'job'); if (hasKeys(chg)) jobUpd.push(['UpdateRecord', jobsTableId, j.id, chg]);
+    });
+    var baseStone = mapById(base.stone), curStone = mapById(stoneCache);
+    (stoneCache || []).forEach(function (r) { if (isTemp(r.id)) { stoneAdds.push(r); return; }
+      var b = baseStone[r.id]; if (!b) return; var chg = diffRow(b, r, 'stone'); if (hasKeys(chg)) stoneUpd.push({ id: r.id, fields: chg }); });
+    (base.stone || []).forEach(function (r) { if (!isTemp(r.id) && !curStone[r.id]) stoneRem.push(r.id); });
+    var baseVis = mapById(base.visits), curVis = mapById(recordsCache);
+    (recordsCache || []).forEach(function (r) { if (isTemp(r.id)) { visAdds.push(r); return; }
+      var b = baseVis[r.id]; if (!b) return; var chg = diffRow(b, r, 'visit'); if (hasKeys(chg)) visUpd.push({ id: r.id, fields: chg }); });
+    (base.visits || []).forEach(function (r) { if (!isTemp(r.id) && !curVis[r.id]) visRem.push(r.id); });
+    var addActs = [];
+    stoneAdds.forEach(function (r) { addActs.push(['AddRecord', STONE.table, null, resolveFields(writableRow(r, 'stone'))]); });
+    visAdds.forEach(function (r) { addActs.push(['AddRecord', mappedTableId, null, resolveFields(writableRow(r, 'visit'))]); });
+    var p = addActs.length ? grist.docApi.applyUserActions(addActs) : Promise.resolve({ retValues: [] });
+    return p.then(function (res) {
+      var rv = (res && res.retValues) || [], k = 0;
+      stoneAdds.forEach(function (r) { if (rv[k] != null) idMap[r.id] = rv[k]; k++; });
+      visAdds.forEach(function (r) { if (rv[k] != null) idMap[r.id] = rv[k]; k++; });
+      var tail = [];
+      jobUpd.forEach(function (a) { tail.push(a); });
+      stoneUpd.forEach(function (u) { tail.push(['UpdateRecord', STONE.table, u.id, resolveFields(u.fields)]); });
+      visUpd.forEach(function (u) { tail.push(['UpdateRecord', mappedTableId, u.id, resolveFields(u.fields)]); });
+      stoneRem.forEach(function (id) { tail.push(['RemoveRecord', STONE.table, id]); });
+      visRem.forEach(function (id) { tail.push(['RemoveRecord', mappedTableId, id]); });
+      if (tail.length) return grist.docApi.applyUserActions(tail);
+    });
+  }
+  function saveEdit(){
+    if (!edit.dirty) return Promise.resolve();
+    return flushEdit().then(function () {
+      edit.dirty = false; edit.base = null;
+      return Promise.all([loadJobs(), reloadStone()]);
+    }).then(function () {
+      if (currentDetailJob) { var j = (jobsCache || []).find(function (x) { return x.id === currentDetailJob.id; }); if (j) currentDetailJob = j; }
+      render(); refreshDetail(currentDetailJob); updateEditBar();
+    }).catch(function (e) { console.error('save failed', e); alert("Couldn't save to Grist — your changes are kept here so you can try again.\n\n" + ((e && e.message) || e)); });
+  }
+  function discardEdit(){
+    if (!edit.dirty) return;
+    if (edit.base) { jobsCache = edit.base.jobs; stoneCache = edit.base.stone; recordsCache = edit.base.visits; }
+    edit.dirty = false; edit.base = null;
+    if (currentDetailJob) { var j = (jobsCache || []).find(function (x) { return x.id === currentDetailJob.id; }); if (j) currentDetailJob = j; }
+    render(); refreshDetail(currentDetailJob); updateEditBar();
+  }
+
+  // ---- floating menus (pill dropdowns, assignee + product pickers) ----
+  function elx(tag, cls, txt){ var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+  function fillColorFor(meta, val){ var o = (meta && meta.choiceOptions || {})[val] || {}; return o.fillColor || 'var(--line)'; }
+  function textColorFor(meta, val){ var o = (meta && meta.choiceOptions || {})[val] || {}; return o.textColor || 'var(--ink)'; }
+  var _floatMenu = null;
+  function closeFloatMenu(){ if (_floatMenu) { _floatMenu.remove(); _floatMenu = null; document.removeEventListener('click', closeFloatMenu); } }
+  function placeMenu(m, anchor){ document.body.appendChild(m); var rc = anchor.getBoundingClientRect();
+    m.style.left = Math.max(8, Math.min(rc.left, window.innerWidth - m.offsetWidth - 12)) + 'px';
+    m.style.top = Math.min(rc.bottom + 4, window.innerHeight - m.offsetHeight - 8) + 'px';
+    setTimeout(function () { document.addEventListener('click', closeFloatMenu); }, 0); }
+  function pillDropdown(current, choices, meta, onPick, emptyLabel){
+    var b = elx('span', 'je-pill');
+    var paint = function (v) { b.textContent = v || emptyLabel || '—'; b.style.background = v ? fillColorFor(meta, v) : 'var(--line2)'; b.style.color = v ? textColorFor(meta, v) : 'var(--muted)'; };
+    paint(current);
+    b.addEventListener('click', function (e) {
+      e.stopPropagation(); closeFloatMenu();
+      var m = elx('div', 'je-menu');
+      var items = choices.slice();
+      items.forEach(function (v) { var r = elx('div', 'je-menu-item'); var dot = elx('span', 'je-dot'); dot.style.background = fillColorFor(meta, v); r.appendChild(dot); r.appendChild(document.createTextNode(v));
+        r.addEventListener('click', function (ev) { ev.stopPropagation(); closeFloatMenu(); onPick(v); }); m.appendChild(r); });
+      if (emptyLabel) { var rc0 = elx('div', 'je-menu-item', emptyLabel); rc0.addEventListener('click', function (ev) { ev.stopPropagation(); closeFloatMenu(); onPick(''); }); m.appendChild(rc0); }
+      _floatMenu = m; placeMenu(m, b);
+    });
+    return b;
+  }
+  function assigneeOptions(){ var s = {}; (jobsCache || []).forEach(function (j) { (j.assigned || []).forEach(function (a) { if (a) s[a] = 1; }); }); return Object.keys(s).sort(); }
+  function openAssignMenu(anchor, job){
+    closeFloatMenu();
+    var m = elx('div', 'je-menu'); var cur = listVals(job.raw ? job.raw[JOB_COLS.assigned] : job.assigned);
+    var opts = assigneeOptions(); cur.forEach(function (a) { if (opts.indexOf(a) === -1) opts.push(a); }); opts.sort();
+    if (!opts.length) { m.appendChild(elx('div', 'je-menu-empty', 'No staff yet')); }
+    opts.forEach(function (name) {
+      var r = elx('div', 'je-menu-item'); var on = cur.indexOf(name) !== -1;
+      var ck = elx('span', 'je-check', on ? '✓' : ''); r.appendChild(ck); r.appendChild(document.createTextNode(name));
+      r.addEventListener('click', function (e) { e.stopPropagation();
+        var i = cur.indexOf(name); if (i >= 0) cur.splice(i, 1); else cur.push(name);
+        setJobField(job, JOB_COLS.assigned, ['L'].concat(cur));
+        ck.textContent = cur.indexOf(name) !== -1 ? '✓' : ''; });
+      m.appendChild(r);
+    });
+    _floatMenu = m; placeMenu(m, anchor);
+  }
+  function openProductMenu(anchor, r){
+    closeFloatMenu();
+    var m = elx('div', 'je-menu je-prodmenu');
+    var inp = elx('input', 'je-search'); inp.placeholder = 'Search product…'; inp.addEventListener('click', function (e) { e.stopPropagation(); }); m.appendChild(inp);
+    var listWrap = elx('div', 'je-prodlist'); m.appendChild(listWrap);
+    var draw = function (q) { listWrap.innerHTML = '';
+      var rows = (catalogueCache || []).filter(function (c) { var lbl = String(c[catLabelCol] || '').toLowerCase(); return !q || lbl.indexOf(q) !== -1; }).slice(0, 40);
+      if (!rows.length) { listWrap.appendChild(elx('div', 'je-menu-empty', 'No match')); }
+      rows.forEach(function (c) { var it = elx('div', 'je-menu-item', String(c[catLabelCol] || ('#' + c.id)));
+        it.addEventListener('click', function (e) { e.stopPropagation(); closeFloatMenu(); setStoneField(r, STONE.product, c.id); }); listWrap.appendChild(it); }); };
+    draw(''); inp.addEventListener('input', function () { draw(inp.value.trim().toLowerCase()); });
+    _floatMenu = m; placeMenu(m, anchor); inp.focus();
+  }
+
+  // ---- date <-> input helpers ----
+  function toDateInputVal(v){ var d = gristToLocalDate(v); if (!d) return ''; var mo = ('0' + (d.getMonth() + 1)).slice(-2), da = ('0' + d.getDate()).slice(-2); return d.getFullYear() + '-' + mo + '-' + da; }
+  function dateInputToGrist(s){ if (!s) return null; var p = s.split('-'); return Date.UTC(+p[0], (+p[1]) - 1, +p[2]) / 1000; }
+
+  // ---- render the editable detail body ----
+  function renderJobEditor(job){
+    var body = document.querySelector('#jobModal .jm-body'); if (!body) return;
     body.innerHTML = '';
+    if (!job.id) { body.appendChild(elx('div', 'jm-empty', "This install isn't linked to a job record yet — open it in the Inbox to add job details.")); renderFooter(job); return; }
+    var raw = job.raw || (job.raw = {});
 
-    orderedDetailFields(buildDetailFields(job)).forEach(function (f) { jmRow(body, f.label, f.node); });
+    // header: job id chip + address
+    var idrow = elx('div', 'je-idrow');
+    idrow.appendChild(elx('span', 'je-jobid', job.jid || (job.raw[JOB_COLS.jid] || '')));
+    body.appendChild(idrow);
+    var addr = document.createElement('input'); addr.className = 'je-addr'; addr.placeholder = 'Address…';
+    addr.value = String(raw[JOB_COLS.addr] != null ? raw[JOB_COLS.addr] : (job.addr || ''));
+    addr.addEventListener('blur', function () { if (addr.value !== String(raw[JOB_COLS.addr] || '')) setJobField(job, JOB_COLS.addr, addr.value); });
+    body.appendChild(addr);
 
-    if (detailLayout.hidden['__installations']) { finishJobModal(job); return; }
-    var vh = document.createElement('div'); vh.className = 'jm-sec'; vh.textContent = 'Installations'; body.appendChild(vh);
-    var visits = mappingsCache ? jobVisits(job) : [];
-    if (!visits.length) {
-      var em = document.createElement('div'); em.className = 'jm-empty'; em.textContent = 'No installation dates yet.'; body.appendChild(em);
-    } else {
-      visits.forEach(function (v, i) {
-        var d = gristToLocalDate(v[mappingsCache.startDate]);
-        var note = (mappingsCache.seqNote != null) ? fmtVal(v[mappingsCache.seqNote]) : '';
-        var row = document.createElement('div'); row.className = 'jm-visit';
-        var vd = document.createElement('span'); vd.className = 'vd';
-        vd.textContent = (i + 1) + '/' + visits.length + ' · ' + fmtDate(d);
-        row.appendChild(vd);
-        if (note) row.appendChild(document.createTextNode(' — ' + note));
-        body.appendChild(row);
+    // stage / payment / assigned
+    var pills = elx('div', 'je-pills');
+    var stageChoices = choiceKeys(jobMetaByColId[JOB_COLS.stage]) || Object.keys(STAGE_COLORS);
+    pills.appendChild(pillDropdown(job.stage || raw[JOB_COLS.stage] || '', stageChoices, jobMetaByColId[JOB_COLS.stage], function (v) { setJobField(job, JOB_COLS.stage, v); }, 'Stage —'));
+    var payChoices = choiceKeys(jobMetaByColId[JOB_COLS.payment]) || Object.keys(PAY_COLORS);
+    pills.appendChild(pillDropdown(job.payment || raw[JOB_COLS.payment] || '', payChoices, jobMetaByColId[JOB_COLS.payment], function (v) { setJobField(job, JOB_COLS.payment, v); }, 'Payment —'));
+    var asg = elx('span', 'je-assign'); var names = listVals(raw[JOB_COLS.assigned]);
+    if (names.length) { names.forEach(function (nm) { asg.appendChild(avatarSpan(nm)); }); } else { asg.appendChild(elx('span', 'je-assign-add', '+ staff')); }
+    asg.title = 'Click to change who is assigned';
+    asg.addEventListener('click', function (e) { e.stopPropagation(); openAssignMenu(asg, job); });
+    pills.appendChild(asg);
+    body.appendChild(pills);
+
+    // measure date + scope summary
+    var mrow = elx('div', 'je-drow');
+    mrow.appendChild(elx('span', 'je-dl', 'Measure date'));
+    var md = document.createElement('input'); md.type = 'date'; md.className = 'je-date'; md.value = toDateInputVal(raw.Meas_Date);
+    md.addEventListener('change', function () { setJobField(job, 'Meas_Date', dateInputToGrist(md.value)); });
+    mrow.appendChild(md); body.appendChild(mrow);
+
+    var stone = jobStone(job);
+    var scopeTot = stone.reduce(function (m, r) { return m + (Number(r[STONE.scope]) || 0); }, 0);
+    var srow = elx('div', 'je-drow'); srow.appendChild(elx('span', 'je-dl', 'Scope'));
+    srow.appendChild(elx('span', 'je-scope', scopeTot + (scopeTot === 1 ? ' slab' : ' slabs'))); body.appendChild(srow);
+
+    // note
+    var nlab = elx('div', 'jm-sec', 'Note'); body.appendChild(nlab);
+    var nt = document.createElement('textarea'); nt.className = 'je-note'; nt.placeholder = 'Capture your note'; nt.value = String(raw.Note || '');
+    nt.addEventListener('blur', function () { if (nt.value !== String(raw.Note || '')) setJobField(job, 'Note', nt.value); });
+    body.appendChild(nt);
+
+    // installations
+    var ih = elx('div', 'jm-sec je-sec-add'); ih.appendChild(document.createTextNode('Installations'));
+    var iadd = elx('span', 'je-add', '+ Add'); iadd.addEventListener('click', function (e) { e.stopPropagation(); addVisit(job); }); ih.appendChild(iadd);
+    body.appendChild(ih);
+    var visits = mappingsCache ? jobVisitsAll(job) : [];
+    if (!visits.length) body.appendChild(elx('div', 'jm-empty', 'No installs scheduled.'));
+    visits.forEach(function (v) {
+      var row = elx('div', 'je-inst');
+      var di = document.createElement('input'); di.type = 'date'; di.className = 'je-date'; di.value = toDateInputVal(v[mappingsCache.startDate]);
+      di.addEventListener('change', function () { setVisitField(v, mappingsCache.startDate, dateInputToGrist(di.value)); });
+      row.appendChild(di);
+      if (mappingsCache.seqNote != null) {
+        var ni = document.createElement('input'); ni.className = 'je-inst-note'; ni.placeholder = 'Note…'; ni.value = fmtVal(v[mappingsCache.seqNote]);
+        ni.addEventListener('blur', function () { if (ni.value !== fmtVal(v[mappingsCache.seqNote])) setVisitField(v, mappingsCache.seqNote, ni.value); });
+        row.appendChild(ni);
+      }
+      var del = elx('span', 'je-del', '×'); del.title = 'Delete install'; del.addEventListener('click', function (e) { e.stopPropagation(); removeVisit(job, v); }); row.appendChild(del);
+      body.appendChild(row);
+    });
+
+    // stone order
+    var sh = elx('div', 'jm-sec je-sec-add'); sh.appendChild(document.createTextNode('Stone Order'));
+    var sadd = elx('span', 'je-add', '+ Add line'); sadd.addEventListener('click', function (e) { e.stopPropagation(); addStoneLine(job); }); sh.appendChild(sadd);
+    body.appendChild(sh);
+    if (stoneCache === null) { body.appendChild(elx('div', 'jm-empty', 'Loading stone lines…')); renderFooter(job); return; }
+    if (!stone.length) body.appendChild(elx('div', 'jm-empty', 'No stone lines for this job.'));
+    var statusChoices = choiceKeys(stoneMetaByColId[STONE.status]) || [];
+    stone.forEach(function (r) {
+      var card = elx('div', 'je-stone');
+      var top = elx('div', 'je-stone-top');
+      var nm = elx('span', 'je-prodname', productLabelFor(r));
+      if (catalogueCache && catalogueCache.length) { nm.title = 'Click to pick a product'; nm.classList.add('pick'); nm.addEventListener('click', function (e) { e.stopPropagation(); openProductMenu(nm, r); }); }
+      top.appendChild(nm);
+      var sdel = elx('span', 'je-del', '×'); sdel.title = 'Delete this stone line'; sdel.addEventListener('click', function (e) { e.stopPropagation(); removeStoneLine(job, r); }); top.appendChild(sdel);
+      card.appendChild(top);
+      var srowc = elx('div', 'je-stone-row');
+      srowc.appendChild(pillDropdown(String(r[STONE.status] || ''), statusChoices, stoneMetaByColId[STONE.status], function (v) { setStoneField(r, STONE.status, v); }, 'Status —'));
+      card.appendChild(srowc);
+      var qrow = elx('div', 'je-qrow');
+      [['scope', 'Scope'], ['order', 'Order'], ['deliv', 'Deliv']].forEach(function (q) {
+        var wrap = elx('label', 'je-q'); wrap.appendChild(elx('span', 'je-qlbl', q[1]));
+        var qi = document.createElement('input'); qi.type = 'number'; qi.className = 'je-qin'; var col = STONE[q[0]];
+        qi.value = (r[col] != null ? r[col] : '');
+        qi.addEventListener('change', function () { setStoneField(r, col, qi.value === '' ? null : Number(qi.value)); });
+        wrap.appendChild(qi); qrow.appendChild(wrap);
       });
-    }
+      var pwrap = elx('label', 'je-q'); pwrap.appendChild(elx('span', 'je-qlbl', 'Price $'));
+      var pin = document.createElement('input'); pin.type = 'number'; pin.className = 'je-qin'; pin.value = (r[STONE.price] != null ? r[STONE.price] : '');
+      pin.addEventListener('change', function () { setStoneField(r, STONE.price, pin.value === '' ? null : Number(pin.value)); });
+      pwrap.appendChild(pin); qrow.appendChild(pwrap);
+      card.appendChild(qrow);
+      var sn = document.createElement('input'); sn.className = 'je-inst-note'; sn.placeholder = 'Note…'; sn.value = String(r[STONE.note] || '');
+      sn.addEventListener('blur', function () { if (sn.value !== String(r[STONE.note] || '')) setStoneField(r, STONE.note, sn.value); });
+      card.appendChild(sn);
+      body.appendChild(card);
+    });
 
-    finishJobModal(job);
+    renderFooter(job);
   }
-  // footer (Edit-in-Inbox) + reveal the modal — shared by both openJobDetails paths
-  function finishJobModal(job) {
-    var modal = document.getElementById('jobModal');
-    var tgt = inboxTargetFor(job);
-    var edit = modal.querySelector('.jm-edit'), hint = modal.querySelector('.jm-hint');
-    if (tgt.url) {
-      edit.href = tgt.url; edit.classList.remove('disabled');
-      edit.textContent = '✎ Edit in ' + tgt.name;
-      hint.textContent = 'Opens the ' + tgt.name + ' inbox with this job selected.';
+  function choiceKeys(meta){ if (!meta) return null; if (Array.isArray(meta.choices) && meta.choices.length) return meta.choices.slice(); var k = Object.keys(meta.choiceOptions || {}); return k.length ? k : null; }
+
+  function renderFooter(job){
+    var foot = document.querySelector('#jobModal .jm-foot'); if (!foot) return;
+    foot.innerHTML = '';
+    if (edit.dirty) {
+      var msg = elx('span', 'jm-hint'); var dot = elx('span', 'je-dirtydot'); msg.appendChild(dot); msg.appendChild(document.createTextNode('Unsaved changes')); foot.appendChild(msg);
+      var disc = elx('button', 'je-btn ghost', 'Discard'); disc.type = 'button'; disc.addEventListener('click', function (e) { e.stopPropagation(); discardEdit(); }); foot.appendChild(disc);
+      var sv = elx('button', 'je-btn primary', 'Save'); sv.type = 'button'; sv.addEventListener('click', function (e) { e.stopPropagation(); saveEdit(); }); foot.appendChild(sv);
     } else {
-      edit.href = '#'; edit.classList.add('disabled');
-      edit.textContent = '✎ Edit';
-      hint.textContent = 'No linked job record to open.';
+      var hint = elx('span', 'jm-hint'); foot.appendChild(hint);
+      var tgt = inboxTargetFor(job || {});
+      var a = elx('a', 'jm-edit'); a.target = '_parent'; a.rel = 'noopener';
+      if (tgt.url) { a.href = tgt.url; a.textContent = '✎ Open in Inbox'; hint.textContent = 'Opens the Inbox with this job selected.'; }
+      else { a.href = '#'; a.className = 'jm-edit disabled'; a.textContent = '✎ Edit'; hint.textContent = 'No linked job record to open.'; }
+      foot.appendChild(a);
     }
-    modal.classList.add('open');
   }
-  function closeJobModal() {
+
+  // ---- unsaved-changes prompt (Save / Discard / Cancel) ----
+  var _unsavedRes = null;
+  function confirmUnsaved(){
+    return new Promise(function (res) {
+      _unsavedRes = res;
+      var ov = document.getElementById('jmConfirm');
+      if (!ov) {
+        ov = elx('div', 'jm-confirm'); ov.id = 'jmConfirm';
+        ov.innerHTML = '<div class="jm-confirm-card"><div class="jm-confirm-t">Unsaved changes</div><div class="jm-confirm-b">You\'ve made changes that haven\'t been saved. Save them or discard them?</div><div class="jm-confirm-f"><button type="button" data-v="cancel" class="je-btn ghost">Cancel</button><button type="button" data-v="discard" class="je-btn ghost">Discard</button><button type="button" data-v="save" class="je-btn primary">Save</button></div></div>';
+        document.getElementById('jobModalCard').appendChild(ov);
+        [].forEach.call(ov.querySelectorAll('button'), function (btn) { btn.addEventListener('click', function (e) { e.stopPropagation(); ov.style.display = 'none'; var r = _unsavedRes; _unsavedRes = null; if (r) r(btn.dataset.v); }); });
+      }
+      ov.style.display = 'flex';
+    });
+  }
+
+  function openJobDetails(job){
+    if (edit.dirty && currentDetailJob && currentDetailJob.id !== job.id) {
+      confirmUnsaved().then(function (choice) {
+        if (choice === 'cancel') return;
+        var go = function () { _openJobNow(job); };
+        if (choice === 'save') saveEdit().then(go); else { discardEdit(); go(); }
+      });
+      return;
+    }
+    _openJobNow(job);
+  }
+  function _openJobNow(job){
+    // edit the canonical jobsCache row so field edits are seen by the save diff
+    if (job && job.id != null) { var canon = (jobsCache || []).find(function (x) { return x.id === job.id; }); if (canon) { if (!canon.raw && job.raw) canon.raw = job.raw; job = canon; } }
+    currentDetailJob = job;
+    document.getElementById('jobModalCard').classList.remove('editing');
+    var g = document.querySelector('.jm-gear'); if (g) g.style.display = 'none';   // field-layout editor is N/A for the editable detail
+    var modal = document.getElementById('jobModal');
+    modal.querySelector('.jm-title').textContent = job.client || job.addr || (job.jid ? 'Job ' + job.jid : 'Job details');
+    renderJobEditor(job);                              // render now so it never blanks
+    ensureStoneLoaded().then(function () { if (currentDetailJob === job) renderJobEditor(job); });
+    modal.classList.add('open');
+    updateEditBar();
+  }
+  function closeJobModal(){
+    if (edit.dirty) {
+      confirmUnsaved().then(function (choice) {
+        if (choice === 'cancel') return;
+        var done = function () { reallyCloseModal(); };
+        if (choice === 'save') saveEdit().then(done); else { discardEdit(); done(); }
+      });
+      return;
+    }
+    reallyCloseModal();
+  }
+  function reallyCloseModal(){
     document.getElementById('jobModal').classList.remove('open');
     document.getElementById('jobModalCard').classList.remove('editing');
+    closeFloatMenu();
     var g = document.querySelector('.jm-gear'); if (g) g.classList.remove('on');
   }
 
@@ -1975,6 +2382,7 @@
   // ---- column metadata + jobs table (needs full access) ----
   function loadMeta() {
     return grist.getTable().getTableId().then(function (tableId) {
+      mappedTableId = tableId;
       return Promise.all([
         grist.docApi.fetchTable('_grist_Tables'),
         grist.docApi.fetchTable('_grist_Tables_column')
@@ -2000,6 +2408,7 @@
     var t = colMeta(mappingsCache.groupBy).type || '';
     if (t.indexOf('Ref:') !== 0) { jobsCache = null; return Promise.resolve(); }
     var jobsTable = t.slice(4);
+    jobsTableId = jobsTable;
     return Promise.all([
       grist.docApi.fetchTable(jobsTable),
       grist.docApi.fetchTable('_grist_Tables'),
@@ -2103,7 +2512,11 @@
   });
   document.getElementById('jobModalCard').addEventListener('click', function (e) { e.stopPropagation(); });
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') closeJobModal();
+    if (e.key !== 'Escape') return;
+    var ov = document.getElementById('jmConfirm');
+    if (ov && ov.style.display === 'flex') { ov.style.display = 'none'; var r = _unsavedRes; _unsavedRes = null; if (r) r('cancel'); return; }
+    if (_floatMenu) { closeFloatMenu(); return; }
+    if (document.getElementById('jobModal').classList.contains('open')) closeJobModal();
   });
   (function () {
     var wrap = document.getElementById('wrap');

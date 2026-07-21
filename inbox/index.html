@@ -1582,6 +1582,12 @@ function pushSharedConfig(){
 function saveForEveryone(){ state.templateShared=true;  savePrefs(); pushSharedConfig(); }
 function saveForMyself()  { state.templateShared=false; savePrefs(); }   // local only; stop following team
 const pushSharedTemplate=function(){ if(state.templateShared) pushSharedConfig(); };  // legacy callers push only when following
+// The saved-grouping LIBRARY is a shared team asset (like views): whenever it
+// changes we write it straight to the Grist doc so every viewer sees it, using
+// setOption (merge-safe) so it's independent of the card-design "for everyone"
+// toggle. Without this the library only lived in localStorage and never reached
+// anyone else's widget.
+function pushSharedGroupings(){ if(!state.grist) return; try{ grist.setOption("savedGroupings", (state.savedGroupings||[]).slice()); }catch(e){} }
 // Editing the rules keeps the named grouping active and marks it dirty
 // (same pattern as views): Update / Revert live in the Group menu.
 function commitGrouping(){ savePrefs(); renderList(); updateToolbar(); }
@@ -1589,16 +1595,16 @@ function findGrouping(n){ return state.savedGroupings.find(x=>x.name===n)||null;
 function isGroupingDirty(){ const g=findGrouping(state.activeGrouping); if(!g)return false;
   return JSON.stringify(normalizeGrouping(state.grouping))!==JSON.stringify(normalizeGrouping(g.grouping)); }
 function updateGrouping(){ const g=findGrouping(state.activeGrouping); if(!g)return;
-  g.grouping=JSON.parse(JSON.stringify(normalizeGrouping(state.grouping))); savePrefs(); renderGroupMenu(); updateToolbar(); }
+  g.grouping=JSON.parse(JSON.stringify(normalizeGrouping(state.grouping))); savePrefs(); pushSharedGroupings(); renderGroupMenu(); updateToolbar(); }
 function applyGrouping(g){ state.grouping=normalizeGrouping(g.grouping); state.activeGrouping=g.name; savePrefs(); closeMenus(); renderList(); updateToolbar(); }
 function saveGroupingAs(){
   const name=prompt('Name this grouping (e.g. "By client", "By stage"):', state.activeGrouping||""); if(!name)return;
   const cfg=JSON.parse(JSON.stringify(state.grouping||{by:"",rules:[],restMode:"value"}));
   const ex=state.savedGroupings.find(x=>x.name===name);
   if(ex){ if(!confirm('Grouping "'+name+'" exists. Overwrite?'))return; ex.grouping=cfg; } else state.savedGroupings.push({name,grouping:cfg});
-  state.activeGrouping=name; savePrefs(); renderGroupMenu(); updateToolbar();
+  state.activeGrouping=name; savePrefs(); pushSharedGroupings(); renderGroupMenu(); updateToolbar();
 }
-function deleteGrouping(name){ state.savedGroupings=state.savedGroupings.filter(x=>x.name!==name); if(state.activeGrouping===name)state.activeGrouping=""; savePrefs(); renderGroupMenu(); updateToolbar(); }
+function deleteGrouping(name){ state.savedGroupings=state.savedGroupings.filter(x=>x.name!==name); if(state.activeGrouping===name)state.activeGrouping=""; savePrefs(); pushSharedGroupings(); renderGroupMenu(); updateToolbar(); }
 function renderGroupMenu(){
   const host=document.getElementById("groupMenu"); host.innerHTML="";
   host.appendChild($("div","phead","Grouping"));
@@ -2390,6 +2396,13 @@ if(typeof grist!=="undefined"){
       personal.forEach(v=>{ if(!merged.some(x=>x.name===v.name)) merged.push(v); });
       if(JSON.stringify(merged)!==JSON.stringify(state.savedViews)){ state.savedViews=merged; renderList(); updateToolbar(); }
     }
+    // Saved-grouping LIBRARY — a team asset adopted by EVERYONE, independent of
+    // the card-design "for everyone" toggle (same as shared views above). Kept
+    // out of the templateShared gate below so viewers on a personal card design
+    // still see team groupings in their menu.
+    if(Array.isArray(opts.savedGroupings) && JSON.stringify(opts.savedGroupings)!==JSON.stringify(state.savedGroupings)){
+      state.savedGroupings=opts.savedGroupings.slice(); renderGroupMenu(); updateToolbar();
+    }
     // Stage order — a team ordering adopted by everyone following it (also independent of the design toggle).
     if(Array.isArray(opts.sharedStageOrder) && opts.sharedStageOrder.length){
       if(state.stageOrderShared==null) state.stageOrderShared=true;   // first run: follow the team order if one exists
@@ -2407,7 +2420,7 @@ if(typeof grist!=="undefined"){
     if(!editing && shared!=null && state.cardTemplate!==shared){ state.cardTemplate=shared; changed=true; }
     // NB: the active grouping is intentionally NOT adopted — it's personal, so the
     // widget always defaults to "No grouping" and the team's grouping is never forced.
-    if(Array.isArray(opts.savedGroupings) && J(opts.savedGroupings)!==J(state.savedGroupings)){ state.savedGroupings=opts.savedGroupings.slice(); }
+    // (The saved-grouping LIBRARY is adopted above, before the templateShared gate.)
     if(typeof opts.cardFontSize==="number" && opts.cardFontSize!==state.cardFontSize){ state.cardFontSize=opts.cardFontSize; fontChanged=true; }
     if(opts.listCardFont && J(opts.listCardFont)!==J(state.listCardFont)){ state.listCardFont=Object.assign({},LIST_CARD_FONT,opts.listCardFont); fontChanged=true; }
     if(opts.summaryFont && J(opts.summaryFont)!==J(state.summaryFont)){ state.summaryFont=Object.assign({},SUMMARY_FONT,opts.summaryFont); changed=true; }

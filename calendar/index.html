@@ -1984,11 +1984,16 @@
   function fillColorFor(meta, val){ var o = (meta && meta.choiceOptions || {})[val] || {}; return o.fillColor || 'var(--line)'; }
   function textColorFor(meta, val){ var o = (meta && meta.choiceOptions || {})[val] || {}; return o.textColor || 'var(--ink)'; }
   var _floatMenu = null;
-  function closeFloatMenu(){ if (_floatMenu) { _floatMenu.remove(); _floatMenu = null; document.removeEventListener('click', closeFloatMenu); } }
+  // Close on any outside click. Must be CAPTURE phase: #jobModalCard stops click
+  // propagation, so a bubble-phase document listener would never fire for clicks
+  // inside the modal and the menu would get stuck open. We skip clicks landing
+  // inside the menu itself so option picks (and the product search box) still work.
+  function closeFloatMenu(e){ if (e && _floatMenu && _floatMenu.contains(e.target)) return;
+    if (_floatMenu) { _floatMenu.remove(); _floatMenu = null; document.removeEventListener('click', closeFloatMenu, true); } }
   function placeMenu(m, anchor){ document.body.appendChild(m); var rc = anchor.getBoundingClientRect();
     m.style.left = Math.max(8, Math.min(rc.left, window.innerWidth - m.offsetWidth - 12)) + 'px';
     m.style.top = Math.min(rc.bottom + 4, window.innerHeight - m.offsetHeight - 8) + 'px';
-    setTimeout(function () { document.addEventListener('click', closeFloatMenu); }, 0); }
+    setTimeout(function () { document.addEventListener('click', closeFloatMenu, true); }, 0); }
   function pillDropdown(current, choices, meta, onPick, emptyLabel){
     var b = elx('span', 'je-pill');
     var paint = function (v) { b.textContent = v || emptyLabel || '—'; b.style.background = v ? fillColorFor(meta, v) : 'var(--line2)'; b.style.color = v ? textColorFor(meta, v) : 'var(--muted)'; };

@@ -57,6 +57,31 @@
   .lg.off{opacity:.5;text-decoration:line-through}
   .lg .n{font-variant-numeric:tabular-nums;color:var(--muted)}
 
+  /* ---- body: calendar + jobs sidebar ---- */
+  .body{flex:1 1 auto;min-height:0;display:flex;gap:12px}
+  .body.noside .sidebar{display:none}
+  .sidebar{flex:0 0 260px;display:flex;flex-direction:column;min-height:0;
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+  .side-head{flex:0 0 auto;padding:12px 12px 10px;display:flex;flex-direction:column;gap:9px;border-bottom:1px solid var(--line2)}
+  .side-title{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
+  .side-title .jc-count{background:var(--line2);color:var(--muted);border-radius:999px;font-size:11px;padding:1px 8px;font-weight:700}
+  .ssearch{position:relative}
+  .ssearch input{width:100%;font:inherit;font-size:12.5px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px 8px 30px}
+  .ssearch input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+  .ssearch svg{position:absolute;left:9px;top:9px;width:15px;height:15px;stroke:var(--muted);fill:none}
+  .job-list{flex:1 1 auto;min-height:0;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:7px}
+  .job{border:1px solid var(--line);border-radius:11px;padding:9px 10px;cursor:pointer;display:flex;flex-direction:column;gap:5px}
+  .job:hover{border-color:var(--accent)}
+  .job.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--accent-soft)}
+  .job .jc{font-weight:700;font-size:13px;line-height:1.25}
+  .job .ja{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .job .jm{display:flex;align-items:center;gap:10px;font-size:11px;color:var(--muted)}
+  .job .jm .k{display:inline-flex;align-items:center;gap:4px}
+  .job .jm .kd{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .job .avs{margin-left:auto;display:flex}
+  .job .avs .av{width:19px;height:19px;font-size:9px;margin-left:-5px;border:1.5px solid var(--panel)}
+  .side-empty{color:var(--muted);font-size:12px;text-align:center;padding:20px 8px}
+
   /* ---- calendar grid ---- */
   .cal{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;
     background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
@@ -147,10 +172,23 @@
       <span class="lg on" id="lgOrdered"><span class="sw" style="background:#f2df3a"></span>Ordered <span class="n" id="nOrdered">0</span></span>
       <span class="lg on" id="lgDelivered"><span class="sw" style="background:#7ad66f"></span>Delivered <span class="n" id="nDelivered">0</span></span>
     </div>
+    <button class="assign" id="btnJobs" title="Show / hide the jobs panel">▦ Jobs</button>
   </div>
-  <div class="cal">
-    <div class="dow" id="dow"></div>
-    <div class="grid" id="grid"></div>
+  <div class="body" id="body">
+    <div class="cal">
+      <div class="dow" id="dow"></div>
+      <div class="grid" id="grid"></div>
+    </div>
+    <div class="sidebar" id="sidebar">
+      <div class="side-head">
+        <div class="side-title">Jobs <span class="jc-count" id="jobCount">0</span></div>
+        <div class="ssearch">
+          <svg viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="jobSearch" type="text" placeholder="Search client, address, stone, status…" autocomplete="off">
+        </div>
+      </div>
+      <div class="job-list" id="jobList"></div>
+    </div>
   </div>
 </div>
 
@@ -204,6 +242,8 @@ const state={
   cursor:new Date(),                    // any day in the viewed range
   view:"month",                         // month | week | agenda
   assignee:null,                        // null = all assignees
+  jobFilter:null,                       // null = all jobs (sidebar selection)
+  jobQ:"", sideOpen:true,
   show:{ ordered:true, delivered:true },
   jobById:{}, catById:{}
 };
@@ -239,10 +279,11 @@ function calDateOf(r){
   return null;
 }
 function passAssignee(r){ return !state.assignee || assigneesOf(r).includes(state.assignee); }
-// Every event indexed by ymd (respecting the assignee filter; show-toggle applied at render).
+function passJob(r){ return !state.jobFilter || refId(r.Job)===state.jobFilter; }
+// Every event indexed by ymd (respecting assignee + job filters; show-toggle applied at render).
 function buildEventIndex(){
   const byYmd={};
-  (state.stone||[]).forEach(r=>{ const cd=calDateOf(r); if(!cd) return; if(!passAssignee(r)) return;
+  (state.stone||[]).forEach(r=>{ const cd=calDateOf(r); if(!cd) return; if(!passAssignee(r)||!passJob(r)) return;
     (byYmd[ymd(cd.date)]=byYmd[ymd(cd.date)]||[]).push({r,kind:cd.kind,date:cd.date}); });
   return byYmd;
 }
@@ -285,6 +326,42 @@ function render(){
 
   if(state.view==="agenda") renderAgenda(byYmd);
   else renderGrid(byYmd);
+  renderSidebar();
+}
+// Right-hand jobs search panel — mirrors the installations calendar's jobs sidebar.
+function jobStoneStats(jid){
+  let n=0,ord=0,del=0;
+  (state.stone||[]).forEach(r=>{ if(refId(r.Job)!==jid) return; n++; const cd=calDateOf(r); if(!cd) return; if(cd.kind==="delivered")del++; else ord++; });
+  return {n,ord,del};
+}
+function renderSidebar(){
+  document.getElementById("body").classList.toggle("noside",!state.sideOpen);
+  const btn=document.getElementById("btnJobs"); btn.classList.toggle("on",state.sideOpen);
+  if(!state.sideOpen) return;
+  const list=document.getElementById("jobList"); list.innerHTML="";
+  const q=(state.jobQ||"").trim().toLowerCase();
+  const jobs=(state.jobs||[]).filter(j=>(state.stone||[]).some(r=>refId(r.Job)===j.id));
+  const hay=j=>{ let s=[jobClient(j),j.Job_Address,j.Address_Formatted,j.Job_ID].filter(Boolean).join(" ");
+    (state.stone||[]).forEach(r=>{ if(refId(r.Job)===j.id) s+=" "+stoneLabel(r)+" "+(r.Product_Supplier||"")+" "+(r.Order_Status||""); });
+    return s.toLowerCase(); };
+  const shown=jobs.filter(j=>!q||hay(j).includes(q)).sort((a,b)=>jobClient(a).localeCompare(jobClient(b)));
+  document.getElementById("jobCount").textContent=shown.length;
+  if(!shown.length){ list.appendChild($("div","side-empty",q?"No jobs match “"+state.jobQ+"”.":"No jobs with stone orders.")); return; }
+  shown.forEach(j=>{
+    const st=jobStoneStats(j.id);
+    const card=$("div","job"+(state.jobFilter===j.id?" on":""));
+    card.appendChild($("div","jc",jobClient(j)));
+    const addr=(String(j.Address_Formatted||j.Job_Address||"")).trim();
+    if(addr){ const a=$("div","ja",addr); a.title=addr; card.appendChild(a); }
+    const jm=$("div","jm");
+    if(st.ord){ const k=$("span","k"); const d=$("span","kd"); d.style.background="#f2df3a"; k.appendChild(d); k.appendChild(document.createTextNode(st.ord+" ordered")); jm.appendChild(k); }
+    if(st.del){ const k=$("span","k"); const d=$("span","kd"); d.style.background="#7ad66f"; k.appendChild(d); k.appendChild(document.createTextNode(st.del+" delivered")); jm.appendChild(k); }
+    const as=choiceList(j.Assigned_To);
+    if(as.length){ const avs=$("span","avs"); as.slice(0,3).forEach(n=>{ const a=$("span","av"); a.style.background=avatarColor(n); a.textContent=initials(n); a.title=n; avs.appendChild(a); }); jm.appendChild(avs); }
+    card.appendChild(jm);
+    card.onclick=()=>{ state.jobFilter=(state.jobFilter===j.id?null:j.id); render(); };
+    list.appendChild(card);
+  });
 }
 function visibleRange(){
   if(state.view==="week"){ const s=weekStart(state.cursor); return { start:s, end:addDays(s,7) }; }
@@ -477,6 +554,8 @@ document.getElementById("assignBtn").onclick=e=>{ e.stopPropagation(); openAssig
 document.getElementById("assignPop").onclick=e=>e.stopPropagation();
 document.getElementById("lgOrdered").onclick=()=>{ state.show.ordered=!state.show.ordered; render(); };
 document.getElementById("lgDelivered").onclick=()=>{ state.show.delivered=!state.show.delivered; render(); };
+document.getElementById("btnJobs").onclick=()=>{ state.sideOpen=!state.sideOpen; render(); };
+document.getElementById("jobSearch").oninput=e=>{ state.jobQ=e.target.value; renderSidebar(); };
 document.getElementById("dayPop").onclick=e=>e.stopPropagation();
 document.addEventListener("click",closePops);
 document.addEventListener("keydown",e=>{ if(e.key==="Escape") closePops(); });

@@ -1374,7 +1374,9 @@ async function ensureGhostJob(){
 let _adopting=false;
 async function adoptOrphanStones(){
   if(!state.grist || state.dirty || _adopting) return;
-  const orphans=(state.stone||[]).filter(r=>refId(r.Job)==null);
+  // Grist delivers an EMPTY Ref column as 0 (not null), so test falsiness — 0/null/"" all mean
+  // "no job". (A real Job id is a positive row number.) Missing this is why orphans slipped through.
+  const orphans=(state.stone||[]).filter(r=>!refId(r.Job));
   if(!orphans.length) return;
   _adopting=true;
   try{

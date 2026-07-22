@@ -898,7 +898,7 @@ function applyGristChoices(sc){
     syncChoiceMaps();
   }catch(e){ console.warn("choice sync failed",e); }
 }
-function avatarColor(name){ const c=state.colors&&state.colors.assignee; return (c&&c[name])||DEFAULT_AVATAR; }
+function avatarColor(name){ const c=state.colors&&state.colors.assignee; return (c&&c[name]) || (name===GHOST_ASSIGNEE?GHOST_RED:DEFAULT_AVATAR); }
 // Black or white text depending on how light the avatar colour is.
 function contrastInk(hex){ const {r,g,b}=hexRgb(hex); return (r*299+g*587+b*114)/1000>150?"#1d2733":"#ffffff"; }
 function avatarEl(name,sm){ const a=$("div","avatar"+(sm?" sm":""),initials(name)); a.title=name;
@@ -1333,10 +1333,11 @@ function createClientAndSet(j,name){
 // shows on the whole-table Stone Order board), so we adopt any orphans into a
 // catch-all "Ghost Job". New jobs get a playful placeholder client + the Ghost
 // assignee, so a half-entered job still reads nicely instead of "—".
-const GHOST_ASSIGNEE = "Ghost";
+const GHOST_ASSIGNEE = "Nè Hé";
+const GHOST_RED = "#e5484d";                        // Nè Hé's avatar/pill colour (red, not the grey default)
 const GHOST_JOB_CLIENT = "👻 Ghost Job (unclaimed stones)";
-const FUN_CLIENTS = ["Anon E. Mouse","Sir Slabs-a-Lot","Marble McMarbleface","The Stone Ranger","Count Slabula","Mystery Marble","Boo Radley"];
-function funnyClientName(){ return FUN_CLIENTS[Math.floor(Math.random()*FUN_CLIENTS.length)]; }
+const FUN_CLIENT = "Cưng ơi cưng";
+function funnyClientName(){ return FUN_CLIENT; }
 // Give a freshly-created (draft) job a funny placeholder client, reusing one if it
 // already exists so we don't pile up duplicates. Runs inside the draft (flushed on Save).
 function defaultFunnyClient(j){

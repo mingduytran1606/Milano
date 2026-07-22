@@ -674,7 +674,8 @@
     s.textContent = val;
     return s;
   }
-  // neutral initials avatar for assignees (no colour) — full name in the tooltip
+  // Nè Hé (the widget's catch-all assignee) shows red; everyone else is a neutral grey avatar.
+  var GHOST_ASSIGNEE = 'Nè Hé', GHOST_RED = '#e5484d';
   function avatarSpan(name) {
     var parts = String(name).trim().split(/\s+/).filter(Boolean);
     var ini = parts.length > 1
@@ -682,6 +683,7 @@
       : String(name).trim().slice(0, 2);
     var s = document.createElement('span');
     s.className = 'avatar';
+    if (name === GHOST_ASSIGNEE) { s.style.background = GHOST_RED; s.style.color = '#fff'; }
     s.textContent = ini.toUpperCase();
     s.title = name;
     return s;

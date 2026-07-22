@@ -333,6 +333,7 @@
   .je-qlbl { font-size:9.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
   .je-qin { width:62px; font:inherit; font-size:12.5px; color:var(--ink); background:var(--panel); border:1px solid var(--line2); border-radius:6px; padding:4px 6px; }
   .je-qin:focus { outline:none; border-color:var(--accent); }
+  .je-qin.je-ro { background:transparent; border-color:transparent; border-bottom:1px solid var(--line2); border-radius:0; color:var(--muted); }
   /* floating menus (pill dropdown / assignee / product picker) */
   .je-menu { position:fixed; z-index:70; min-width:150px; max-width:300px; max-height:280px; overflow-y:auto; background:var(--panel);
     border:1px solid var(--line); border-radius:9px; box-shadow:0 10px 30px rgba(0,0,0,.22); padding:5px; }
@@ -607,7 +608,7 @@
   function isReadonlyCol(role, col){
     if (col === 'id' || col === 'manualSort' || col === 'Job_ID' || col === 'Client_Label' || col === 'Stones' || col === 'Inst_Dates') return true;
     if (role === 'job'   && (col === 'Scope_Qty' || col === 'Ordered_Qty' || col === 'In_WH_Qty')) return true;
-    if (role === 'stone' && (col === 'Product_Code' || col === 'Product_Supplier' || col === 'Stone')) return true;
+    if (role === 'stone' && (col === 'Product_Code' || col === 'Product_Supplier' || col === 'Stone' || col === 'Product_Price_slab')) return true;
     return false;
   }
   var TMP_BASE = 1e9, _tmpSeq = 1e9;
@@ -649,6 +650,9 @@
   }
   function colMeta(colId) { return metaByColId[colId] || {}; }
   function colLabel(colId) { return colMeta(colId).label || colId; }
+  // A genuine read-only formula column: isFormula true AND a non-empty formula.
+  // (Trigger/data columns have isFormula false and stay writable.)
+  function isFormulaCol(colId) { var m = colMeta(colId); return !!(m.isFormula && m.formula && String(m.formula).trim() !== ''); }
   function isChoiceCol(colId) {
     var t = colMeta(colId).type || '';
     return t === 'Choice' || t === 'ChoiceList';
@@ -989,7 +993,9 @@
     var fields = {};
     var copyCols = [mappingsCache.startDate, mappingsCache.title, mappingsCache.type, mappingsCache.groupBy, mappingsCache.seqNote]
       .concat(mappingsCache.details || []);
-    copyCols.forEach(function (c) { if (c != null && rec[c] != null && rec[c] !== '') fields[c] = rec[c]; });
+    // Never copy Grist formula columns (e.g. a computed "n/total" seq label) — creating a row with a
+    // value for a formula column raises a ValueError and the whole duplicate fails.
+    copyCols.forEach(function (c) { if (c != null && !isFormulaCol(c) && rec[c] != null && rec[c] !== '') fields[c] = rec[c]; });
     grist.getTable().create({ fields: fields })
       .then(function (r) { if (r && r.id) { pendingCursor = r.id; } })
       .catch(function (err) { console.error('duplicate failed', err); alert('Could not duplicate this installation.'); });
@@ -2137,10 +2143,11 @@
         qi.addEventListener('change', function () { setStoneField(r, col, qi.value === '' ? null : Number(qi.value)); });
         wrap.appendChild(qi); qrow.appendChild(wrap);
       });
-      var pwrap = elx('label', 'je-q'); pwrap.appendChild(elx('span', 'je-qlbl', 'Price $'));
-      var pin = document.createElement('input'); pin.type = 'number'; pin.className = 'je-qin'; pin.value = (r[STONE.price] != null ? r[STONE.price] : '');
-      pin.addEventListener('change', function () { setStoneField(r, STONE.price, pin.value === '' ? null : Number(pin.value)); });
-      pwrap.appendChild(pin); qrow.appendChild(pwrap);
+      // Price / slab is a Grist formula (looked up from the product) — read-only, never written back.
+      var pwrap = elx('label', 'je-q'); pwrap.title = 'Price / slab — from the product; edit the product to change it';
+      pwrap.appendChild(elx('span', 'je-qlbl', 'Price $'));
+      pwrap.appendChild(elx('span', 'je-qin je-ro', (r[STONE.price] != null && r[STONE.price] !== '') ? String(r[STONE.price]) : '0'));
+      qrow.appendChild(pwrap);
       card.appendChild(qrow);
       var sn = document.createElement('input'); sn.className = 'je-inst-note'; sn.placeholder = 'Note…'; sn.value = String(r[STONE.note] || '');
       sn.addEventListener('blur', function () { if (sn.value !== String(r[STONE.note] || '')) setStoneField(r, STONE.note, sn.value); });
@@ -2399,7 +2406,8 @@
           if (cols.parentId[i] !== tref) continue;
           var co = {};
           try { co = (JSON.parse(cols.widgetOptions[i] || '{}')).choiceOptions || {}; } catch (e) {}
-          m[cols.colId[i]] = { label: cols.label[i] || cols.colId[i], type: cols.type[i] || '', choiceOptions: co };
+          m[cols.colId[i]] = { label: cols.label[i] || cols.colId[i], type: cols.type[i] || '', choiceOptions: co,
+            isFormula: !!(cols.isFormula && cols.isFormula[i]), formula: (cols.formula && cols.formula[i]) || '' };
         }
         metaByColId = m;
         return loadInboxColors().then(function () { applyChoiceColorOverrides(metaByColId); });

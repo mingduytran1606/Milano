@@ -1005,7 +1005,7 @@ function isTempId(id){ return typeof id==="number" && id>=TMP_BASE; }
 function isReadonlyCol(role,col){
   if(col==="id"||col==="manualSort"||col==="Job_ID"||col==="Client_Label"||col==="Stones"||col==="Inst_Dates") return true;
   if(role==="job"   && (col==="Scope_Qty"||col==="Ordered_Qty"||col==="In_WH_Qty")) return true;
-  if(role==="stone" && (col==="Product_Code"||col==="Product_Supplier"||col==="Stone")) return true;
+  if(role==="stone" && (col==="Product_Code"||col==="Product_Supplier"||col==="Stone"||col==="Product_Price_slab")) return true;
   return false;
 }
 function tableRole(table){ return table==="Jobs_Detail"?"job" : table==="Stone_Order"?"stone" : table==="Inst_"?"visit" : "other"; }
@@ -2506,15 +2506,13 @@ function renderDetail(){
     line.appendChild(stoneQtyInput(r,"Scope_Qty","Scope qty",false));
     line.appendChild(stoneQtyInput(r,"Ordered_Qty","Order qty",true));
     line.appendChild(stoneQtyInput(r,"Delivery_Qty","Delivered qty",true));
-    // Price prefills from the chosen product but stays editable (per-order override).
-    const pw=$("div","lprice"); pw.appendChild(document.createTextNode("$"));
-    const pi=document.createElement("input"); pi.type="number"; pi.title="Price / slab — prefilled from the product, editable";
-    pi.value=(r.Product_Price_slab!=null?r.Product_Price_slab:"");
-    // Size the box to its digits so the "$" hugs the number instead of drifting toward the Deliv column.
-    const sizePi=()=>{ const n=String(pi.value||"").length||2; pi.style.width="calc("+n+"ch + 6px)"; };
-    sizePi(); pi.oninput=sizePi;
-    pi.onchange=()=>update("Stone_Order",r.id,{Product_Price_slab:pi.value===""?null:Number(pi.value)});
-    pw.appendChild(pi); line.appendChild(pw);
+    // Price / slab is a Grist formula column (looked up from the chosen product) — read-only.
+    // Writing it back raised "Can't save value to formula column Product_Price_slab", so show it
+    // as text. To change a price, edit the product profile (pencil) / the Catalogue price.
+    const pw=$("div","lprice ro"); pw.title="Price / slab — from the product profile; edit the product to change it";
+    const pv=(r.Product_Price_slab!=null&&r.Product_Price_slab!=="")?r.Product_Price_slab:0;
+    pw.appendChild(document.createTextNode("$"+pv));
+    line.appendChild(pw);
     const nti=document.createElement("textarea"); nti.className="lnote"; nti.value=esc(r.Note); nti.placeholder="Note…";
     if(state.stoneNoteH) nti.style.height=state.stoneNoteH+"px";   // shared, remembered height
     nti.onblur=()=>{ if(nti.value!==esc(r.Note)) update("Stone_Order",r.id,{Note:nti.value}); };

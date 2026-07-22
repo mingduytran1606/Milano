@@ -1475,9 +1475,29 @@ function openJobPicker(r,anchor){
       list.appendChild(row);
     });
     if(!rows.length) list.appendChild($("div","pp-empty","No matching jobs."));
+    // No job for this stone yet? Create one and attach the stone to it.
+    const add=$("div","pp-row create","＋ New job"+(si.value.trim()?" “"+si.value.trim()+"”":"…"));
+    add.style.color="var(--accent-ink)"; add.style.fontWeight="600";
+    add.onmousedown=e=>{ e.preventDefault(); closeMenus(); newJobForStone(r,si.value); };
+    list.appendChild(add);
   }
   draw(""); si.oninput=()=>draw(si.value);
   closeMenus(); m.hidden=false; positionPop(m,anchor,330); setTimeout(()=>si.focus(),0);
+}
+// Create a brand-new job, attach this stone line to it, and jump to it so details can be filled in.
+// If the picker search had text, use it as the client name; otherwise a funny placeholder client.
+function newJobForStone(r,name){
+  const f={Stage:"Quote", Input_Date:toEpochSec(dateInput(new Date())), Assigned_To:["L",GHOST_ASSIGNEE]};
+  addRecord("Jobs_Detail",f,id=>{
+    update("Stone_Order",r.id,{Job:id});                 // move the stone onto the new job
+    const j=state.jobs.find(x=>x.id===id);
+    const nm=(name||"").trim(), R=state.ref.client;
+    if(nm && R){ const ex=(state.clients||[]).find(c=>String(c[R.labelCol]||"").toLowerCase()===nm.toLowerCase());
+      if(ex) setClient(j,ex); else createClientAndSet(j,nm); }
+    else defaultFunnyClient(j);
+    state.selectedId=id; state.pinnedNew=[id,...(state.pinnedNew||[]).filter(x=>x!==id)]; state.recentJobs[id]=Date.now();
+    savePrefs(); renderAll();
+  });
 }
 
 // ---- generic "create record" modal (used for new product) ----

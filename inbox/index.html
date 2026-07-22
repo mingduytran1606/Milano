@@ -622,6 +622,7 @@
 </div>
 <div class="popmenu rowmenu" id="rowMenu" hidden></div>
 <div class="popmenu prodpick" id="prodPicker" hidden></div>
+<div class="popmenu prodpick" id="jobPicker" hidden></div>
 <div class="popmenu choicepop" id="choicePop" hidden></div>
 <div class="popmenu choicepop" id="assignPop" hidden></div>
 <div class="modal" id="formModal" hidden>
@@ -1453,6 +1454,31 @@ function catalogueHaystack(c){
   for(const k in c){ if(k==="id") continue; const v=c[k]; if(typeof v==="string") s+=" "+v; }
   return s.toLowerCase();
 }
+// ---- move a stone line to another job (split the Ghost Job back into real jobs) ----
+function jobPickLabel(j){ return (String(j.Client_Label||"").trim()) || (String(j.Job_Address||j.Address_Formatted||"").trim()) || j.Job_ID || ("#"+j.id); }
+function openJobPicker(r,anchor){
+  const m=document.getElementById("jobPicker"); m.innerHTML="";
+  const sw=$("div","pp-search"); const si=document.createElement("input"); si.type="text"; si.placeholder="Move to job — search client / address…"; si.autocomplete="off";
+  sw.appendChild(si); m.appendChild(sw);
+  const list=$("div","pp-list"); m.appendChild(list);
+  const cur=refId(r.Job);
+  const hay=j=>((j.Client_Label||"")+" "+(j.Job_Address||"")+" "+(j.Address_Formatted||"")+" "+(j.Job_ID||"")).toLowerCase();
+  function draw(q){
+    list.innerHTML=""; const ql=(q||"").trim().toLowerCase();
+    const rows=(state.jobs||[]).filter(j=>!ql||hay(j).includes(ql));
+    rows.slice(0,80).forEach(j=>{
+      const row=$("div","pp-row"+(cur===j.id?" on":""));
+      row.appendChild($("div","pplabel",jobPickLabel(j)));
+      const sub=(String(j.Job_Address||j.Address_Formatted||"").trim());
+      if(sub && sub!==jobPickLabel(j)) row.appendChild($("div","ppsub",sub));
+      row.onmousedown=e=>{ e.preventDefault(); closeMenus(); if(j.id!==cur) update("Stone_Order",r.id,{Job:j.id}); };
+      list.appendChild(row);
+    });
+    if(!rows.length) list.appendChild($("div","pp-empty","No matching jobs."));
+  }
+  draw(""); si.oninput=()=>draw(si.value);
+  closeMenus(); m.hidden=false; positionPop(m,anchor,330); setTimeout(()=>si.focus(),0);
+}
 
 // ---- generic "create record" modal (used for new product) ----
 let _formState=null;
@@ -1639,6 +1665,7 @@ const MENUS=[["stageBtn","stageMenu",renderStageFilter],["paymentBtn","paymentMe
 function closeMenus(){ MENUS.forEach(([b,m])=>{ document.getElementById(m).hidden=true; document.getElementById(b).classList.remove("open"); });
   const rm=document.getElementById("rowMenu"); if(rm)rm.hidden=true;
   const pp=document.getElementById("prodPicker"); if(pp)pp.hidden=true;
+  const jp=document.getElementById("jobPicker"); if(jp)jp.hidden=true;
   const cp=document.getElementById("choicePop"); if(cp)cp.hidden=true;
   const ap=document.getElementById("assignPop"); if(ap)ap.hidden=true;
   document.querySelectorAll(".job .kebab.open").forEach(k=>k.classList.remove("open")); }
@@ -2629,6 +2656,10 @@ function renderDetail(){
       prod.title="Double-click to pick a different product";
       prod.ondblclick=e=>{ e.stopPropagation(); openProductPicker(r,prod); };
     }
+    // Move this stone line to another job (e.g. split it out of the Ghost Job).
+    const mvb=$("span","pencil movejob"); mvb.textContent="⇄"; mvb.title="Move this stone line to another job";
+    mvb.onclick=e=>{ e.stopPropagation(); openJobPicker(r,mvb); };
+    nmrow.appendChild(mvb);
     prod.appendChild(nmrow);
     // ── Section 1: Product · Scope · Status · Price ──
     line.appendChild(prod);

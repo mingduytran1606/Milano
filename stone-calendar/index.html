@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Milano — Stone Order Calendar</title>
+<script src="https://milano.getgrist.com/grist-plugin-api.js"></script>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --ink:#1d2733; --muted:#6b7683;
+    --line:#e2e5ea; --line2:#eef1f4;
+    --accent:#16b378; --accent-soft:#eafaf2; --accent-ink:#0f7a52;
+    --danger:#e5484d;
+    --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.10);
+    --radius:14px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{ --bg:#12161b; --panel:#1a1f26; --ink:#e8edf2; --muted:#9aa6b2;
+      --line:#2a323b; --line2:#232a32;
+      --accent:#35c993; --accent-soft:#173a30; --accent-ink:#7ee0bd; --shadow:0 1px 2px rgba(0,0,0,.4);}
+  }
+  :root[data-theme="light"]{ --bg:#f6f7f9; --panel:#ffffff; --ink:#1d2733; --muted:#6b7683;
+    --line:#e2e5ea; --line2:#eef1f4; --accent:#16b378; --accent-soft:#eafaf2; --accent-ink:#0f7a52;}
+  :root[data-theme="dark"]{ --bg:#12161b; --panel:#1a1f26; --ink:#e8edf2; --muted:#9aa6b2;
+    --line:#2a323b; --line2:#232a32; --accent:#35c993; --accent-soft:#173a30; --accent-ink:#7ee0bd;}
+
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .app{height:100%;display:flex;flex-direction:column;padding:14px;gap:12px}
+
+  /* ---- top bar ---- */
+  .topbar{flex:0 0 auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .nav{display:flex;align-items:center;gap:6px}
+  .navbtn{width:32px;height:32px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+    cursor:pointer;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center}
+  .navbtn:hover{border-color:var(--accent);color:var(--accent-ink)}
+  .title{font-size:18px;font-weight:800;letter-spacing:.2px;min-width:170px}
+  .today{font:inherit;font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:9px;border:1px solid var(--line);
+    background:var(--panel);color:var(--ink);cursor:pointer}
+  .today:hover{border-color:var(--accent);color:var(--accent-ink)}
+  .spacer{flex:1 1 auto}
+  .legend{display:flex;gap:8px}
+  .lg{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:5px 11px;border-radius:999px;
+    border:1px solid var(--line);background:var(--panel);color:var(--muted);cursor:pointer;user-select:none}
+  .lg .sw{width:11px;height:11px;border-radius:3px;flex:0 0 auto}
+  .lg.on{color:var(--ink);border-color:var(--accent)}
+  .lg.off{opacity:.5;text-decoration:line-through}
+  .lg .n{font-variant-numeric:tabular-nums;color:var(--muted)}
+
+  /* ---- calendar grid ---- */
+  .cal{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+  .dow{flex:0 0 auto;display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--line)}
+  .dow span{padding:8px 6px;text-align:center;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .grid{flex:1 1 auto;display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:1fr;overflow-y:auto}
+  .cell{border-right:1px solid var(--line2);border-bottom:1px solid var(--line2);min-height:104px;padding:5px 6px;
+    display:flex;flex-direction:column;gap:3px;overflow:hidden}
+  .cell:nth-child(7n){border-right:0}
+  .cell.out{background:var(--bg)}
+  .cell.out .dn{opacity:.4}
+  .cell.wknd{background:color-mix(in srgb,var(--bg) 55%,var(--panel))}
+  .drow{display:flex;align-items:center;gap:4px}
+  .dn{font-size:11.5px;font-weight:700;color:var(--muted);width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center}
+  .cell.today .dn{background:var(--accent);color:#fff;border-radius:50%}
+  .dsum{margin-left:auto;font-size:9.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+  .ev{font-size:10.5px;line-height:1.3;border-radius:6px;padding:2px 6px;cursor:pointer;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:5px}
+  .ev .dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
+  .ev b{font-weight:700}
+  .ev .who{color:var(--muted)}
+  .ev.ordered{background:#fdf6c8}
+  .ev.delivered{background:#dcf7d6}
+  @media (prefers-color-scheme:dark){ .ev.ordered{background:#3a380f} .ev.delivered{background:#173a24} }
+  :root[data-theme="dark"] .ev.ordered{background:#3a380f}
+  :root[data-theme="dark"] .ev.delivered{background:#173a24}
+  :root[data-theme="light"] .ev.ordered{background:#fdf6c8}
+  :root[data-theme="light"] .ev.delivered{background:#dcf7d6}
+  .more{font-size:10px;font-weight:600;color:var(--accent-ink);cursor:pointer;padding:1px 2px}
+  .more:hover{text-decoration:underline}
+
+  /* ---- day popover ---- */
+  .pop{position:fixed;z-index:60;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    box-shadow:0 14px 36px rgba(16,24,40,.24);padding:10px 12px;min-width:240px;max-width:320px;max-height:70vh;overflow:auto}
+  .pop[hidden]{display:none}
+  .pop h4{margin:0 0 8px;font-size:12px;font-weight:800}
+  .pev{padding:7px 0;border-top:1px solid var(--line2)}
+  .pev:first-of-type{border-top:0}
+  .pev .pline{display:flex;align-items:center;gap:6px}
+  .pev .kind{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;border-radius:5px;padding:1px 6px}
+  .pev .kind.ordered{background:#fdf6c8;color:#7a5c00}
+  .pev .kind.delivered{background:#dcf7d6;color:#0f7a52}
+  .pev .pname{font-weight:700;font-size:12.5px}
+  .pev .pmeta{font-size:11.5px;color:var(--muted);margin-top:2px}
+
+  .demo-tag{position:fixed;bottom:9px;left:11px;font-size:10px;color:var(--muted);background:var(--panel);
+    border:1px solid var(--line);border-radius:20px;padding:2px 9px;opacity:.75;z-index:40}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="nav">
+      <button class="navbtn" id="prev" title="Previous month">‹</button>
+      <button class="navbtn" id="next" title="Next month">›</button>
+    </div>
+    <div class="title" id="title">—</div>
+    <button class="today" id="todayBtn">Today</button>
+    <div class="spacer"></div>
+    <div class="legend">
+      <span class="lg on" id="lgOrdered"><span class="sw" style="background:#f2df3a"></span>Ordered <span class="n" id="nOrdered">0</span></span>
+      <span class="lg on" id="lgDelivered"><span class="sw" style="background:#7ad66f"></span>Delivered <span class="n" id="nDelivered">0</span></span>
+    </div>
+  </div>
+  <div class="cal">
+    <div class="dow" id="dow"></div>
+    <div class="grid" id="grid"></div>
+  </div>
+</div>
+
+<div class="pop" id="dayPop" hidden></div>
+<div class="demo-tag" id="demoTag" hidden>demo data</div>
+
+<script>
+"use strict";
+/* ============================================================
+   Milano — Stone Order Calendar widget
+   Plots each Stone_Order line on a month calendar:
+     • ordered but not delivered  → placed on its ORDER date
+     • delivered                  → placed on its DELIVERY date
+   Shares the Inbox / Catalogue foundation: design tokens, the
+   Order_Status model, and the Grist read plumbing.
+   ============================================================ */
+
+// ---- status model ----
+const ORD_DEFAULT = {
+  "2.  Placed Order":"#FEF47A","3. Awaiting Order":"#FED6FB","6. Delivered":"#98FD90",
+  "4. Awaiting Pickup":"#75B5FC","7. Not Delivered Yet":"#CCFEFE","5. On hold":"#FEE7C3",
+  "1. No Stock":"#FD8182","Cancelled":"#DCDCDC","Delivered by WF":"#E1FEDE",
+  "Delivered by Aboda":"#E1FEDE","Delivered by Client":"#E1FEDE","Return":"#CCFEFE","N/A":"#e9edf1"};
+const ORD_C = Object.assign({}, ORD_DEFAULT);
+const statusColor = s => ORD_C[s] || "#e9edf1";
+const statusLabel = s => (s==null||s==="") ? "To sort" : s;
+const SPECIAL_COL = /^(manualSort|gristHelper_|id$)/;
+function isDeliveredStatus(r){ const low=String(r.Order_Status||"").toLowerCase(); return /deliver/.test(low) && !/not deliver/.test(low); }
+
+// ---- generic helpers ----
+const $=(t,c,txt)=>{const e=document.createElement(t); if(c)e.className=c; if(txt!=null)e.textContent=txt; return e;};
+function refId(v){ if(v==null)return null; if(typeof v==="number")return v;
+  if(Array.isArray(v))return v[2]; if(typeof v==="object")return v.rowId!=null?v.rowId:v.id; return v; }
+function toDate(v){ if(v==null||v==="")return null;
+  if(typeof v==="number")return new Date(v*1000);
+  if(v instanceof Date)return v; const d=new Date(v); return isNaN(d)?null:d; }
+function fmtDMY(v){ const d=toDate(v); if(!d)return "—";
+  return String(d.getDate()).padStart(2,"0")+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+d.getFullYear(); }
+const num=v=>{ const n=Number(v); return isFinite(n)?n:0; };
+function ymd(d){ return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate(); }
+function columnarToRows(t){ if(!t||!t.id)return []; return t.id.map((id,i)=>{const o={id}; for(const k in t)if(k!=="id")o[k]=t[k][i]; return o;}); }
+
+const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DOW=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+// ---- state ----
+const state={
+  stone:[], jobs:[], catalogue:[], grist:false,
+  ref:{ product:null },
+  y:null, m:null,                       // viewed year / month (0-11)
+  show:{ ordered:true, delivered:true },
+  jobById:{}, catById:{}
+};
+window._stonecal=state;
+
+// ---- lookups ----
+function reindex(){ state.jobById={}; state.jobs.forEach(j=>state.jobById[j.id]=j);
+  state.catById={}; state.catalogue.forEach(c=>state.catById[c.id]=c); }
+function jobFor(r){ return state.jobById[refId(r.Job)]||null; }
+function catFor(r){ return state.catById[refId(r.Product)]||null; }
+function stoneLabel(r){ const c=catFor(r);
+  if(c && c.Product_Full && String(c.Product_Full).trim()) return String(c.Product_Full).trim();
+  if(r.Product_Code) return [r.Product_Supplier,r.Product_Code].filter(Boolean).join(" · ");
+  return r.Product_Supplier || r.Stone || "Stone"; }
+function jobClient(j){ return j ? ((String(j.Client_Label||"")).trim() || (String(j.Job_Address||"")).trim() || j.Job_ID || ("#"+j.id)) : "—"; }
+function jobCode(j){ return j ? (j.Job_ID || ("#"+j.id)) : ""; }
+
+// Map a stone line to its calendar date per the rule:
+// delivered → delivery date; otherwise (ordered/pending) → order date.
+function calDateOf(r){
+  if(isDeliveredStatus(r) && toDate(r.Delivery_Date)) return { date:toDate(r.Delivery_Date), kind:"delivered" };
+  if(toDate(r.Order_Date)) return { date:toDate(r.Order_Date), kind:"ordered" };
+  return null;
+}
+// All events in the currently viewed month, indexed by ymd.
+function eventsByDay(){
+  const map={}, counts={ordered:0,delivered:0};
+  (state.stone||[]).forEach(r=>{
+    const cd=calDateOf(r); if(!cd) return;
+    if(cd.date.getFullYear()!==state.y || cd.date.getMonth()!==state.m) return;
+    counts[cd.kind]++;
+    if(!state.show[cd.kind]) return;
+    const k=ymd(cd.date);
+    (map[k]=map[k]||[]).push({r, kind:cd.kind, date:cd.date});
+  });
+  return { map, counts };
+}
+
+// ============================================================
+//  RENDER
+// ============================================================
+function render(){
+  reindex();
+  document.getElementById("demoTag").hidden=state.grist;
+  document.getElementById("title").textContent=MONTHS[state.m]+" "+state.y;
+  const dow=document.getElementById("dow"); dow.innerHTML=""; DOW.forEach(d=>dow.appendChild($("span",null,d)));
+
+  const { map, counts } = eventsByDay();
+  document.getElementById("nOrdered").textContent=counts.ordered;
+  document.getElementById("nDelivered").textContent=counts.delivered;
+  document.getElementById("lgOrdered").classList.toggle("off",!state.show.ordered);
+  document.getElementById("lgOrdered").classList.toggle("on",state.show.ordered);
+  document.getElementById("lgDelivered").classList.toggle("off",!state.show.delivered);
+  document.getElementById("lgDelivered").classList.toggle("on",state.show.delivered);
+
+  const grid=document.getElementById("grid"); grid.innerHTML="";
+  const first=new Date(state.y,state.m,1);
+  const offset=(first.getDay()+6)%7;                 // Monday-first
+  const start=new Date(state.y,state.m,1-offset);
+  const todayK=ymd(new Date());
+  for(let i=0;i<42;i++){
+    const d=new Date(start.getFullYear(),start.getMonth(),start.getDate()+i);
+    const inMonth=d.getMonth()===state.m;
+    const wknd=(d.getDay()===0||d.getDay()===6);
+    const cell=$("div","cell"+(inMonth?"":" out")+(wknd?" wknd":"")+(ymd(d)===todayK?" today":""));
+    const drow=$("div","drow");
+    drow.appendChild($("span","dn",String(d.getDate())));
+    const evs=(map[ymd(d)]||[]).slice().sort((a,b)=>(a.kind===b.kind?0:a.kind==="ordered"?-1:1));
+    if(evs.length) drow.appendChild($("span","dsum",String(evs.length)));
+    cell.appendChild(drow);
+
+    const CAP=4;
+    evs.slice(0,CAP).forEach(e=>cell.appendChild(eventChip(e)));
+    if(evs.length>CAP){ const more=$("div","more","+"+(evs.length-CAP)+" more");
+      more.onclick=ev=>{ ev.stopPropagation(); openDay(d,evs,more); }; cell.appendChild(more); }
+    if(evs.length) cell.onclick=()=>openDay(d,evs,cell);
+    grid.appendChild(cell);
+  }
+}
+function eventChip(e){
+  const r=e.r, j=jobFor(r);
+  const chip=$("div","ev "+e.kind);
+  const dot=$("span","dot"); dot.style.background=statusColor(r.Order_Status); chip.appendChild(dot);
+  chip.appendChild($("b",null,jobClient(j)));
+  chip.appendChild($("span","who"," · "+stoneLabel(r)));
+  chip.title=(e.kind==="delivered"?"Delivered ":"Ordered ")+fmtDMY(e.date)+"\n"+jobClient(j)+" ("+jobCode(j)+")\n"+stoneLabel(r)
+    +"\nStatus: "+statusLabel(r.Order_Status)+" · Ord "+num(r.Ordered_Qty)+" / Deliv "+num(r.Delivery_Qty);
+  chip.onclick=ev=>{ ev.stopPropagation(); openDay(e.date,[e],chip); };
+  return chip;
+}
+function openDay(d,evs,anchor){
+  const m=document.getElementById("dayPop"); m.innerHTML="";
+  m.appendChild($("h4",null,DOW[(d.getDay()+6)%7]+" "+d.getDate()+" "+MONTHS[d.getMonth()]+" "+d.getFullYear()));
+  evs.forEach(e=>{
+    const r=e.r, j=jobFor(r);
+    const pev=$("div","pev");
+    const line=$("div","pline");
+    const k=$("span","kind "+e.kind, e.kind==="delivered"?"Delivered":"Ordered"); line.appendChild(k);
+    line.appendChild($("span","pname",jobClient(j)));
+    pev.appendChild(line);
+    pev.appendChild($("div","pmeta",stoneLabel(r)+" · "+jobCode(j)));
+    pev.appendChild($("div","pmeta","Status "+statusLabel(r.Order_Status)+" · Ordered "+num(r.Ordered_Qty)+" · Delivered "+num(r.Delivery_Qty)
+      +(e.kind==="delivered"?(" · Delivered "+fmtDMY(r.Delivery_Date)):(" · Ordered "+fmtDMY(r.Order_Date)))));
+    m.appendChild(pev);
+  });
+  closePops(); m.hidden=false; positionPop(m,anchor,300);
+}
+function positionPop(el,anchor,w){
+  const rc=anchor.getBoundingClientRect();
+  el.style.left=Math.max(8,Math.min(rc.left,window.innerWidth-(w||260)-12))+"px";
+  const below=rc.bottom+6, h=el.offsetHeight||280;
+  el.style.top=(below+h>window.innerHeight-8 ? Math.max(8,rc.top-h-6) : below)+"px";
+}
+function closePops(){ const e=document.getElementById("dayPop"); if(e)e.hidden=true; }
+
+// ============================================================
+//  SCHEMA + DATA (live)
+// ============================================================
+async function loadGristSchema(){
+  const [T,C]=await Promise.all([grist.docApi.fetchTable("_grist_Tables"), grist.docApi.fetchTable("_grist_Tables_column")]);
+  const tables=columnarToRows(T), cols=columnarToRows(C);
+  const tableById={}; tables.forEach(t=>tableById[t.tableId]=t);
+  const colByRowId={}; cols.forEach(c=>colByRowId[c.id]=c);
+  const colsOf=tid=>{ const t=tableById[tid]; return t?cols.filter(c=>c.parentId===t.id):[]; };
+  const isEditable=c=>!c.isFormula && c.colId && !SPECIAL_COL.test(c.colId);
+  const bestLabelCol=tid=>{ const cs=colsOf(tid).filter(isEditable);
+    return ((cs.find(c=>/full|name|title|label|desc/i.test(c.colId))||cs.find(c=>(c.type||"").startsWith("Text"))||cs[0]||{}).colId)||null; };
+  function refInfo(parentTableId,colId){
+    const col=colsOf(parentTableId).find(c=>c.colId===colId); if(!col)return null;
+    const mt=/^Ref(?:List)?:(.+)$/.exec(col.type||""); if(!mt)return null;
+    const targetTableId=mt[1], vis=col.visibleCol&&colByRowId[col.visibleCol];
+    return { colId, targetTableId, labelCol:(vis&&vis.colId)||bestLabelCol(targetTableId) };
+  }
+  return { refInfo };
+}
+async function pullTables(){
+  const [so,jd]=await Promise.all([grist.docApi.fetchTable("Stone_Order"), grist.docApi.fetchTable("Jobs_Detail")]);
+  state.stone=columnarToRows(so); state.jobs=columnarToRows(jd);
+  if(state.ref.product){ try{ const cat=await grist.docApi.fetchTable(state.ref.product.targetTableId); state.catalogue=columnarToRows(cat); }catch(e){} }
+  reindex();
+}
+async function refetch(){ if(!state.grist)return; try{ await pullTables(); }catch(e){ console.warn("fetch failed",e); } render(); }
+
+if(typeof grist!=="undefined"){
+  try{ grist.ready({ requiredAccess:"full" }); }catch(e){}
+  try{ grist.onRecord(()=>{}); }catch(e){}
+  grist.docApi.fetchTable("Stone_Order").then(async ()=>{
+    try{ const sc=await loadGristSchema(); state.ref.product=sc.refInfo("Stone_Order","Product"); }catch(e){ console.warn("schema failed",e); }
+    try{ await pullTables(); }catch(e){ console.warn("initial fetch failed",e); }
+    state.grist=true; render();
+  }).catch(()=>{});
+}
+
+// ============================================================
+//  SAMPLE DATA (standalone / preview)
+// ============================================================
+const SAMPLE_JOBS=[
+  { id:2,  Job_ID:"J0002", Client_Label:"Annie",       Job_Address:"31 Harridge St, Rosebud VIC 3939" },
+  { id:8,  Job_ID:"J0008", Client_Label:"Home owner",  Job_Address:"1/162 Kambrook Rd, Caulfield North VIC 3161" },
+  { id:14, Job_ID:"J0014", Client_Label:"Harry Aboda", Job_Address:"105 Point Nepean Rd, Dromana VIC 3936" },
+  { id:19, Job_ID:"J0019", Client_Label:"Naz",         Job_Address:"19 Stephens St, Balwyn North VIC 3104" },
+  { id:23, Job_ID:"J0023", Client_Label:"Louis",       Job_Address:"11 Banksia Ct, Croydon South VIC 3136" }
+];
+const SAMPLE_CAT=[
+  {id:101,Supplier:"Lavistone",  Code:"LS303", Product_Full:"Lavistone · LS303 · Cararra Lux 20mm"},
+  {id:102,Supplier:"YDL",        Code:"1888",  Product_Full:"YDL · 1888 · Kalala Bianco 20mm"},
+  {id:103,Supplier:"Caesarstone",Code:"CS5100",Product_Full:"Caesarstone · CS5100 · Vanilla Noir 20mm"},
+  {id:104,Supplier:"Lavistone",  Code:"LSU401",Product_Full:"Lavistone · LSU401 · Taj Classico 20mm"},
+  {id:107,Supplier:"WF",         Code:"3420",  Product_Full:"WF · Marble · Biancatto 20mm"}
+];
+// Dates chosen around July 2026 so the sample month is populated.
+const D=(y,m,d)=>Math.floor(Date.UTC(y,m-1,d)/1000);
+const SAMPLE_STONE=[
+  { id:1, Job:2,  Product:101, Product_Code:"LS303", Product_Supplier:"Lavistone",  Ordered_Qty:2, Delivery_Qty:2, Order_Status:"6. Delivered",     Order_Date:D(2026,7,5),  Delivery_Date:D(2026,7,18) },
+  { id:2, Job:8,  Product:102, Product_Code:"1888",  Product_Supplier:"YDL",        Ordered_Qty:2, Delivery_Qty:0, Order_Status:"2.  Placed Order",  Order_Date:D(2026,7,9),  Delivery_Date:null },
+  { id:3, Job:8,  Product:103, Product_Code:"CS5100",Product_Supplier:"Caesarstone",Ordered_Qty:2, Delivery_Qty:0, Order_Status:"7. Not Delivered Yet",Order_Date:D(2026,7,9), Delivery_Date:null },
+  { id:5, Job:14, Product:107, Product_Code:"3420",  Product_Supplier:"WF",         Ordered_Qty:8, Delivery_Qty:0, Order_Status:"4. Awaiting Pickup", Order_Date:D(2026,7,15), Delivery_Date:null },
+  { id:6, Job:19, Product:104, Product_Code:"LSU401",Product_Supplier:"Lavistone",  Ordered_Qty:4, Delivery_Qty:4, Order_Status:"6. Delivered",     Order_Date:D(2026,7,2),  Delivery_Date:D(2026,7,22) },
+  { id:8, Job:23, Product:101, Product_Code:"LS303", Product_Supplier:"Lavistone",  Ordered_Qty:5, Delivery_Qty:5, Order_Status:"6. Delivered",     Order_Date:D(2026,6,28), Delivery_Date:D(2026,7,10) },
+  { id:9, Job:23, Product:104, Product_Code:"LSU401",Product_Supplier:"Lavistone",  Ordered_Qty:2, Delivery_Qty:0, Order_Status:"3. Awaiting Order", Order_Date:D(2026,7,24), Delivery_Date:null }
+];
+const DEMO_REF={ product:{ targetTableId:"Catalogue", labelCol:"Product_Full" } };
+window._test=function(stone,jobs,catalogue,y,m){
+  state.stone=stone||[]; state.jobs=jobs||[]; state.catalogue=catalogue||[];
+  if(y!=null){ state.y=y; state.m=m; } reindex(); render();
+};
+
+// ============================================================
+//  BOOT
+// ============================================================
+function go(delta){ let m=state.m+delta, y=state.y; if(m<0){m=11;y--;} if(m>11){m=0;y++;} state.m=m; state.y=y; render(); }
+document.getElementById("prev").onclick=()=>go(-1);
+document.getElementById("next").onclick=()=>go(1);
+document.getElementById("todayBtn").onclick=()=>{ const t=new Date(); state.y=t.getFullYear(); state.m=t.getMonth(); render(); };
+document.getElementById("lgOrdered").onclick=()=>{ state.show.ordered=!state.show.ordered; render(); };
+document.getElementById("lgDelivered").onclick=()=>{ state.show.delivered=!state.show.delivered; render(); };
+document.getElementById("dayPop").onclick=e=>e.stopPropagation();
+document.addEventListener("click",closePops);
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closePops(); });
+
+{ const t=new Date(); state.y=t.getFullYear(); state.m=t.getMonth(); }
+if(!state.ref.product) state.ref.product=DEMO_REF.product;
+// sample-first so the grid is never blank; live wiring above flips + replaces it.
+window._test(SAMPLE_STONE,SAMPLE_JOBS,SAMPLE_CAT);
+</script>
+</body>
+</html>

@@ -90,6 +90,8 @@
   .section-h .st{font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink)}
   .section-h .sc{font-size:11px;font-weight:700;color:var(--accent-ink);background:var(--accent-soft);border-radius:999px;padding:1px 8px}
   .section-h .ssub{font-size:11.5px;color:var(--muted)}
+  .view-sub{font-size:11.5px;color:var(--muted);margin:-2px 0 8px 2px}
+  .hro{font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink);padding:3px 2px;text-align:right}
 
   .prod-head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
   .prof-life{margin-top:12px;display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
@@ -127,6 +129,12 @@
   .htbl-head{background:var(--bg);border-bottom:1px solid var(--line);border-radius:12px 12px 0 0}
   .htbl-head .hh{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);white-space:nowrap}
   .htbl-head .hh.n{text-align:right}
+  /* month sub-header inside a grouped table (Status Summary) */
+  .hmonth{display:flex;align-items:center;gap:10px;padding:7px 12px;background:var(--accent-soft);
+    border-top:1px solid var(--line);border-bottom:1px solid var(--line2)}
+  .hmonth .hm-name{font-weight:700;font-size:12px;color:var(--accent-ink)}
+  .hmonth .hm-sum{display:flex;gap:12px;font-size:11.5px;color:var(--muted);margin-left:4px}
+  .hmonth .hm-sum b{color:var(--ink);font-variant-numeric:tabular-nums}
   .hrow{border-top:1px solid var(--line2)}
   .hrow:hover{background:var(--line2)}
   .hjob{display:flex;align-items:center;gap:7px;min-width:0}
@@ -158,7 +166,25 @@
   .cprow:hover,.cprow.on{background:var(--line2)}
   .cprow .rtick{margin-left:auto;color:var(--accent-ink);font-weight:800}
 
-  .demo-tag{position:fixed;bottom:9px;right:11px;font-size:10px;color:var(--muted);background:var(--panel);
+  /* ---------- floating column config ---------- */
+  .cfg-fab{position:fixed;bottom:16px;right:16px;z-index:45;width:36px;height:36px;border-radius:50%;
+    border:1px solid var(--line);background:var(--panel);color:var(--muted);cursor:pointer;font-size:16px;
+    box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center}
+  .cfg-fab:hover{color:var(--ink);border-color:var(--accent)}
+  .cfgpop{min-width:252px}
+  .cfg-h{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:4px 6px 8px}
+  .cfgrow{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:8px}
+  .cfgrow:hover{background:var(--line2)}
+  .cfgrow .ck{display:flex;align-items:center;gap:8px;flex:1 1 auto;cursor:pointer;font-size:12.5px}
+  .cfgrow .ck input{accent-color:var(--accent)}
+  .cfgrow .mv{color:var(--muted);cursor:pointer;padding:0 5px;border-radius:5px;font-size:13px;user-select:none}
+  .cfgrow .mv:hover{background:var(--line);color:var(--ink)}
+  .cfgrow .mv.off{opacity:.22;pointer-events:none}
+  .cfg-foot{border-top:1px solid var(--line2);margin-top:6px;padding-top:5px}
+  .cfg-reset{font:inherit;font-size:12px;color:var(--accent-ink);background:none;border:0;cursor:pointer;padding:5px 7px}
+  .cfg-reset:hover{text-decoration:underline}
+
+  .demo-tag{position:fixed;bottom:9px;left:11px;font-size:10px;color:var(--muted);background:var(--panel);
     border:1px solid var(--line);border-radius:20px;padding:2px 9px;opacity:.75;z-index:40}
 </style>
 </head>
@@ -181,7 +207,9 @@
   <div class="detail-pane" id="detail"></div>
 </div>
 
+<button class="cfg-fab" id="cfgBtn" title="Configure table columns">&#9881;</button>
 <div class="pop" id="choicePop" hidden></div>
+<div class="pop" id="cfgPop" hidden></div>
 <div class="demo-tag" id="demoTag" hidden>demo data</div>
 
 <script>
@@ -256,12 +284,12 @@ const LSKEY="milano_catalogue_prefs_v1";
 const state={
   stone:[], jobs:[], catalogue:[], grist:false,
   ref:{ product:null },
-  q:"", selectedCatId:null, selectedMonth:null, searchW:null,
+  q:"", selectedCatId:null, selectedMonth:null, statusView:"active", searchW:null, colCfg:null,
   jobById:{}, catById:{}, ordersByCat:{}
 };
 window._catsearch=state;
 function loadPrefs(){ try{ return JSON.parse(localStorage.getItem(LSKEY))||{}; }catch(e){ return {}; } }
-function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ searchW:state.searchW })); }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ searchW:state.searchW, colCfg:state.colCfg })); }catch(e){} }
 
 // ---- lookups ----
 function reindex(){
@@ -382,12 +410,29 @@ function renderDetail(){
   s1.appendChild(life);
   app.appendChild(s1);
 
-  // ═══ Section 2 — Active orders (placed & awaiting delivery, any month) ═══
+  // ═══ Section 2 — Status Summary (pills switch the status view; grouped by date) ═══
   const s2=$("div","section");
-  const active=allOrders.filter(isActiveOrder).slice().sort(byDateDesc);
-  s2.appendChild(sectionHead("Active orders","placed & awaiting delivery",active.length));
-  if(!active.length) s2.appendChild($("div","hist-none","No active orders — nothing placed and awaiting delivery."));
-  else s2.appendChild(orderTable(active));
+  s2.appendChild(sectionHead("Status summary",null,null));
+  const VIEWS=[
+    { key:"active",    label:"Active order", sub:"placed & awaiting delivery", filter:isActiveOrder,       dateField:"Order_Date",    empty:"No active orders — nothing placed and awaiting delivery." },
+    { key:"delivered", label:"Delivered",    sub:"grouped by delivery date",   filter:isDeliveredStatus,   dateField:"Delivery_Date", empty:"Nothing delivered for this product yet." }
+  ];
+  let sv=state.statusView; if(!VIEWS.some(v=>v.key===sv)) sv="active"; state.statusView=sv;
+  const svrow=$("div","mrow");
+  VIEWS.forEach(v=>{
+    const rows=allOrders.filter(v.filter);
+    const p=$("button","mpill"+(sv===v.key?" on":"")+(rows.length?"":" empty"));
+    p.appendChild($("span","mp-name",v.label));
+    if(rows.length) p.appendChild($("span","mp-n",String(rows.length)));
+    p.onclick=()=>{ state.statusView=v.key; renderDetail(); };
+    svrow.appendChild(p);
+  });
+  s2.appendChild(svrow);
+  const view=VIEWS.find(v=>v.key===sv);
+  const svRows=allOrders.filter(view.filter);
+  if(view.sub) s2.appendChild($("div","view-sub",view.sub));
+  if(!svRows.length) s2.appendChild($("div","hist-none",view.empty));
+  else s2.appendChild(groupedOrderTable(svRows, view.dateField));
   app.appendChild(s2);
 
   // ═══ Section 3 — Order history by month ═══
@@ -444,15 +489,100 @@ function renderDetail(){
   app.appendChild(s3);
 }
 
-// Shared one-line order table (used by Active orders + monthly history).
+// ---- column-config-driven one-line order table ----
+// The visible set + order come from state.colCfg (edited in the floating config panel).
+const COL_DEFS={
+  client:   {label:"Client",        w:"minmax(160px,1.6fr)", min:160, build:clientCell},
+  status:   {label:"Status",        w:"148px",               min:148, build:r=>pill(r.Order_Status||"",ORD_C,{options:ORDS,xs:true,onchange:v=>update(r.id,{Order_Status:v})})},
+  ord:      {label:"Ord",  num:true, w:"52px",  min:52,  build:r=>numCell(r,"Ordered_Qty",true,x=>num(x.Ordered_Qty)<num(x.Scope_Qty))},
+  orderdate:{label:"Order date",     w:"124px", min:124, build:r=>dateCell(r,"Order_Date")},
+  deliv:    {label:"Deliv", num:true, w:"52px",  min:52, build:r=>numCell(r,"Delivery_Qty",true,x=>num(x.Delivery_Qty)<num(x.Ordered_Qty))},
+  delivdate:{label:"Delivery date",  w:"124px", min:124, build:r=>dateCell(r,"Delivery_Date")},
+  inv:      {label:"INV",            w:"84px",  min:84,  build:r=>textCell(r,"INV","—")},
+  note:     {label:"Note",           w:"minmax(120px,1.3fr)", min:120, build:r=>textCell(r,"Note","Note…")},
+  scope:    {label:"Scope", num:true, w:"54px", min:54,  build:r=>numCell(r,"Scope_Qty",false)},
+  price:    {label:"$/slab",num:true, w:"74px", min:74,  build:priceCell}
+};
+const COL_ORDER=["client","status","ord","orderdate","deliv","delivdate","inv","note","scope","price"];
+const COL_DEFAULT_ON={client:1,status:1,ord:1,orderdate:1,deliv:1,delivdate:1,inv:1,note:1,scope:0,price:0};
+function defaultColCfg(){ return COL_ORDER.map(k=>({key:k,on:!!COL_DEFAULT_ON[k]})); }
+function ensureColCfg(){
+  if(!Array.isArray(state.colCfg)) state.colCfg=defaultColCfg();
+  state.colCfg=state.colCfg.filter(c=>c&&COL_DEFS[c.key]);          // drop unknown keys
+  COL_ORDER.forEach(k=>{ if(!state.colCfg.some(c=>c.key===k)) state.colCfg.push({key:k,on:!!COL_DEFAULT_ON[k]}); });
+  return state.colCfg;
+}
+function visibleCols(){ const v=ensureColCfg().filter(c=>c.on).map(c=>c.key); return v.length?v:["client","status"]; }
+function gridTemplate(vis){ return vis.map(k=>COL_DEFS[k].w).join(" "); }
+function minWidthOf(vis){ return vis.reduce((s,k)=>s+COL_DEFS[k].min,0)+9*(vis.length-1)+24; }
+function headerRow(vis,tpl){ const h=$("div","hgridrow htbl-head"); h.style.gridTemplateColumns=tpl;
+  vis.forEach(k=>{ const d=COL_DEFS[k]; h.appendChild($("span","hh"+(d.num?" n":""),d.label)); }); return h; }
+function orderRow(r,vis,tpl){ const row=$("div","hgridrow hrow"); row.style.gridTemplateColumns=tpl;
+  vis.forEach(k=>row.appendChild(COL_DEFS[k].build(r))); return row; }
+function clientCell(r){ const j=jobFor(r); const d=$("div","hjob");
+  if(j){ d.appendChild($("span","jclient",jobClient(j)));
+    if(jobAddr(j)){ const a=$("span","jaddr",jobAddr(j)); a.title=jobAddr(j); d.appendChild(a); } }
+  else d.appendChild($("span","jaddr","No job linked"));
+  return d; }
+function priceCell(r){ const c=catFor(r);
+  const v=(r.Product_Price_slab!=null&&r.Product_Price_slab!=="")?r.Product_Price_slab:(c?c.Price_Slab:0);
+  return $("div","hro","$"+(v!=null&&v!==""?v:0)); }
+
+// Flat table (one month already chosen) — used by the monthly history section.
 function orderTable(rows){
-  const wrap=$("div","htbl-wrap"); const tbl=$("div","htbl");
-  const thead=$("div","hgridrow htbl-head");
-  [["Job / client",""],["Status",""],["Ord","n"],["Order date",""],["Deliv","n"],["Delivery date",""],["INV",""],["Note",""]]
-    .forEach(([t,cls])=>thead.appendChild($("span","hh"+(cls?" "+cls:""),t)));
-  tbl.appendChild(thead);
-  rows.forEach(r=>tbl.appendChild(historyRow(r)));
+  const vis=visibleCols(), tpl=gridTemplate(vis);
+  const wrap=$("div","htbl-wrap"); const tbl=$("div","htbl"); tbl.style.minWidth=minWidthOf(vis)+"px";
+  tbl.appendChild(headerRow(vis,tpl));
+  rows.forEach(r=>tbl.appendChild(orderRow(r,vis,tpl)));
   wrap.appendChild(tbl); return wrap;
+}
+// Table split into month sub-sections by `dateField`, each with a subtotal.
+function groupedOrderTable(rows,dateField){
+  const vis=visibleCols(), tpl=gridTemplate(vis);
+  const groups=[]; const gmap={};
+  rows.forEach(r=>{ const k=monthKeyByField(r,dateField); let g=gmap[k]; if(!g){g={key:k,rows:[]};gmap[k]=g;groups.push(g);} g.rows.push(r); });
+  groups.forEach(g=>g.rows.sort((a,b)=>{ const da=+toDate(a[dateField])||0, db=+toDate(b[dateField])||0; return db-da||(b.id||0)-(a.id||0); }));
+  groups.sort((a,b)=>{ if(a.key==null)return 1; if(b.key==null)return -1; return b.key-a.key; });
+  const wrap=$("div","htbl-wrap"); const tbl=$("div","htbl"); tbl.style.minWidth=minWidthOf(vis)+"px";
+  tbl.appendChild(headerRow(vis,tpl));
+  groups.forEach(g=>{
+    const ord=g.rows.reduce((s,r)=>s+num(r.Ordered_Qty),0);
+    const del=g.rows.reduce((s,r)=>s+num(r.Delivery_Qty),0);
+    const mb=$("div","hmonth");
+    mb.appendChild($("span","hm-name",monthLabelOf(g.key)));
+    const sum=$("span","hm-sum");
+    sum.appendChild($("span",null,g.rows.length+" order"+(g.rows.length===1?"":"s")));
+    const so=$("span"); so.appendChild(document.createTextNode("ordered ")); so.appendChild($("b",null,String(ord))); sum.appendChild(so);
+    const sd=$("span"); sd.appendChild(document.createTextNode("delivered ")); sd.appendChild($("b",null,String(del))); sum.appendChild(sd);
+    mb.appendChild(sum);
+    tbl.appendChild(mb);
+    g.rows.forEach(r=>tbl.appendChild(orderRow(r,vis,tpl)));
+  });
+  wrap.appendChild(tbl); return wrap;
+}
+// ---- floating column configuration ----
+function openConfig(){
+  const m=document.getElementById("cfgPop"); m.className="pop cfgpop"; m.innerHTML="";
+  m.appendChild($("div","cfg-h","Table columns — show & order"));
+  const cfg=ensureColCfg();
+  cfg.forEach((cc,i)=>{
+    const row=$("div","cfgrow");
+    const lab=document.createElement("label"); lab.className="ck";
+    const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=cc.on;
+    cb.onchange=()=>{ cc.on=cb.checked; savePrefs(); render(); };
+    lab.appendChild(cb); lab.appendChild(document.createTextNode(COL_DEFS[cc.key].label));
+    row.appendChild(lab);
+    const up=$("span","mv"+(i===0?" off":""),"↑");
+    up.onclick=()=>{ if(i>0){ [cfg[i-1],cfg[i]]=[cfg[i],cfg[i-1]]; savePrefs(); render(); openConfig(); } };
+    const dn=$("span","mv"+(i===cfg.length-1?" off":""),"↓");
+    dn.onclick=()=>{ if(i<cfg.length-1){ [cfg[i+1],cfg[i]]=[cfg[i],cfg[i+1]]; savePrefs(); render(); openConfig(); } };
+    row.appendChild(up); row.appendChild(dn);
+    m.appendChild(row);
+  });
+  const foot=$("div","cfg-foot"); const rst=$("button","cfg-reset","Reset to default");
+  rst.onclick=()=>{ state.colCfg=defaultColCfg(); savePrefs(); render(); openConfig(); };
+  foot.appendChild(rst); m.appendChild(foot);
+  closePops(); m.hidden=false; positionPop(m,document.getElementById("cfgBtn"),252);
 }
 function sectionHead(title,sub,count){
   const h=$("div","section-h");
@@ -469,34 +599,14 @@ function isActiveOrder(r){ return ACTIVE_STATES.indexOf(String(r.Order_Status||"
 
 const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
 const MONTHS_SHORT=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-function monthKeyOf(r){ const d=toDate(r.Order_Date); if(!d) return null; return d.getFullYear()*100+(d.getMonth()+1); }
-function monthLabelOf(key){ if(key==null) return "No order date"; return MONTHS[(key%100)-1]+" "+Math.floor(key/100); }
+function monthKeyByField(r,field){ const d=toDate(r[field]); if(!d) return null; return d.getFullYear()*100+(d.getMonth()+1); }
+function monthKeyOf(r){ return monthKeyByField(r,"Order_Date"); }
+function monthLabelOf(key){ if(key==null) return "No date"; return MONTHS[(key%100)-1]+" "+Math.floor(key/100); }
 function monthPillLabel(key){ return MONTHS_SHORT[(key%100)-1]+" "+Math.floor(key/100); }
 function currentMonthKey(){ const d=new Date(); return d.getFullYear()*100+(d.getMonth()+1); }
 
 function stat(v,label){ const s=$("div","stat"); s.appendChild($("div","sv",String(v))); s.appendChild($("div","sl",label)); return s; }
 
-// One order = one line, aligned to the shared column grid.
-function historyRow(r){
-  const j=jobFor(r);
-  const row=$("div","hgridrow hrow");
-
-  const job=$("div","hjob");
-  if(j){ job.appendChild($("span","jobchip",jobCode(j)));
-    job.appendChild($("span","jclient",jobClient(j)));
-    if(jobAddr(j)){ const a=$("span","jaddr",jobAddr(j)); a.title=jobAddr(j); job.appendChild(a); }
-  } else job.appendChild($("span","jaddr","No job linked"));
-  row.appendChild(job);
-
-  row.appendChild(pill(r.Order_Status||"",ORD_C,{options:ORDS,xs:true,onchange:v=>update(r.id,{Order_Status:v})}));
-  row.appendChild(numCell(r,"Ordered_Qty",true,x=>num(x.Ordered_Qty)<num(x.Scope_Qty)));
-  row.appendChild(dateCell(r,"Order_Date"));
-  row.appendChild(numCell(r,"Delivery_Qty",true,x=>num(x.Delivery_Qty)<num(x.Ordered_Qty)));
-  row.appendChild(dateCell(r,"Delivery_Date"));
-  row.appendChild(textCell(r,"INV","—"));
-  row.appendChild(textCell(r,"Note","Note…"));
-  return row;
-}
 function numCell(r,col,auto,shortFn){
   const i=document.createElement("input"); i.type="number"; i.className="hcell-in"+(shortFn&&shortFn(r)?" short":"");
   i.value=(r[col]!=null?r[col]:"");
@@ -548,7 +658,7 @@ function positionPop(el,anchor,w){
   el.style.top=(below+h>window.innerHeight-8 ? Math.max(8,rc.top-h-6) : below)+"px";
   el.style.right="auto";
 }
-function closePops(){ const e=document.getElementById("choicePop"); if(e)e.hidden=true; }
+function closePops(){ ["choicePop","cfgPop"].forEach(id=>{const e=document.getElementById(id); if(e)e.hidden=true;}); }
 
 // ============================================================
 //  WRITE-BACK (demo mutates local state; live writes to Grist)
@@ -695,10 +805,14 @@ const qInput=document.getElementById("q");
 qInput.oninput=e=>{ state.q=e.target.value; state.selectedCatId=null; render(); };
 document.getElementById("qClr").onclick=()=>{ state.q=""; qInput.value=""; state.selectedCatId=null; render(); qInput.focus(); };
 document.getElementById("choicePop").onclick=e=>e.stopPropagation();
+document.getElementById("cfgPop").onclick=e=>e.stopPropagation();
+document.getElementById("cfgBtn").onclick=e=>{ e.stopPropagation();
+  const m=document.getElementById("cfgPop"); if(m.hidden) openConfig(); else m.hidden=true; };
 document.addEventListener("click",closePops);
 document.addEventListener("keydown",e=>{ if(e.key==="Escape") closePops(); });
 
-{ const p=loadPrefs(); if(p.searchW) state.searchW=p.searchW; }
+{ const p=loadPrefs(); if(p.searchW) state.searchW=p.searchW; if(Array.isArray(p.colCfg)) state.colCfg=p.colCfg; }
+ensureColCfg();
 initSplitter();
 // Sample-first so the pane is never blank; the live wiring above flips + replaces it.
 if(!state.ref.product) state.ref.product=DEMO_REF.product;

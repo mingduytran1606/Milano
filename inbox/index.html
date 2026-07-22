@@ -329,13 +329,13 @@
   .field .ro{color:var(--ink);font-weight:500}
   /* Sectioned grid: [Product Scope Status Price] | [Order qty · date] | [Deliv qty · date] | [Note]
      12 tracks — the three 1px tracks are the vertical dividers between sections. */
-  .stone-head{display:grid;grid-template-columns:minmax(140px,1.2fr) 48px 150px 64px 1px 48px 118px 1px 48px 118px 1px minmax(140px,1fr);gap:8px;padding:0 0 8px;align-items:end}
+  .stone-head{display:grid;grid-template-columns:minmax(140px,1.2fr) 48px 150px 64px 1px 48px 140px 1px 48px 140px 1px minmax(140px,1fr);gap:8px;padding:0 0 8px;align-items:end}
   .stonecard .card-body{overflow-x:auto}
-  .stonecard .stone-head,.stonecard .line{grid-template-columns:minmax(140px,1.2fr) 48px 150px 64px 1px 48px 118px 1px 48px 118px 1px minmax(140px,1fr);min-width:960px}
+  .stonecard .stone-head,.stonecard .line{grid-template-columns:minmax(140px,1.2fr) 48px 150px 64px 1px 48px 140px 1px 48px 140px 1px minmax(140px,1fr);min-width:1010px}
   .stone-head span{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
   .stone-head span.num{text-align:right}
   .stone-div{align-self:stretch;width:1px;background:var(--line2)}
-  .line{position:relative;display:grid;grid-template-columns:minmax(140px,1.2fr) 48px 150px 64px 1px 48px 118px 1px 48px 118px 1px minmax(140px,1fr);gap:8px;align-items:start;padding:11px 0;border-top:1px solid var(--line2)}
+  .line{position:relative;display:grid;grid-template-columns:minmax(140px,1.2fr) 48px 150px 64px 1px 48px 140px 1px 48px 140px 1px minmax(140px,1fr);gap:8px;align-items:start;padding:11px 0;border-top:1px solid var(--line2)}
   .line-del{position:absolute;top:4px;right:-2px;z-index:4;color:var(--danger);cursor:pointer;opacity:0;font-weight:700;font-size:14px;line-height:1;padding:1px 4px}
   .line:hover .line-del{opacity:.45}
   .line .line-del:hover{opacity:1}
@@ -345,14 +345,14 @@
   .line .prod{min-width:0;padding-top:5px}
   .line select.pill{max-width:100%}
   .line .statuscell{display:flex;flex-direction:column;gap:6px;align-items:flex-start;min-width:0;max-width:100%;padding-left:22px;margin-top:5px}
-  .stone-head span.status-h{padding-left:22px}
+  .stone-head span.status-h,.stone-head span.date-h{padding-left:22px}
   .line .statusdate{display:flex;flex-direction:column;gap:2px;width:100%}
   .line .sdline{font-size:11.5px;color:var(--muted);cursor:pointer;border-bottom:1px dashed transparent;align-self:flex-start}
   .line .sdline:hover{color:var(--ink);border-bottom-color:var(--line)}
   .line .statusdate input{font:inherit;font-size:12px;color:var(--ink);background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:4px 2px;max-width:100%}
   .line .statusdate input:focus{outline:none;border-bottom-color:var(--accent)}
   .line .statusage{font-size:11.5px;color:var(--muted);font-style:italic}
-  .line .ldate{margin-top:5px}
+  .line .ldate{margin-top:5px;padding-left:22px}
   .line .ldateinp{width:100%;max-width:118px;font:inherit;color:var(--ink);background:transparent;border:0;border-bottom:1px solid transparent;border-radius:0;padding:5px 2px}
   .line .ldateinp:hover{border-bottom-color:var(--line)}
   .line .ldateinp:focus{outline:none;border-bottom-color:var(--accent)}
@@ -2608,8 +2608,8 @@ function renderDetail(){
     // | [Order qty · Order date] | [Deliv qty · Delivery date] | [Note].
     const H=(t,cls)=>hd.appendChild($("span",cls||null,t||""));
     H("Product"); H("Scope","num"); H("Status","status-h"); H("Price","num");
-    H("","stone-div"); H("Order","num"); H("Order date");
-    H("","stone-div"); H("Deliv","num"); H("Delivery date");
+    H("","stone-div"); H("Order","num"); H("Order date","date-h");
+    H("","stone-div"); H("Deliv","num"); H("Delivery date","date-h");
     H("","stone-div"); H("Note");
     sb.appendChild(hd); }
   const stoneSorted=[...stone].sort((a,b)=>(b.id||0)-(a.id||0));   // newest line on top

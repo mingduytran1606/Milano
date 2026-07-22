@@ -327,15 +327,15 @@
   .field input,.field textarea{font:inherit;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:9px;padding:7px 9px;width:100%}
   .field textarea{resize:vertical;min-height:52px}
   .field .ro{color:var(--ink);font-weight:500}
-  .stone-head{display:grid;grid-template-columns:minmax(0,1.15fr) 150px 44px 44px 44px 120px 120px 66px minmax(0,1fr);gap:8px;padding:0 0 8px}
+  /* Sectioned grid: [Product Scope Status Price] | [Order qty · date] | [Deliv qty · date] | [Note]
+     12 tracks — the three 1px tracks are the vertical dividers between sections. */
+  .stone-head{display:grid;grid-template-columns:minmax(140px,1.2fr) 48px 150px 64px 1px 48px 118px 1px 48px 118px 1px minmax(140px,1fr);gap:8px;padding:0 0 8px;align-items:end}
   .stonecard .card-body{overflow-x:auto}
-  .stonecard .stone-head,.stonecard .line{grid-template-columns:var(--stone-grid, minmax(140px,1.15fr) 150px 44px 44px 44px 120px 120px 66px minmax(120px,1fr));min-width:900px}
-  .stone-head span{position:relative;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
-  .stone-head .col-rz{position:absolute;top:-2px;right:-8px;width:11px;bottom:-6px;cursor:col-resize;z-index:3}
-  .stone-head .col-rz::after{content:"";position:absolute;left:5px;top:0;bottom:0;width:1px;background:transparent}
-  .stone-head .col-rz:hover::after{background:var(--accent)}
-  .stone-head span:nth-child(3),.stone-head span:nth-child(4),.stone-head span:nth-child(5),.stone-head span:nth-child(8){text-align:right}
-  .line{position:relative;display:grid;grid-template-columns:minmax(0,1.15fr) 150px 44px 44px 44px 120px 120px 66px minmax(0,1fr);gap:8px;align-items:start;padding:11px 0;border-top:1px solid var(--line2)}
+  .stonecard .stone-head,.stonecard .line{grid-template-columns:minmax(140px,1.2fr) 48px 150px 64px 1px 48px 118px 1px 48px 118px 1px minmax(140px,1fr);min-width:960px}
+  .stone-head span{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .stone-head span.num{text-align:right}
+  .stone-div{align-self:stretch;width:1px;background:var(--line2)}
+  .line{position:relative;display:grid;grid-template-columns:minmax(140px,1.2fr) 48px 150px 64px 1px 48px 118px 1px 48px 118px 1px minmax(140px,1fr);gap:8px;align-items:start;padding:11px 0;border-top:1px solid var(--line2)}
   .line-del{position:absolute;top:4px;right:-2px;z-index:4;color:var(--danger);cursor:pointer;opacity:0;font-weight:700;font-size:14px;line-height:1;padding:1px 4px}
   .line:hover .line-del{opacity:.45}
   .line .line-del:hover{opacity:1}
@@ -2600,16 +2600,14 @@ function renderDetail(){
   sh.appendChild(sadd); sc.appendChild(sh);
   const sb=$("div","card-body");
   if(!stone.length){ sb.appendChild($("div","empty","No stone lines for this job.")); }
-  else { const hd=$("div","stone-head"); ["Product","Status","Scope","Order","Deliv","Order date","Delivery date","Price","Note"].forEach(t=>hd.appendChild($("span",null,t)));
-    [...hd.children].forEach((cell,i)=>{ if(i===hd.children.length-1) return;
-      const h=$("span","col-rz"); h.title="Drag to resize column";
-      h.onmousedown=e=>{ e.preventDefault(); e.stopPropagation();
-        const widths=[...hd.children].map(c=>Math.round(c.getBoundingClientRect().width)); state.stoneColW=widths.slice();
-        const startX=e.clientX, startW=widths[i];
-        const mv=ev=>{ state.stoneColW[i]=Math.max(30,Math.round(startW+(ev.clientX-startX))); applyStoneGrid(sc); };
-        const up=()=>{ document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up); savePrefs(); };
-        document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up); };
-      cell.appendChild(h); });
+  else { const hd=$("div","stone-head");
+    // Four sections, separated by divider cells (empty spans): [Product Scope Status Price]
+    // | [Order qty · Order date] | [Deliv qty · Delivery date] | [Note].
+    const H=(t,cls)=>hd.appendChild($("span",cls||null,t||""));
+    H("Product"); H("Scope","num"); H("Status"); H("Price","num");
+    H("","stone-div"); H("Order","num"); H("Order date");
+    H("","stone-div"); H("Deliv","num"); H("Delivery date");
+    H("","stone-div"); H("Note");
     sb.appendChild(hd); }
   const stoneSorted=[...stone].sort((a,b)=>(b.id||0)-(a.id||0));   // newest line on top
   stoneSorted.forEach(r=>{
@@ -2629,28 +2627,33 @@ function renderDetail(){
       prod.ondblclick=e=>{ e.stopPropagation(); openProductPicker(r,prod); };
     }
     prod.appendChild(nmrow);
+    // ── Section 1: Product · Scope · Status · Price ──
     line.appendChild(prod);
+    line.appendChild(stoneQtyInput(r,"Scope_Qty","Scope qty",false));
     const scell=$("div","statuscell");
     scell.appendChild(pill(r.Order_Status,ORD_C,{options:ORDS,onchange:v=>update("Stone_Order",r.id,{Order_Status:v})}));
     // Relative-time under the status: counts up from the delivery date once delivered, otherwise
-    // from the order date once ordered. Dates are edited in the dedicated columns to the right.
+    // from the order date once ordered. Dates are edited in the dedicated columns.
     let ageTxt="";
     if(isDeliveredStatus(r) && toDate(r.Delivery_Date)) ageTxt=agoText("Delivered",relDays(r.Delivery_Date));
     else if(toDate(r.Order_Date)) ageTxt=agoText("Ordered",relDays(r.Order_Date));
     if(ageTxt) scell.appendChild($("div","statusage",ageTxt));
     line.appendChild(scell);
-    line.appendChild(stoneQtyInput(r,"Scope_Qty","Scope qty",false));
-    line.appendChild(stoneQtyInput(r,"Ordered_Qty","Order qty",true));
-    line.appendChild(stoneQtyInput(r,"Delivery_Qty","Delivered qty",true));
-    line.appendChild(stoneDateInput(r,"Order_Date"));
-    line.appendChild(stoneDateInput(r,"Delivery_Date"));
-    // Price / slab is a Grist formula column (looked up from the chosen product) — read-only.
-    // Writing it back raised "Can't save value to formula column Product_Price_slab", so show it
-    // as text. To change a price, edit the product profile (pencil) / the Catalogue price.
+    // Price / slab is a read-only Grist formula (looked up from the product) — edit via the product.
     const pw=$("div","lprice ro"); pw.title="Price / slab — from the product profile; edit the product to change it";
     const pv=(r.Product_Price_slab!=null&&r.Product_Price_slab!=="")?r.Product_Price_slab:0;
     pw.appendChild(document.createTextNode("$"+pv));
     line.appendChild(pw);
+    // ── Section 2: Order qty · Order date ──
+    line.appendChild($("div","stone-div"));
+    line.appendChild(stoneQtyInput(r,"Ordered_Qty","Order qty",true));
+    line.appendChild(stoneDateInput(r,"Order_Date"));
+    // ── Section 3: Delivery qty · Delivery date ──
+    line.appendChild($("div","stone-div"));
+    line.appendChild(stoneQtyInput(r,"Delivery_Qty","Delivered qty",true));
+    line.appendChild(stoneDateInput(r,"Delivery_Date"));
+    // ── Section 4: Note ──
+    line.appendChild($("div","stone-div"));
     const nti=document.createElement("textarea"); nti.className="lnote"; nti.value=esc(r.Note); nti.placeholder="Note…";
     if(state.stoneNoteH) nti.style.height=state.stoneNoteH+"px";   // shared, remembered height
     nti.onblur=()=>{ if(nti.value!==esc(r.Note)) update("Stone_Order",r.id,{Note:nti.value}); };
@@ -2658,7 +2661,7 @@ function renderDetail(){
     line.appendChild(nti);
     sb.appendChild(line);
   });
-  sc.appendChild(sb); applyStoneGrid(sc); app.appendChild(sc);
+  sc.appendChild(sb); app.appendChild(sc);
 }
 
 function renderAll(){ renderList(); renderDetail(); }

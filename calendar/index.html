@@ -608,13 +608,9 @@
   function isReadonlyCol(role, col){
     if (col === 'id' || col === 'manualSort' || col === 'Job_ID' || col === 'Client_Label' || col === 'Stones' || col === 'Inst_Dates') return true;
     if (role === 'job'   && (col === 'Scope_Qty' || col === 'Ordered_Qty' || col === 'In_WH_Qty')) return true;
-    if (role === 'stone' && (col === 'Product_Code' || col === 'Product_Supplier' || col === 'Stone')) return true;
-    // Product_Price_slab is writable (per-order/discount price) UNLESS Grist has it as a pure formula col.
-    if (role === 'stone' && col === 'Product_Price_slab' && stonePriceIsFormula()) return true;
+    if (role === 'stone' && (col === 'Product_Code' || col === 'Product_Supplier' || col === 'Stone' || col === 'Product_Price_slab')) return true;
     return false;
   }
-  // Pure (read-only) formula col on Stone_Order: isFormula set AND a non-empty formula.
-  function stonePriceIsFormula() { var m = stoneMetaByColId[STONE.price]; return !!(m && m.isFormula && m.formula && String(m.formula).trim() !== ''); }
   var TMP_BASE = 1e9, _tmpSeq = 1e9;
   function nextTmp(){ return ++_tmpSeq; }
   function isTemp(id){ return typeof id === 'number' && id >= TMP_BASE; }
@@ -1880,8 +1876,7 @@
         if (cols.parentId[i] !== tref) continue;
         var wo = {}; try { wo = JSON.parse(cols.widgetOptions[i] || '{}'); } catch (e) {}
         sm[cols.colId[i]] = { label: cols.label[i] || cols.colId[i], type: cols.type[i] || '',
-          choices: wo.choices || null, choiceOptions: wo.choiceOptions || {},
-          isFormula: !!(cols.isFormula && cols.isFormula[i]), formula: (cols.formula && cols.formula[i]) || '' };
+          choices: wo.choices || null, choiceOptions: wo.choiceOptions || {} };
         if (cols.colId[i] === STONE.product) {
           var mm = /^Ref:(.+)$/.exec(cols.type[i] || ''); if (mm) catTable = mm[1];
           catVisRef = cols.visibleCol && cols.visibleCol[i];
@@ -2148,20 +2143,10 @@
         qi.addEventListener('change', function () { setStoneField(r, col, qi.value === '' ? null : Number(qi.value)); });
         wrap.appendChild(qi); qrow.appendChild(wrap);
       });
-      // Price / slab prefills from the product but the team overrides it per order (e.g. a discount
-      // price kept for reference). Editable when Grist stores it as a data column; when it's a pure
-      // formula col, writing raised "Can't save value to formula column Product_Price_slab", so
-      // there we show it read-only instead.
-      var pwrap = elx('label', 'je-q'); pwrap.appendChild(elx('span', 'je-qlbl', 'Price $'));
-      if (stonePriceIsFormula()) {
-        pwrap.title = 'Price / slab — a Grist formula (from the product); edit the product to change it';
-        pwrap.appendChild(elx('span', 'je-qin je-ro', (r[STONE.price] != null && r[STONE.price] !== '') ? String(r[STONE.price]) : '0'));
-      } else {
-        pwrap.title = 'Price / slab — prefilled from the product, editable (e.g. a discount price)';
-        var pin = document.createElement('input'); pin.type = 'number'; pin.className = 'je-qin'; pin.value = (r[STONE.price] != null ? r[STONE.price] : '');
-        pin.addEventListener('change', function () { setStoneField(r, STONE.price, pin.value === '' ? null : Number(pin.value)); });
-        pwrap.appendChild(pin);
-      }
+      // Price / slab is a Grist formula (looked up from the product) — read-only, never written back.
+      var pwrap = elx('label', 'je-q'); pwrap.title = 'Price / slab — from the product; edit the product to change it';
+      pwrap.appendChild(elx('span', 'je-qlbl', 'Price $'));
+      pwrap.appendChild(elx('span', 'je-qin je-ro', (r[STONE.price] != null && r[STONE.price] !== '') ? String(r[STONE.price]) : '0'));
       qrow.appendChild(pwrap);
       card.appendChild(qrow);
       var sn = document.createElement('input'); sn.className = 'je-inst-note'; sn.placeholder = 'Note…'; sn.value = String(r[STONE.note] || '');

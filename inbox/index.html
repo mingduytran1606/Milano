@@ -907,8 +907,6 @@ function avatarStack(names,sm){
 const LSKEY="milano_inbox_prefs_v2";
 const state = { jobs:[], stone:[], inst:[], clients:[], catalogue:[], selectedId:null, grist:false,
   ref:{ client:null, product:null },   // resolved from the Grist schema (or DEMO_REF standalone)
-  stonePriceEditable:true,              // Stone_Order.Product_Price_slab is a data col we can write (e.g. discount price);
-                                        // set false in Grist when it's a pure formula col (then price shows read-only)
   stoneNoteH:null,                      // shared height for stone-order note boxes
   stoneColW:null,                       // persisted stone-order column widths (px)
   sumLeftPct:null,                      // summary card: left column width %
@@ -1007,9 +1005,7 @@ function isTempId(id){ return typeof id==="number" && id>=TMP_BASE; }
 function isReadonlyCol(role,col){
   if(col==="id"||col==="manualSort"||col==="Job_ID"||col==="Client_Label"||col==="Stones"||col==="Inst_Dates") return true;
   if(role==="job"   && (col==="Scope_Qty"||col==="Ordered_Qty"||col==="In_WH_Qty")) return true;
-  if(role==="stone" && (col==="Product_Code"||col==="Product_Supplier"||col==="Stone")) return true;
-  // Product_Price_slab is writable (per-order/discount price) UNLESS Grist has it as a pure formula col.
-  if(role==="stone" && col==="Product_Price_slab" && !state.stonePriceEditable) return true;
+  if(role==="stone" && (col==="Product_Code"||col==="Product_Supplier"||col==="Stone"||col==="Product_Price_slab")) return true;
   return false;
 }
 function tableRole(table){ return table==="Jobs_Detail"?"job" : table==="Stone_Order"?"stone" : table==="Inst_"?"visit" : "other"; }
@@ -1271,9 +1267,7 @@ async function loadGristSchema(){
   }
   function colChoices(tableId,colId){ const c=colsOf(tableId).find(x=>x.colId===colId); return c?choicesOf(c):null; }
   function colChoiceColors(tableId,colId){ const c=colsOf(tableId).find(x=>x.colId===colId); return c?choiceColorsOf(c):{}; }
-  // Pure (read-only) formula col: isFormula set AND a non-empty formula. Trigger/data cols have isFormula false.
-  function isFormulaCol(tableId,colId){ const c=colsOf(tableId).find(x=>x.colId===colId); return !!(c&&c.isFormula&&c.formula&&String(c.formula).trim()!==""); }
-  return { refInfo, colChoices, colChoiceColors, isFormulaCol };
+  return { refInfo, colChoices, colChoiceColors };
 }
 
 // ---- assigning / creating referenced records ----
@@ -2512,25 +2506,13 @@ function renderDetail(){
     line.appendChild(stoneQtyInput(r,"Scope_Qty","Scope qty",false));
     line.appendChild(stoneQtyInput(r,"Ordered_Qty","Order qty",true));
     line.appendChild(stoneQtyInput(r,"Delivery_Qty","Delivered qty",true));
-    // Price / slab prefills from the chosen product but the team overrides it per order (e.g. a
-    // discount price kept for reference). That write only works when the Grist column is a DATA
-    // column. If it's a pure formula col, writing raised "Can't save value to formula column
-    // Product_Price_slab" and broke the save — so there we fall back to a read-only display.
-    if(state.stonePriceEditable){
-      const pw=$("div","lprice"); pw.appendChild(document.createTextNode("$"));
-      const pi=document.createElement("input"); pi.type="number"; pi.title="Price / slab — prefilled from the product, editable (e.g. a discount price)";
-      pi.value=(r.Product_Price_slab!=null?r.Product_Price_slab:"");
-      // Size the box to its digits so the "$" hugs the number instead of drifting toward the Deliv column.
-      const sizePi=()=>{ const n=String(pi.value||"").length||2; pi.style.width="calc("+n+"ch + 6px)"; };
-      sizePi(); pi.oninput=sizePi;
-      pi.onchange=()=>update("Stone_Order",r.id,{Product_Price_slab:pi.value===""?null:Number(pi.value)});
-      pw.appendChild(pi); line.appendChild(pw);
-    }else{
-      const pw=$("div","lprice ro"); pw.title="Price / slab — a Grist formula (from the product); edit the product/Catalogue to change it";
-      const pv=(r.Product_Price_slab!=null&&r.Product_Price_slab!=="")?r.Product_Price_slab:0;
-      pw.appendChild(document.createTextNode("$"+pv));
-      line.appendChild(pw);
-    }
+    // Price / slab is a Grist formula column (looked up from the chosen product) — read-only.
+    // Writing it back raised "Can't save value to formula column Product_Price_slab", so show it
+    // as text. To change a price, edit the product profile (pencil) / the Catalogue price.
+    const pw=$("div","lprice ro"); pw.title="Price / slab — from the product profile; edit the product to change it";
+    const pv=(r.Product_Price_slab!=null&&r.Product_Price_slab!=="")?r.Product_Price_slab:0;
+    pw.appendChild(document.createTextNode("$"+pv));
+    line.appendChild(pw);
     const nti=document.createElement("textarea"); nti.className="lnote"; nti.value=esc(r.Note); nti.placeholder="Note…";
     if(state.stoneNoteH) nti.style.height=state.stoneNoteH+"px";   // shared, remembered height
     nti.onblur=()=>{ if(nti.value!==esc(r.Note)) update("Stone_Order",r.id,{Note:nti.value}); };
@@ -2665,11 +2647,9 @@ if(typeof grist!=="undefined"){
       state.ref.client =sc.refInfo("Jobs_Detail","Client_Name");
       state.ref.product=sc.refInfo("Stone_Order","Product");
       state.assignChoices=sc.colChoices("Jobs_Detail","Assigned_To")||null;
-      // Price is editable only when Grist stores it as a data column, not a pure formula.
-      state.stonePriceEditable=!sc.isFormulaCol("Stone_Order","Product_Price_slab");
       applyGristChoices(sc);
       finishRefSetup();
-    }catch(e){ state.ref.client=null; state.ref.product=null; state.stonePriceEditable=false; console.warn("schema introspection failed — lookups disabled",e); }
+    }catch(e){ state.ref.client=null; state.ref.product=null; console.warn("schema introspection failed — lookups disabled",e); }
     try{ await pullTables(); }catch(e){ console.warn("initial fetch failed",e); }
     goLive();
     renderAll();

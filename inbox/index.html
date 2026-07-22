@@ -898,7 +898,7 @@ function applyGristChoices(sc){
     syncChoiceMaps();
   }catch(e){ console.warn("choice sync failed",e); }
 }
-function avatarColor(name){ const c=state.colors&&state.colors.assignee; return (c&&c[name])||DEFAULT_AVATAR; }
+function avatarColor(name){ const c=state.colors&&state.colors.assignee; return (c&&c[name]) || (name===GHOST_ASSIGNEE?GHOST_RED:DEFAULT_AVATAR); }
 // Black or white text depending on how light the avatar colour is.
 function contrastInk(hex){ const {r,g,b}=hexRgb(hex); return (r*299+g*587+b*114)/1000>150?"#1d2733":"#ffffff"; }
 function avatarEl(name,sm){ const a=$("div","avatar"+(sm?" sm":""),initials(name)); a.title=name;
@@ -1175,11 +1175,13 @@ function newJob(){
   const f={Stage:"Quote",Input_Date:toEpochSec(dateInput(new Date()))};
   const st=activeKeys(state.filter.stage);     if(st.length===1) f.Stage=st[0];
   const py=activeKeys(state.filter.payment);   if(py.length===1) f.Payment_Status=py[0];
-  const as=activeKeys(state.filter.assigned);  if(as.length) f.Assigned_To=["L",...as];
+  const as=activeKeys(state.filter.assigned);
+  f.Assigned_To = as.length ? ["L",...as] : ["L",GHOST_ASSIGNEE];   // default to 👻 Ghost
   addRecord("Jobs_Detail",f,id=>{
     state.selectedId=id;
     state.pinnedNew=[id,...(state.pinnedNew||[]).filter(x=>x!==id)];
     state.recentJobs[id]=Date.now();
+    defaultFunnyClient(state.jobs.find(j=>j.id===id));   // playful placeholder client until a real one is set
     savePrefs(); renderAll();
   });
 }
@@ -1323,6 +1325,64 @@ function createClientAndSet(j,name){
   const R=state.ref.client; if(!R)return; const f={}; f[R.labelCol]=name;
   addRecord(R.targetTableId,f,newId=>{ setClient(j,Object.assign({id:newId},f)); });
 }
+
+// ============================================================
+//  FUN DEFAULTS 👻  — nothing should show up blank or go missing
+// ============================================================
+// A stone line with no Job is invisible in this job-organised view (it only
+// shows on the whole-table Stone Order board), so we adopt any orphans into a
+// catch-all "Ghost Job". New jobs get a playful placeholder client + the Ghost
+// assignee, so a half-entered job still reads nicely instead of "—".
+const GHOST_ASSIGNEE = "Nè Hé";
+const GHOST_RED = "#e5484d";                        // Nè Hé's avatar/pill colour (red, not the grey default)
+const GHOST_JOB_CLIENT = "👻 Ghost Job (unclaimed stones)";
+const FUN_CLIENT = "Cưng ơi cưng";
+function funnyClientName(){ return FUN_CLIENT; }
+// Give a freshly-created (draft) job a funny placeholder client, reusing one if it
+// already exists so we don't pile up duplicates. Runs inside the draft (flushed on Save).
+function defaultFunnyClient(j){
+  const R=state.ref.client; if(!R||!j) return;
+  const name=funnyClientName();
+  const existing=(state.clients||[]).find(c=>String(c[R.labelCol]||"").toLowerCase()===name.toLowerCase());
+  if(existing) setClient(j,existing); else createClientAndSet(j,name);
+}
+// Find (or create) the single catch-all Ghost Job and return its id.
+async function ensureGhostJob(){
+  const R=state.ref.client;
+  let clientId=null;
+  if(R){
+    const existingClient=(state.clients||[]).find(c=>String(c[R.labelCol]||"")===GHOST_JOB_CLIENT);
+    clientId=existingClient?existingClient.id:null;
+    if(clientId!=null){ const j=(state.jobs||[]).find(x=>refId(x.Client_Name)===clientId); if(j) return j.id; }
+    if(clientId==null){
+      const cr=await grist.docApi.applyUserActions([["AddRecord",R.targetTableId,null,{[R.labelCol]:GHOST_JOB_CLIENT}]]);
+      clientId=(cr&&cr.retValues&&cr.retValues[0])||null;
+    }
+  } else {
+    // no client ref — match/mark the ghost job by a sentinel address instead
+    const j=(state.jobs||[]).find(x=>String(x.Job_Address||"")===GHOST_JOB_CLIENT); if(j) return j.id;
+  }
+  const jf={Stage:"Quote", Assigned_To:["L",GHOST_ASSIGNEE]};
+  if(clientId!=null) jf.Client_Name=clientId; else jf.Job_Address=GHOST_JOB_CLIENT;
+  const jr=await grist.docApi.applyUserActions([["AddRecord","Jobs_Detail",null,jf]]);
+  return (jr&&jr.retValues&&jr.retValues[0])||null;
+}
+// Adopt every Job-less stone line into the Ghost Job so it stops going missing.
+// Writes directly (not via the draft); skipped while the user has unsaved edits.
+let _adopting=false;
+async function adoptOrphanStones(){
+  if(!state.grist || state.dirty || _adopting) return;
+  const orphans=(state.stone||[]).filter(r=>refId(r.Job)==null);
+  if(!orphans.length) return;
+  _adopting=true;
+  try{
+    const jobId=await ensureGhostJob();
+    if(jobId==null) return;
+    await grist.docApi.applyUserActions(orphans.map(o=>["UpdateRecord","Stone_Order",o.id,{Job:jobId}]));
+    if(!state.dirty){ await pullTables(); renderAll(); }
+  }catch(e){ console.warn("orphan-stone adoption failed",e); }
+  finally{ _adopting=false; }
+}
 function setProduct(r,cat){
   const R=state.ref.product; if(!R)return;
   {                                                   // mirror the read-only formula cols so the line updates now
@@ -1399,7 +1459,8 @@ function editProductProfile(r,anchor){
 function currentAssignees(j){ return choiceList(j.Assigned_To); }
 function assigneeOptions(){
   const fromData=[...new Set((state.jobs||[]).flatMap(j=>choiceList(j.Assigned_To)))].filter(Boolean);
-  return [...new Set([...(state.assignChoices||[]),...fromData])].sort((a,b)=>String(a).toLowerCase().localeCompare(String(b).toLowerCase()));
+  // Ghost 👻 is always offered so it can be picked even before any job uses it.
+  return [...new Set([GHOST_ASSIGNEE,...(state.assignChoices||[]),...fromData])].sort((a,b)=>String(a).toLowerCase().localeCompare(String(b).toLowerCase()));
 }
 function toggleAssignee(j,name){
   const cur=currentAssignees(j).slice(); const i=cur.indexOf(name);
@@ -2712,6 +2773,7 @@ if(typeof grist!=="undefined"){
     try{ await pullTables(); }catch(e){ console.warn("initial fetch failed",e); }
     goLive();
     renderAll();
+    adoptOrphanStones();   // 👻 sweep any Job-less stone lines into the Ghost Job so they're visible
   }).catch(()=>{});
 }
 

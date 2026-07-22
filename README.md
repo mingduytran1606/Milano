@@ -9,6 +9,7 @@ to this repo, **push to `main` = deploy**.
 |---|---|---|---|
 | `inbox/` | Consolidated Inbox (jobs master–detail) | *(inbox site)* | serves at **root** (`index.html`) |
 | `stone-order/` | Stone Order Board (procurement Kanban by status) | *(stone-order site)* | serves at **root** (`index.html`) |
+| `stone-search/` | Stone Search (find a stone → order/delivery breakdown + its job) | *(stone-search site)* | serves at **root** (`index.html`) |
 | `calendar/` | Installations calendar + jobs sidebar | `silly-paletas-da1298` | serves at **root** (`index.html`) |
 | `address/` | Address autocomplete / new-job creator | `milanoaddresswidget` | **`/milano-address-widget.html`** (root 404s — keep the filename!) |
 | `stage-summary/` | Stage summary counts | *(stage-summary site)* | `/milano-stage-summary-widget.html` |
@@ -43,6 +44,8 @@ by the next push).
   **SELECT BY** = the Jobs list section.
 - Stone Order Board: Custom widget on the Stone Order page, **Table = Stone_Order**,
   **Access = Full**, **SELECT BY** = unset (whole-table procurement board).
+- Stone Search: Custom widget, **Table = Stone_Order**, **Access = Full**,
+  **SELECT BY** = unset (searches the whole table; picks its own selection).
 - Calendar: mapped to `Inst_`; Access = Full.
 - Address/new-job: mapped to Jobs_Detail; needs `?key=GOOGLE_KEY` query param.
 - Stage summary: Access = Read table.

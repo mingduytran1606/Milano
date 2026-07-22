@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Milano — Catalogue Search</title>
+<script src="https://milano.getgrist.com/grist-plugin-api.js"></script>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --ink:#1d2733; --muted:#6b7683;
+    --line:#e2e5ea; --line2:#eef1f4;
+    --accent:#16b378; --accent-soft:#eafaf2; --accent-ink:#0f7a52;
+    --danger:#e5484d;
+    --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.10);
+    --radius:14px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{ --bg:#12161b; --panel:#1a1f26; --ink:#e8edf2; --muted:#9aa6b2;
+      --line:#2a323b; --line2:#232a32;
+      --accent:#35c993; --accent-soft:#173a30; --accent-ink:#7ee0bd;
+      --shadow:0 1px 2px rgba(0,0,0,.4);}
+  }
+  :root[data-theme="light"]{ --bg:#f6f7f9; --panel:#ffffff; --ink:#1d2733; --muted:#6b7683;
+    --line:#e2e5ea; --line2:#eef1f4; --accent:#16b378; --accent-soft:#eafaf2; --accent-ink:#0f7a52;
+    --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.10);}
+  :root[data-theme="dark"]{ --bg:#12161b; --panel:#1a1f26; --ink:#e8edf2; --muted:#9aa6b2;
+    --line:#2a323b; --line2:#232a32; --accent:#35c993; --accent-soft:#173a30; --accent-ink:#7ee0bd;
+    --shadow:0 1px 2px rgba(0,0,0,.4);}
+
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+  #app{height:100%;display:flex;gap:8px;padding:14px}
+
+  /* ---------- catalogue search (left) ---------- */
+  .search-pane{flex:0 0 372px;display:flex;flex-direction:column;min-height:0;
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);overflow:hidden}
+  .search-head{padding:12px 14px 10px;display:flex;flex-direction:column;gap:9px;border-bottom:1px solid var(--line2)}
+  .search-title{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+    display:flex;align-items:center;gap:8px}
+  .search-title .count{background:var(--line2);color:var(--muted);border-radius:999px;font-size:11px;padding:1px 8px;font-weight:700}
+  .search{position:relative}
+  .search input{width:100%;font:inherit;font-size:13px;color:var(--ink);background:var(--bg);
+    border:1px solid var(--line);border-radius:9px;padding:9px 30px 9px 32px}
+  .search input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+  .search .sic{position:absolute;left:9px;top:50%;transform:translateY(-50%);width:15px;height:15px;
+    stroke:var(--muted);fill:none}
+  .search .clr{position:absolute;right:8px;top:50%;transform:translateY(-50%);color:var(--muted);
+    cursor:pointer;font-size:15px;line-height:1;padding:2px 4px;border-radius:6px}
+  .search .clr:hover{background:var(--line2);color:var(--ink)}
+
+  .results{flex:1 1 auto;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:7px}
+  .results::-webkit-scrollbar{width:9px}
+  .results::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
+  .res-empty{color:var(--muted);text-align:center;padding:34px 14px;font-size:12.5px}
+
+  .ccard{border:1px solid var(--line);border-radius:11px;padding:9px 11px;cursor:pointer;
+    background:var(--panel);display:flex;flex-direction:column;gap:6px;transition:border-color .1s,box-shadow .1s}
+  .ccard:hover{border-color:var(--accent)}
+  .ccard.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent),var(--shadow);background:var(--accent-soft)}
+  .ccard .ctop{display:flex;align-items:center;gap:7px}
+  .ccard .csup{font-size:10.5px;font-weight:700;color:var(--muted);background:var(--line2);border-radius:6px;
+    padding:1px 6px;white-space:nowrap}
+  .ccard .cspacer{flex:1 1 auto}
+  .ccard .cprice{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .ccard .cname{font-weight:600;font-size:13px;line-height:1.3;word-break:break-word}
+  .ccard .cmeta{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted)}
+  .ccard .ccode{font-variant-numeric:tabular-nums}
+  .ccard .cbadge{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--accent-ink);background:var(--accent-soft);
+    border-radius:999px;padding:1px 8px}
+  .ccard .cbadge.zero{color:var(--muted);background:var(--line2)}
+
+  /* ---------- splitter ---------- */
+  .splitter{flex:0 0 7px;cursor:col-resize;align-self:stretch;position:relative}
+  .splitter::after{content:"";position:absolute;left:2px;right:2px;top:0;bottom:0;border-radius:3px;background:var(--line)}
+  .splitter:hover::after,.splitter.drag::after{background:var(--accent)}
+
+  /* ---------- history (right) ---------- */
+  .detail-pane{flex:1 1 auto;min-width:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px}
+  .detail-empty{flex:1 1 auto;display:flex;align-items:center;justify-content:center;color:var(--muted);
+    text-align:center;font-size:13px;padding:40px;
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+
+  /* three separate panels: profile · active orders · monthly history */
+  .section{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:15px 17px}
+  .section-h{display:flex;align-items:baseline;gap:9px;margin-bottom:11px}
+  .section-h .st{font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink)}
+  .section-h .sc{font-size:11px;font-weight:700;color:var(--accent-ink);background:var(--accent-soft);border-radius:999px;padding:1px 8px}
+  .section-h .ssub{font-size:11.5px;color:var(--muted)}
+  .view-sub{font-size:11.5px;color:var(--muted);margin:-2px 0 8px 2px}
+  .hro{font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink);padding:3px 2px;text-align:right}
+
+  .prod-head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+  .prof-life{margin-top:12px;display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+  .prof-life .lb b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
+  .prod-title{flex:1 1 auto;min-width:0}
+  .prod-name{font-size:21px;font-weight:700;line-height:1.25;word-break:break-word}
+  .prod-sub{margin-top:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:12.5px}
+  .prod-sub .psup{font-weight:700;background:var(--line2);border-radius:7px;padding:2px 8px;color:var(--ink)}
+  .prod-price{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .prod-price small{font-size:11px;font-weight:600;color:var(--muted);display:block;text-align:right;letter-spacing:.03em;text-transform:uppercase}
+
+  /* ---------- month picker pills ---------- */
+  .mrow{display:flex;gap:7px;flex-wrap:wrap;margin:2px 0 6px}
+  .mpill{font:inherit;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;
+    border:1px solid var(--line);background:var(--panel);color:var(--ink);font-size:12.5px;font-weight:600;cursor:pointer;
+    white-space:nowrap}
+  .mpill:hover{border-color:var(--accent)}
+  .mpill.empty{color:var(--muted)}
+  .mpill.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .mpill .mp-n{font-size:10.5px;font-weight:700;background:var(--line2);color:var(--muted);border-radius:999px;padding:0 6px;line-height:16px}
+  .mpill.on .mp-n{background:rgba(255,255,255,.28);color:#fff}
+
+  .hist-stats{display:flex;gap:9px;flex-wrap:wrap;margin:14px 0 6px}
+  .stat{flex:1 1 120px;min-width:110px;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:8px 12px}
+  .stat .sv{font-size:20px;font-weight:800;line-height:1.15;font-variant-numeric:tabular-nums}
+  .stat .sl{font-size:10.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+
+  /* ---------- histogram (stacked bars: ordered slabs per month) ---------- */
+  .hist-chart{margin-top:18px}
+  .chart-h{display:flex;align-items:baseline;gap:9px;margin-bottom:12px}
+  .chart-h .st{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink)}
+  .chart-h .ssub{font-size:11.5px;color:var(--muted)}
+  .chart-scroll{overflow-x:auto;padding-bottom:2px}
+  .chart{display:flex;align-items:flex-end;gap:12px;min-height:152px;padding:2px}
+  .chart.daily{gap:4px}
+  .chart.daily .bar{width:15px;border-radius:4px 4px 0 0}
+  .chart.daily .bar-v{font-size:9px}
+  .chart.daily .bar-x{font-size:9px}
+  .bar-col.zero{cursor:default}
+  .bar-col.zero .bar-x{opacity:.45}
+  .bar-col{display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;flex:0 0 auto}
+  .bar-col .bar-v{font-size:11px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+  .bar{width:30px;min-height:2px;display:flex;flex-direction:column;justify-content:flex-end;
+    border-radius:6px 6px 0 0;overflow:hidden;background:var(--line2)}
+  .bar .seg{width:100%}
+  .bar .seg.cur{background:var(--accent)}
+  .bar .seg.other{background:#c3ccd6}
+  .bar-col:hover .bar{filter:brightness(1.05)}
+  .bar-col .bar-x{font-size:10.5px;color:var(--muted);white-space:nowrap}
+  .bar-col.sel .bar-x{color:var(--accent-ink);font-weight:700}
+  .bar-col.sel .bar{outline:2px solid var(--accent-ink);outline-offset:1px}
+  .chart-legend{display:flex;gap:16px;margin-top:11px}
+  .chart-legend .lg{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted)}
+  .chart-legend .sw{width:11px;height:11px;border-radius:3px;display:inline-block;flex:0 0 auto}
+  .chart-legend .sw.cur{background:var(--accent)}
+  .chart-legend .sw.other{background:#c3ccd6}
+  @media (prefers-color-scheme:dark){ .bar .seg.other,.chart-legend .sw.other{background:#3a434d} }
+  :root[data-theme="dark"] .bar .seg.other,:root[data-theme="dark"] .chart-legend .sw.other{background:#3a434d}
+  :root[data-theme="light"] .bar .seg.other,:root[data-theme="light"] .chart-legend .sw.other{background:#c3ccd6}
+
+  .hist-h{margin:18px 0 8px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .htbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+  .htbl{min-width:900px}
+  /* one shared column grid keeps the header, month bars and every order row aligned */
+  .hgridrow{display:grid;
+    grid-template-columns:minmax(180px,1.6fr) 146px 46px 124px 46px 124px 74px minmax(120px,1.3fr);
+    gap:9px;align-items:center;padding:8px 12px}
+  .htbl-head{background:var(--bg);border-bottom:1px solid var(--line);border-radius:12px 12px 0 0}
+  .htbl-head .hh{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);white-space:nowrap}
+  .htbl-head .hh.n{text-align:right}
+  /* month sub-header inside a grouped table (Status Summary) */
+  .hmonth{display:flex;align-items:center;gap:10px;padding:7px 12px;background:var(--accent-soft);
+    border-top:1px solid var(--line);border-bottom:1px solid var(--line2)}
+  .hmonth .hm-name{font-weight:700;font-size:12px;color:var(--accent-ink)}
+  .hmonth .hm-sum{display:flex;gap:12px;font-size:11.5px;color:var(--muted);margin-left:4px}
+  .hmonth .hm-sum b{color:var(--ink);font-variant-numeric:tabular-nums}
+  .hrow{border-top:1px solid var(--line2)}
+  .hrow:hover{background:var(--line2)}
+  .hjob{display:flex;align-items:center;gap:7px;min-width:0}
+  .hjob .jobchip{font-weight:700;color:var(--accent-ink);background:var(--accent-soft);border-radius:7px;padding:1px 8px;flex:0 0 auto}
+  .hjob .jclient{font-weight:600;white-space:nowrap;flex:0 0 auto}
+  .hjob .jaddr{color:var(--muted);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .hcell-in{font:inherit;font-size:12.5px;color:var(--ink);background:transparent;border:0;border-bottom:1px solid transparent;
+    border-radius:0;padding:3px 2px;width:100%;min-width:0}
+  .hcell-in:hover{border-bottom-color:var(--line)}
+  .hcell-in:focus{outline:none;border-bottom-color:var(--accent)}
+  input.hcell-in[type=number]{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;-moz-appearance:textfield}
+  input.hcell-in[type=number]::-webkit-outer-spin-button,input.hcell-in[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  input.hcell-in.short{color:var(--danger)}
+  .hist-none{color:var(--muted);font-size:12.5px;padding:16px;text-align:center;border:1px dashed var(--line);border-radius:12px}
+
+  /* ---------- pills ---------- */
+  .pill{display:inline-flex;align-items:center;gap:5px;border-radius:20px;padding:3px 11px;font-size:12px;
+    font-weight:700;white-space:nowrap;line-height:1.5;color:var(--ink)}
+  .pill.xs{font-size:10.5px;padding:1px 8px;gap:4px}
+  .pill .pdot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .pill-select{cursor:pointer}
+  .pcaret{font-size:8px;opacity:.65}
+
+  /* ---------- popovers ---------- */
+  .pop{position:fixed;z-index:60;background:var(--panel);border:1px solid var(--line);border-radius:11px;
+    box-shadow:0 12px 34px rgba(16,24,40,.22);padding:5px;min-width:200px;max-height:62vh;overflow:auto}
+  .pop[hidden]{display:none}
+  .cprow{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:8px;cursor:pointer}
+  .cprow:hover,.cprow.on{background:var(--line2)}
+  .cprow .rtick{margin-left:auto;color:var(--accent-ink);font-weight:800}
+
+  /* ---------- floating column config ---------- */
+  .cfg-fab{position:fixed;bottom:8px;right:8px;z-index:50;width:36px;height:36px;border-radius:50%;
+    border:1px solid var(--line);background:var(--panel);color:var(--muted);cursor:pointer;font-size:16px;
+    box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center}
+  .cfg-fab:hover{color:var(--ink);border-color:var(--accent)}
+  .cfgpop{min-width:252px}
+  .cfg-h{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:4px 6px 8px}
+  .cfgrow{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:8px}
+  .cfgrow:hover{background:var(--line2)}
+  .cfgrow .ck{display:flex;align-items:center;gap:8px;flex:1 1 auto;cursor:pointer;font-size:12.5px}
+  .cfgrow .ck input{accent-color:var(--accent)}
+  .cfgrow .mv{color:var(--muted);cursor:pointer;padding:0 5px;border-radius:5px;font-size:13px;user-select:none}
+  .cfgrow .mv:hover{background:var(--line);color:var(--ink)}
+  .cfgrow .mv.off{opacity:.22;pointer-events:none}
+  .cfg-foot{border-top:1px solid var(--line2);margin-top:6px;padding-top:5px}
+  .cfg-reset{font:inherit;font-size:12px;color:var(--accent-ink);background:none;border:0;cursor:pointer;padding:5px 7px}
+  .cfg-reset:hover{text-decoration:underline}
+
+  .demo-tag{position:fixed;bottom:9px;left:11px;font-size:10px;color:var(--muted);background:var(--panel);
+    border:1px solid var(--line);border-radius:20px;padding:2px 9px;opacity:.75;z-index:40}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="search-pane">
+    <div class="search-head">
+      <div class="search-title">Catalogue <span class="count" id="resCount">0</span></div>
+      <div class="search">
+        <svg class="sic" viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input id="q" type="text" placeholder="Search catalogue — product, code, supplier…" autocomplete="off">
+        <span class="clr" id="qClr" title="Clear" hidden>&times;</span>
+      </div>
+    </div>
+    <div class="results" id="results"></div>
+  </div>
+
+  <div class="splitter" id="splitter"></div>
+
+  <div class="detail-pane" id="detail"></div>
+</div>
+
+<button class="cfg-fab" id="cfgBtn" title="Configure table columns">&#9881;</button>
+<div class="pop" id="choicePop" hidden></div>
+<div class="pop" id="cfgPop" hidden></div>
+<div class="demo-tag" id="demoTag" hidden>demo data</div>
+
+<script>
+"use strict";
+/* ============================================================
+   Milano — Catalogue Search widget
+   Left: search the Catalogue (product · code · supplier).
+   Right: click a product → its full ORDER HISTORY — every
+   Stone_Order line that used it, across all jobs, with the
+   order/delivery dates + qtys, status, INV and note. Each
+   history row is editable in place and writes back to
+   Stone_Order. Shares the Inbox / Board foundation: design
+   tokens, the Order_Status model, and the Grist plumbing.
+   ============================================================ */
+
+// ---- status model (strings + colours must round-trip to Grist) ----
+const ORD_DEFAULT = {
+  "2.  Placed Order":"#FEF47A","3. Awaiting Order":"#FED6FB","6. Delivered":"#98FD90",
+  "4. Awaiting Pickup":"#75B5FC","7. Not Delivered Yet":"#CCFEFE","5. On hold":"#FEE7C3",
+  "1. No Stock":"#FD8182","Cancelled":"#DCDCDC","Delivered by WF":"#E1FEDE",
+  "Delivered by Aboda":"#E1FEDE","Delivered by Client":"#E1FEDE","Return":"#CCFEFE","N/A":"#e9edf1"};
+const ORD_C = Object.assign({}, ORD_DEFAULT);
+let ORDS = Object.keys(ORD_C);
+const statusColor = s => ORD_C[s] || "#e9edf1";
+const statusLabel = s => (s==null||s==="") ? "To sort" : s;
+const SPECIAL_COL = /^(manualSort|gristHelper_|id$)/;
+
+// Auto-advance the status from the line's own data (mirrors Inbox §5).
+const PRE_ORDER_STATES = ["","3. Awaiting Order","7. Not Delivered Yet","1. No Stock"];
+function isDeliveredStatus(r){ const low=String(r.Order_Status||"").toLowerCase(); return /deliver/.test(low) && !/not deliver/.test(low); }
+function autoStatus(r){
+  const s=String(r.Order_Status||""), low=s.toLowerCase();
+  if(/cancel|n\/a|return|on hold/.test(low)) return null;
+  if(toDate(r.Delivery_Date) && !isDeliveredStatus(r)) return "6. Delivered";
+  if(toDate(r.Order_Date) && PRE_ORDER_STATES.indexOf(s)>=0) return "2.  Placed Order";
+  return null;
+}
+
+// ---- generic helpers (mirror the inbox / board for Grist correctness) ----
+const $=(t,c,txt)=>{const e=document.createElement(t); if(c)e.className=c; if(txt!=null)e.textContent=txt; return e;};
+function refId(v){ if(v==null)return null; if(typeof v==="number")return v;
+  if(Array.isArray(v))return v[2]; if(typeof v==="object")return v.rowId!=null?v.rowId:v.id; return v; }
+function toDate(v){ if(v==null||v==="")return null;
+  if(typeof v==="number")return new Date(v*1000);
+  if(v instanceof Date)return v;
+  const d=new Date(v); return isNaN(d)?null:d; }
+function fmtDMY(v){ const d=toDate(v); if(!d)return "";
+  return String(d.getDate()).padStart(2,"0")+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+d.getFullYear(); }
+function dateInput(v){ const d=toDate(v); if(!d)return "";
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function toEpochSec(str){ if(!str)return null; const [y,m,d]=str.split("-").map(Number);
+  return Math.floor(Date.UTC(y,m-1,d)/1000); }
+const num=v=>{ const n=Number(v); return isFinite(n)?n:0; };
+function esc(v){ return v==null?"":String(v); }
+function columnarToRows(t){ if(!t||!t.id)return []; return t.id.map((id,i)=>{const o={id}; for(const k in t)if(k!=="id")o[k]=t[k][i]; return o;}); }
+function hexRgb(h){ h=String(h||"").replace("#",""); if(h.length===3)h=h.split("").map(c=>c+c).join("");
+  return {r:parseInt(h.slice(0,2),16)||0,g:parseInt(h.slice(2,4),16)||0,b:parseInt(h.slice(4,6),16)||0}; }
+function softTint(hex){ const {r,g,b}=hexRgb(hex||"#cfd4d1");
+  const bg="rgb("+Math.round(r+(255-r)*.72)+","+Math.round(g+(255-g)*.72)+","+Math.round(b+(255-b)*.72)+")";
+  const dot="rgb("+Math.round(r*.66)+","+Math.round(g*.66)+","+Math.round(b*.66)+")";
+  return {bg,dot}; }
+function relDays(v){ const d=toDate(v); if(!d) return null;
+  const t=new Date(), a=new Date(t.getFullYear(),t.getMonth(),t.getDate()), b=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  return Math.round((a-b)/86400000); }
+function agoText(verb,n){ if(n==null) return "";
+  if(n===0) return verb+" today";
+  if(n<0) return verb+" in "+(-n)+(-n===1?" day":" days");
+  return verb+" "+n+(n===1?" day":" days")+" ago"; }
+
+// ---- state ----
+const LSKEY="milano_catalogue_prefs_v1";
+const state={
+  stone:[], jobs:[], catalogue:[], grist:false,
+  ref:{ product:null },
+  q:"", selectedCatId:null, selectedMonth:null, statusView:"active", searchW:null, colCfg:null,
+  jobById:{}, catById:{}, ordersByCat:{}
+};
+window._catsearch=state;
+function loadPrefs(){ try{ return JSON.parse(localStorage.getItem(LSKEY))||{}; }catch(e){ return {}; } }
+function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ searchW:state.searchW, colCfg:state.colCfg })); }catch(e){} }
+
+// ---- lookups ----
+function reindex(){
+  state.jobById={}; state.jobs.forEach(j=>state.jobById[j.id]=j);
+  state.catById={}; state.catalogue.forEach(c=>state.catById[c.id]=c);
+  // Group every stone line under the catalogue product it references.
+  state.ordersByCat={};
+  (state.stone||[]).forEach(r=>{ const pid=refId(r.Product); if(pid==null)return;
+    (state.ordersByCat[pid]=state.ordersByCat[pid]||[]).push(r); });
+}
+function jobFor(r){ return state.jobById[refId(r.Job)]||null; }
+function catFor(r){ return state.catById[refId(r.Product)]||null; }
+function catLabel(c){ return (c.Product_Full && String(c.Product_Full).trim())
+  || [c.Supplier,c.Code].filter(Boolean).join(" · ") || ("#"+c.id); }
+function catalogueHaystack(c){ let s=catLabel(c)||"";
+  for(const k in c){ if(k==="id")continue; const v=c[k]; if(typeof v==="string") s+=" "+v; } return s.toLowerCase(); }
+function priceOf(c){ const v=c&&c.Price_Slab; return (v!=null&&v!=="")?v:0; }
+function supplierFor(r){ const c=catFor(r); return r.Product_Supplier || (c&&c.Supplier) || ""; }
+function ordersFor(catId){ return state.ordersByCat[catId]||[]; }
+function jobClient(j){ return j ? ((String(j.Client_Label||"")).trim() || (String(j.Job_Address||"")).trim() || j.Job_ID || ("#"+j.id)) : "—"; }
+function jobAddr(j){ return j ? ((String(j.Address_Formatted||j.Job_Address||"")).trim()) : ""; }
+function jobCode(j){ return j ? (j.Job_ID || ("#"+j.id)) : ""; }
+
+// ============================================================
+//  SEARCH — rank catalogue products by closeness to the query
+// ============================================================
+function scoreText(hay,q){
+  if(!hay) return 0; hay=String(hay).toLowerCase();
+  if(hay===q) return 100;
+  if(hay.startsWith(q)) return 78;
+  if(new RegExp("\\b"+q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).test(hay)) return 60;
+  const i=hay.indexOf(q); if(i<0) return 0;
+  return 42-Math.min(i,20);
+}
+function scoreCat(c,q){
+  let best=0;
+  [catLabel(c), c.Code, c.Supplier].forEach(f=>{ const s=scoreText(f,q); if(s>best)best=s; });
+  if(best===0 && catalogueHaystack(c).includes(q)) best=20;   // any other string field
+  return best;
+}
+function rankedCatalogue(){
+  const q=state.q.trim().toLowerCase();
+  const list=state.catalogue||[];
+  if(!q) return [...list].sort((a,b)=>catLabel(a).localeCompare(catLabel(b)));
+  return list.map(c=>({c,s:scoreCat(c,q)}))
+    .filter(x=>x.s>0)
+    .sort((a,b)=>b.s-a.s || catLabel(a.c).localeCompare(catLabel(b.c)))
+    .map(x=>x.c);
+}
+
+// ============================================================
+//  RENDER
+// ============================================================
+function render(){ reindex(); renderResults(); renderDetail(); }
+
+function renderResults(){
+  const wrap=document.getElementById("results"); wrap.innerHTML="";
+  const rows=rankedCatalogue();
+  document.getElementById("resCount").textContent=rows.length;
+  document.getElementById("demoTag").hidden=state.grist;
+  document.getElementById("qClr").hidden=!state.q;
+
+  if(!rows.some(c=>c.id===state.selectedCatId)) state.selectedCatId = rows.length ? rows[0].id : null;
+
+  if(!rows.length){
+    wrap.appendChild($("div","res-empty", state.q ? "No products match “"+state.q+"”." : "No catalogue products yet."));
+    return;
+  }
+  rows.forEach(c=>wrap.appendChild(catalogueCard(c)));
+}
+
+function catalogueCard(c){
+  const n=ordersFor(c.id).length;
+  const card=$("div","ccard"+(c.id===state.selectedCatId?" on":""));
+  card.onclick=()=>{ state.selectedCatId=c.id; render(); };
+
+  const top=$("div","ctop");
+  top.appendChild($("div","cname",catLabel(c)));
+  card.appendChild(top);
+
+  const meta=$("div","cmeta");
+  if(c.Supplier) meta.appendChild($("span","csup",c.Supplier));
+  if(c.Code) meta.appendChild($("span","ccode","Code "+c.Code));
+  meta.appendChild($("span","cprice","$"+priceOf(c)+"/slab"));
+  const badge=$("span","cbadge"+(n?"":" zero"), n?(n+" order"+(n===1?"":"s")):"no orders");
+  meta.appendChild(badge);
+  card.appendChild(meta);
+  return card;
+}
+
+function renderDetail(){
+  const app=document.getElementById("detail"); app.innerHTML="";
+  const c=state.catById[state.selectedCatId];
+  if(!c){ app.appendChild($("div","detail-empty","Search the catalogue, then pick a product to see its profile and order history.")); return; }
+  const allOrders=ordersFor(c.id);
+  const byDateDesc=(a,b)=>{ const da=+toDate(a.Order_Date)||0, db=+toDate(b.Order_Date)||0; return db-da || (b.id||0)-(a.id||0); };
+
+  // ═══ Section 1 — Stone profile ═══
+  const s1=$("div","section");
+  const head=$("div","prod-head");
+  const tw=$("div","prod-title");
+  tw.appendChild($("div","prod-name",catLabel(c)));
+  const sub=$("div","prod-sub");
+  if(c.Supplier) sub.appendChild($("span","psup",c.Supplier));
+  if(c.Code) sub.appendChild($("span",null,"Code "+c.Code));
+  tw.appendChild(sub);
+  head.appendChild(tw);
+  const price=$("div","prod-price"); price.appendChild(document.createTextNode("$"+priceOf(c)));
+  price.appendChild($("small",null,"per slab")); head.appendChild(price);
+  s1.appendChild(head);
+  // all-time context (the scoreboard below is month-scoped, so summarise lifetime here)
+  const lifeJobs=new Set(allOrders.map(r=>refId(r.Job)).filter(v=>v!=null));
+  const lifeOrd=allOrders.reduce((s,r)=>s+num(r.Ordered_Qty),0);
+  const lifeDel=allOrders.reduce((s,r)=>s+num(r.Delivery_Qty),0);
+  const life=$("div","prof-life");
+  life.appendChild(lifeBit(allOrders.length,"orders all-time"));
+  life.appendChild(lifeBit(lifeJobs.size,"jobs"));
+  life.appendChild(lifeBit(lifeOrd,"slabs ordered"));
+  life.appendChild(lifeBit(lifeDel,"slabs delivered"));
+  s1.appendChild(life);
+  app.appendChild(s1);
+
+  // ═══ Section 2 — Status Summary (pills switch the status view; grouped by date) ═══
+  const s2=$("div","section");
+  s2.appendChild(sectionHead("Status summary",null,null));
+  const VIEWS=[
+    { key:"active",    label:"Active order", sub:"placed & awaiting delivery", filter:isActiveOrder,       dateField:"Order_Date",    empty:"No active orders — nothing placed and awaiting delivery." },
+    { key:"delivered", label:"Delivered",    sub:"grouped by delivery date",   filter:isDeliveredStatus,   dateField:"Delivery_Date", empty:"Nothing delivered for this product yet." }
+  ];
+  let sv=state.statusView; if(!VIEWS.some(v=>v.key===sv)) sv="active"; state.statusView=sv;
+  const svrow=$("div","mrow");
+  VIEWS.forEach(v=>{
+    const rows=allOrders.filter(v.filter);
+    const p=$("button","mpill"+(sv===v.key?" on":"")+(rows.length?"":" empty"));
+    p.appendChild($("span","mp-name",v.label));
+    if(rows.length) p.appendChild($("span","mp-n",String(rows.length)));
+    p.onclick=()=>{ state.statusView=v.key; renderDetail(); };
+    svrow.appendChild(p);
+  });
+  s2.appendChild(svrow);
+  const view=VIEWS.find(v=>v.key===sv);
+  const svRows=allOrders.filter(view.filter);
+  if(view.sub) s2.appendChild($("div","view-sub",view.sub));
+  if(!svRows.length) s2.appendChild($("div","hist-none",view.empty));
+  else s2.appendChild(groupedOrderTable(svRows, view.dateField));
+  app.appendChild(s2);
+
+  // ═══ Section 3 — Order history by month ═══
+  const s3=$("div","section");
+  s3.appendChild(sectionHead("Order history",null,null));
+
+  const curKey=currentMonthKey();
+  const keySet=new Set(allOrders.map(monthKeyOf).filter(k=>k!=null));
+  keySet.add(curKey);                                  // this month is always offered
+  const monthKeys=[...keySet].sort((a,b)=>b-a);        // newest first
+  const hasUndated=allOrders.some(r=>monthKeyOf(r)==null);
+
+  // resolve the active selection against what this product actually has
+  let sel=state.selectedMonth;
+  if(sel==="all"){ /* always valid */ }
+  else if(sel==="undated"){ if(!hasUndated) sel=curKey; }
+  else if(!(typeof sel==="number" && keySet.has(sel))) sel=curKey;
+  state.selectedMonth=sel;
+
+  const countIn=k=>allOrders.filter(r=>monthKeyOf(r)===k).length;
+  const mrow=$("div","mrow");
+  // "All time" pill first
+  {
+    const p=$("button","mpill"+(sel==="all"?" on":""));
+    p.appendChild($("span","mp-name","All time"));
+    if(allOrders.length) p.appendChild($("span","mp-n",String(allOrders.length)));
+    p.onclick=()=>{ state.selectedMonth="all"; renderDetail(); };
+    mrow.appendChild(p);
+  }
+  monthKeys.forEach(k=>{
+    const p=$("button","mpill"+(sel===k?" on":"")+(countIn(k)?"":" empty"));
+    p.appendChild($("span","mp-name",monthPillLabel(k)));
+    const n=countIn(k); if(n) p.appendChild($("span","mp-n",String(n)));
+    p.onclick=()=>{ state.selectedMonth=k; renderDetail(); };
+    mrow.appendChild(p);
+  });
+  if(hasUndated){
+    const p=$("button","mpill"+(sel==="undated"?" on":""));
+    p.appendChild($("span","mp-name","No date"));
+    p.appendChild($("span","mp-n",String(allOrders.filter(r=>monthKeyOf(r)==null).length)));
+    p.onclick=()=>{ state.selectedMonth="undated"; renderDetail(); };
+    mrow.appendChild(p);
+  }
+  s3.appendChild(mrow);
+
+  // orders for the selected scope, most-recent first
+  const orders=allOrders.filter(r=> sel==="all" ? true : sel==="undated" ? monthKeyOf(r)==null : monthKeyOf(r)===sel).slice().sort(byDateDesc);
+
+  // table first
+  const selLabel = sel==="all" ? "any month" : sel==="undated" ? "orders with no order date" : monthLabelOf(sel);
+  if(!orders.length) s3.appendChild($("div","hist-none","No orders for this product in "+selLabel+"."));
+  else s3.appendChild(orderTable(orders));
+
+  // scoreboard — now below the table (for the selected month)
+  const jobs=new Set(orders.map(r=>refId(r.Job)).filter(v=>v!=null));
+  const ordered=orders.reduce((s,r)=>s+num(r.Ordered_Qty),0);
+  const delivered=orders.reduce((s,r)=>s+num(r.Delivery_Qty),0);
+  const stats=$("div","hist-stats");
+  stats.appendChild(stat(orders.length,"orders"));
+  stats.appendChild(stat(jobs.size,"jobs"));
+  stats.appendChild(stat(ordered,"slabs ordered"));
+  stats.appendChild(stat(delivered,"slabs delivered"));
+  s3.appendChild(stats);
+
+  // histogram — daily ordered slabs for the selected month across the whole supplier
+  s3.appendChild(histogram(c));
+  app.appendChild(s3);
+}
+
+// Daily stacked column chart for the SELECTED month: one bar per calendar day,
+// height = slabs ordered that day across ALL of this product's supplier, split
+// into "this stone" (highlighted) + "other <supplier>". Follows the month pills.
+function supplierDaily(c,monthKey){
+  const sup=c.Supplier||"", curId=c.id;
+  const year=Math.floor(monthKey/100), month=monthKey%100;
+  const lastDay=new Date(year,month,0).getDate();
+  const days=[]; for(let i=1;i<=lastDay;i++) days.push({day:i,cur:0,other:0});
+  (state.stone||[]).forEach(r=>{
+    if(supplierFor(r)!==sup) return;
+    const dt=toDate(r.Order_Date); if(!dt) return;
+    if(dt.getFullYear()!==year || (dt.getMonth()+1)!==month) return;
+    const q=num(r.Ordered_Qty); if(q<=0) return;
+    const idx=dt.getDate()-1; if(idx<0||idx>=days.length) return;
+    if(refId(r.Product)===curId) days[idx].cur+=q; else days[idx].other+=q;
+  });
+  return days;
+}
+// Monthly aggregation across the whole supplier (used by the All-time view).
+function supplierMonthly(c){
+  const sup=c.Supplier||"", curId=c.id, byMonth={};
+  (state.stone||[]).forEach(r=>{
+    if(supplierFor(r)!==sup) return;
+    const k=monthKeyOf(r); if(k==null) return;
+    const q=num(r.Ordered_Qty); if(q<=0) return;
+    const m=byMonth[k]||(byMonth[k]={key:k,cur:0,other:0});
+    if(refId(r.Product)===curId) m.cur+=q; else m.other+=q;
+  });
+  return Object.keys(byMonth).map(k=>byMonth[k]).sort((a,b)=>a.key-b.key);
+}
+function histogram(c){
+  const box=$("div","hist-chart");
+  const sel=state.selectedMonth;
+  const allTime = sel==="all";
+  const supTxt=(c.Supplier?("all "+c.Supplier+" orders · "):"")+"this stone highlighted";
+  const head=$("div","chart-h");
+  head.appendChild($("span","st", allTime?"Ordered by month":"Ordered by day"));
+  head.appendChild($("span","ssub",(typeof sel==="number"?monthLabelOf(sel)+" · ":allTime?"all time · ":"")+supTxt));
+  box.appendChild(head);
+
+  if(!allTime && typeof sel!=="number"){ box.appendChild($("div","hist-none","Pick a month above to see its daily breakdown.")); return box; }
+  // All time → one bar per month; a specific month → one bar per day.
+  const data = allTime ? supplierMonthly(c) : supplierDaily(c,sel);
+  const empty = allTime ? !data.length : !data.some(d=>d.cur+d.other>0);
+  if(empty){ box.appendChild($("div","hist-none","No "+(c.Supplier?c.Supplier+" ":"")+"orders"+(allTime?" yet.":" in "+monthLabelOf(sel)+"."))); return box; }
+  const max=Math.max(1,...data.map(d=>d.cur+d.other));
+  const H=118;
+  const scroll=$("div","chart-scroll"); const chart=$("div","chart"+(allTime?"":" daily"));
+  data.forEach(d=>{
+    const total=d.cur+d.other;
+    const col=$("div","bar-col"+(total?"":" zero")+(allTime&&d.key===state.selectedMonth?" sel":""));
+    const label = allTime ? monthLabelOf(d.key) : (d.day+" "+monthLabelOf(sel));
+    col.title=label+(total?(" — "+total+" slab"+(total===1?"":"s")+" ("+d.cur+" this stone, "+d.other+" other)"):" — no orders");
+    col.appendChild($("div","bar-v",total?String(total):""));
+    const bar=$("div","bar");
+    if(d.cur>0){ const s=$("div","seg cur"); s.style.height=Math.max(2,d.cur/max*H)+"px"; bar.appendChild(s); }
+    if(d.other>0){ const s=$("div","seg other"); s.style.height=Math.max(2,d.other/max*H)+"px"; bar.appendChild(s); }
+    col.appendChild(bar);
+    col.appendChild($("div","bar-x", allTime?monthPillLabel(d.key):String(d.day)));
+    if(allTime){ col.style.cursor="pointer"; col.onclick=()=>{ state.selectedMonth=d.key; renderDetail(); }; }
+    chart.appendChild(col);
+  });
+  scroll.appendChild(chart); box.appendChild(scroll);
+
+  const legend=$("div","chart-legend");
+  const l1=$("span","lg"); l1.appendChild($("i","sw cur")); l1.appendChild(document.createTextNode("This stone")); legend.appendChild(l1);
+  const l2=$("span","lg"); l2.appendChild($("i","sw other")); l2.appendChild(document.createTextNode(c.Supplier?("Other "+c.Supplier):"Other")); legend.appendChild(l2);
+  box.appendChild(legend);
+  return box;
+}
+
+// ---- column-config-driven one-line order table ----
+// The visible set + order come from state.colCfg (edited in the floating config panel).
+const COL_DEFS={
+  client:   {label:"Client",        w:"minmax(160px,1.6fr)", min:160, build:clientCell},
+  status:   {label:"Status",        w:"148px",               min:148, build:r=>pill(r.Order_Status||"",ORD_C,{options:ORDS,xs:true,onchange:v=>update(r.id,{Order_Status:v})})},
+  ord:      {label:"Ord",  num:true, w:"52px",  min:52,  build:r=>numCell(r,"Ordered_Qty",true,x=>num(x.Ordered_Qty)<num(x.Scope_Qty))},
+  orderdate:{label:"Order date",     w:"124px", min:124, build:r=>dateCell(r,"Order_Date")},
+  deliv:    {label:"Deliv", num:true, w:"52px",  min:52, build:r=>numCell(r,"Delivery_Qty",true,x=>num(x.Delivery_Qty)<num(x.Ordered_Qty))},
+  delivdate:{label:"Delivery date",  w:"124px", min:124, build:r=>dateCell(r,"Delivery_Date")},
+  inv:      {label:"INV",            w:"84px",  min:84,  build:r=>textCell(r,"INV","—")},
+  note:     {label:"Note",           w:"minmax(120px,1.3fr)", min:120, build:r=>textCell(r,"Note","Note…")},
+  scope:    {label:"Scope", num:true, w:"54px", min:54,  build:r=>numCell(r,"Scope_Qty",false)},
+  price:    {label:"$/slab",num:true, w:"74px", min:74,  build:priceCell}
+};
+const COL_ORDER=["client","status","ord","orderdate","deliv","delivdate","inv","note","scope","price"];
+const COL_DEFAULT_ON={client:1,status:1,ord:1,orderdate:1,deliv:1,delivdate:1,inv:1,note:1,scope:0,price:0};
+function defaultColCfg(){ return COL_ORDER.map(k=>({key:k,on:!!COL_DEFAULT_ON[k]})); }
+function ensureColCfg(){
+  if(!Array.isArray(state.colCfg)) state.colCfg=defaultColCfg();
+  state.colCfg=state.colCfg.filter(c=>c&&COL_DEFS[c.key]);          // drop unknown keys
+  COL_ORDER.forEach(k=>{ if(!state.colCfg.some(c=>c.key===k)) state.colCfg.push({key:k,on:!!COL_DEFAULT_ON[k]}); });
+  return state.colCfg;
+}
+function visibleCols(){ const v=ensureColCfg().filter(c=>c.on).map(c=>c.key); return v.length?v:["client","status"]; }
+function gridTemplate(vis){ return vis.map(k=>COL_DEFS[k].w).join(" "); }
+function minWidthOf(vis){ return vis.reduce((s,k)=>s+COL_DEFS[k].min,0)+9*(vis.length-1)+24; }
+function headerRow(vis,tpl){ const h=$("div","hgridrow htbl-head"); h.style.gridTemplateColumns=tpl;
+  vis.forEach(k=>{ const d=COL_DEFS[k]; h.appendChild($("span","hh"+(d.num?" n":""),d.label)); }); return h; }
+function orderRow(r,vis,tpl){ const row=$("div","hgridrow hrow"); row.style.gridTemplateColumns=tpl;
+  vis.forEach(k=>row.appendChild(COL_DEFS[k].build(r))); return row; }
+function clientCell(r){ const j=jobFor(r); const d=$("div","hjob");
+  if(j){ d.appendChild($("span","jclient",jobClient(j)));
+    if(jobAddr(j)){ const a=$("span","jaddr",jobAddr(j)); a.title=jobAddr(j); d.appendChild(a); } }
+  else d.appendChild($("span","jaddr","No job linked"));
+  return d; }
+function priceCell(r){ const c=catFor(r);
+  const v=(r.Product_Price_slab!=null&&r.Product_Price_slab!=="")?r.Product_Price_slab:(c?c.Price_Slab:0);
+  return $("div","hro","$"+(v!=null&&v!==""?v:0)); }
+
+// Flat table (one month already chosen) — used by the monthly history section.
+function orderTable(rows){
+  const vis=visibleCols(), tpl=gridTemplate(vis);
+  const wrap=$("div","htbl-wrap"); const tbl=$("div","htbl"); tbl.style.minWidth=minWidthOf(vis)+"px";
+  tbl.appendChild(headerRow(vis,tpl));
+  rows.forEach(r=>tbl.appendChild(orderRow(r,vis,tpl)));
+  wrap.appendChild(tbl); return wrap;
+}
+// Table split into month sub-sections by `dateField`, each with a subtotal.
+function groupedOrderTable(rows,dateField){
+  const vis=visibleCols(), tpl=gridTemplate(vis);
+  const groups=[]; const gmap={};
+  rows.forEach(r=>{ const k=monthKeyByField(r,dateField); let g=gmap[k]; if(!g){g={key:k,rows:[]};gmap[k]=g;groups.push(g);} g.rows.push(r); });
+  groups.forEach(g=>g.rows.sort((a,b)=>{ const da=+toDate(a[dateField])||0, db=+toDate(b[dateField])||0; return db-da||(b.id||0)-(a.id||0); }));
+  groups.sort((a,b)=>{ if(a.key==null)return 1; if(b.key==null)return -1; return b.key-a.key; });
+  const wrap=$("div","htbl-wrap"); const tbl=$("div","htbl"); tbl.style.minWidth=minWidthOf(vis)+"px";
+  tbl.appendChild(headerRow(vis,tpl));
+  groups.forEach(g=>{
+    const ord=g.rows.reduce((s,r)=>s+num(r.Ordered_Qty),0);
+    const del=g.rows.reduce((s,r)=>s+num(r.Delivery_Qty),0);
+    const mb=$("div","hmonth");
+    mb.appendChild($("span","hm-name",monthLabelOf(g.key)));
+    const sum=$("span","hm-sum");
+    sum.appendChild($("span",null,g.rows.length+" order"+(g.rows.length===1?"":"s")));
+    const so=$("span"); so.appendChild(document.createTextNode("ordered ")); so.appendChild($("b",null,String(ord))); sum.appendChild(so);
+    const sd=$("span"); sd.appendChild(document.createTextNode("delivered ")); sd.appendChild($("b",null,String(del))); sum.appendChild(sd);
+    mb.appendChild(sum);
+    tbl.appendChild(mb);
+    g.rows.forEach(r=>tbl.appendChild(orderRow(r,vis,tpl)));
+  });
+  wrap.appendChild(tbl); return wrap;
+}
+// ---- floating column configuration ----
+function openConfig(){
+  const m=document.getElementById("cfgPop"); m.className="pop cfgpop"; m.innerHTML="";
+  m.appendChild($("div","cfg-h","Table columns — show & order"));
+  const cfg=ensureColCfg();
+  cfg.forEach((cc,i)=>{
+    const row=$("div","cfgrow");
+    const lab=document.createElement("label"); lab.className="ck";
+    const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=cc.on;
+    cb.onchange=()=>{ cc.on=cb.checked; savePrefs(); render(); };
+    lab.appendChild(cb); lab.appendChild(document.createTextNode(COL_DEFS[cc.key].label));
+    row.appendChild(lab);
+    const up=$("span","mv"+(i===0?" off":""),"↑");
+    up.onclick=()=>{ if(i>0){ [cfg[i-1],cfg[i]]=[cfg[i],cfg[i-1]]; savePrefs(); render(); openConfig(); } };
+    const dn=$("span","mv"+(i===cfg.length-1?" off":""),"↓");
+    dn.onclick=()=>{ if(i<cfg.length-1){ [cfg[i+1],cfg[i]]=[cfg[i],cfg[i+1]]; savePrefs(); render(); openConfig(); } };
+    row.appendChild(up); row.appendChild(dn);
+    m.appendChild(row);
+  });
+  const foot=$("div","cfg-foot"); const rst=$("button","cfg-reset","Reset to default");
+  rst.onclick=()=>{ state.colCfg=defaultColCfg(); savePrefs(); render(); openConfig(); };
+  foot.appendChild(rst); m.appendChild(foot);
+  closePops(); m.hidden=false; positionPop(m,document.getElementById("cfgBtn"),252);
+}
+function sectionHead(title,sub,count){
+  const h=$("div","section-h");
+  h.appendChild($("span","st",title));
+  if(count!=null) h.appendChild($("span","sc",String(count)));
+  if(sub) h.appendChild($("span","ssub",sub));
+  return h;
+}
+function lifeBit(v,label){ const s=$("span","lb"); s.appendChild($("b",null,String(v))); s.appendChild(document.createTextNode(" "+label)); return s; }
+
+// An order is "active" when it's been placed but not yet delivered/closed.
+const ACTIVE_STATES=["2.  Placed Order","7. Not Delivered Yet","4. Awaiting Pickup"];
+function isActiveOrder(r){ return ACTIVE_STATES.indexOf(String(r.Order_Status||""))>=0; }
+
+const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+const MONTHS_SHORT=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function monthKeyByField(r,field){ const d=toDate(r[field]); if(!d) return null; return d.getFullYear()*100+(d.getMonth()+1); }
+function monthKeyOf(r){ return monthKeyByField(r,"Order_Date"); }
+function monthLabelOf(key){ if(key==null) return "No date"; return MONTHS[(key%100)-1]+" "+Math.floor(key/100); }
+function monthPillLabel(key){ return MONTHS_SHORT[(key%100)-1]+" "+Math.floor(key/100); }
+function currentMonthKey(){ const d=new Date(); return d.getFullYear()*100+(d.getMonth()+1); }
+
+function stat(v,label){ const s=$("div","stat"); s.appendChild($("div","sv",String(v))); s.appendChild($("div","sl",label)); return s; }
+
+function numCell(r,col,auto,shortFn){
+  const i=document.createElement("input"); i.type="number"; i.className="hcell-in"+(shortFn&&shortFn(r)?" short":"");
+  i.value=(r[col]!=null?r[col]:"");
+  i.onchange=()=>{ const v=i.value===""?null:Number(i.value); auto?updateStoneAuto(r,{[col]:v}):update(r.id,{[col]:v}); };
+  return i;
+}
+function dateCell(r,col){
+  const i=document.createElement("input"); i.type="date"; i.className="hcell-in"; i.value=dateInput(r[col]);
+  i.onchange=()=>updateStoneAuto(r,{[col]:toEpochSec(i.value)});
+  return i;
+}
+function textCell(r,col,ph){
+  const i=document.createElement("input"); i.type="text"; i.className="hcell-in"; i.value=esc(r[col]); if(ph)i.placeholder=ph;
+  i.onchange=()=>update(r.id,{[col]:i.value});
+  return i;
+}
+
+// ---- pill + choice picker (per-option colours, like the inbox) ----
+function pill(val,colors,opts){
+  opts=opts||{};
+  const c=colors[val]||"#e9edf1"; const t=softTint(c);
+  if(opts.onchange){
+    const trig=$("span","pill pill-select"+(opts.xs?" xs":"")); trig.style.background=t.bg;
+    const d=$("span","pdot"); d.style.background=t.dot; trig.appendChild(d);
+    trig.appendChild(document.createTextNode(statusLabel(val)));
+    trig.appendChild($("span","pcaret","▾"));
+    trig.onclick=e=>{ e.stopPropagation(); openChoicePicker(trig,{value:val,options:opts.options||Object.keys(colors),colors,onpick:opts.onchange}); };
+    return trig;
+  }
+  const p=$("span","pill"+(opts.xs?" xs":""),statusLabel(val)); p.style.background=t.bg;
+  const d=$("span","pdot"); d.style.background=t.dot; p.insertBefore(d,p.firstChild); return p;
+}
+function openChoicePicker(anchor,cfg){
+  const m=document.getElementById("choicePop"); m.innerHTML="";
+  (cfg.options||[]).forEach(o=>{
+    const row=$("div","cprow"+(o===cfg.value?" on":""));
+    const p=$("span","pill",statusLabel(o)); const t=softTint(cfg.colors[o]||"#e9edf1"); p.style.background=t.bg;
+    const d=$("span","pdot"); d.style.background=t.dot; p.insertBefore(d,p.firstChild); row.appendChild(p);
+    if(o===cfg.value) row.appendChild($("span","rtick","✓"));
+    row.onmousedown=e=>{ e.preventDefault(); closePops(); cfg.onpick(o); };
+    m.appendChild(row);
+  });
+  closePops(); m.hidden=false; positionPop(m,anchor,210);
+}
+function positionPop(el,anchor,w){
+  const rc=anchor.getBoundingClientRect();
+  el.style.left=Math.max(8,Math.min(rc.left,window.innerWidth-(w||220)-12))+"px";
+  const below=rc.bottom+6, h=el.offsetHeight||260;
+  el.style.top=(below+h>window.innerHeight-8 ? Math.max(8,rc.top-h-6) : below)+"px";
+  el.style.right="auto";
+}
+function closePops(){ ["choicePop","cfgPop"].forEach(id=>{const e=document.getElementById(id); if(e)e.hidden=true;}); }
+
+// ============================================================
+//  WRITE-BACK (demo mutates local state; live writes to Grist)
+// ============================================================
+function update(rowId,fields){
+  const r=state.stone.find(x=>x.id===rowId); if(r)Object.assign(r,fields);
+  render();
+  if(state.grist){ grist.docApi.applyUserActions([["UpdateRecord","Stone_Order",rowId,fields]]).then(refetch).catch(e=>console.warn("update failed",e)); }
+}
+function updateStoneAuto(r,fields){
+  Object.assign(r,fields);                       // optimistic so the rule sees new values
+  const auto=autoStatus(r);
+  if(auto && auto!==r.Order_Status) fields.Order_Status=auto;
+  update(r.id,fields);
+}
+
+// ============================================================
+//  SCHEMA INTROSPECTION (Product ref target + live status choices/colours)
+// ============================================================
+async function loadGristSchema(){
+  const [T,C]=await Promise.all([
+    grist.docApi.fetchTable("_grist_Tables"),
+    grist.docApi.fetchTable("_grist_Tables_column")]);
+  const tables=columnarToRows(T), cols=columnarToRows(C);
+  const tableById={}; tables.forEach(t=>tableById[t.tableId]=t);
+  const colByRowId={}; cols.forEach(c=>colByRowId[c.id]=c);
+  const colsOf=tid=>{ const t=tableById[tid]; return t?cols.filter(c=>c.parentId===t.id):[]; };
+  const isEditable=c=>!c.isFormula && c.colId && !SPECIAL_COL.test(c.colId);
+  const choicesOf=c=>{ try{ return JSON.parse(c.widgetOptions||"{}").choices||null; }catch(e){ return null; } };
+  const choiceColorsOf=c=>{ try{ const o=JSON.parse(c.widgetOptions||"{}").choiceOptions||{}; const m={};
+    for(const k in o){ if(o[k]&&o[k].fillColor) m[k]=o[k].fillColor; } return m; }catch(e){ return {}; } };
+  const bestLabelCol=tid=>{ const cs=colsOf(tid).filter(isEditable);
+    return ((cs.find(c=>/full|name|title|label|desc/i.test(c.colId))||cs.find(c=>(c.type||"").startsWith("Text"))||cs[0]||{}).colId)||null; };
+  function refInfo(parentTableId,colId){
+    const col=colsOf(parentTableId).find(c=>c.colId===colId); if(!col)return null;
+    const m=/^Ref(?:List)?:(.+)$/.exec(col.type||""); if(!m)return null;
+    const targetTableId=m[1], vis=col.visibleCol&&colByRowId[col.visibleCol];
+    return { colId, targetTableId, labelCol:(vis&&vis.colId)||bestLabelCol(targetTableId) };
+  }
+  function colChoices(tableId,colId){ const c=colsOf(tableId).find(x=>x.colId===colId); return c?choicesOf(c):null; }
+  function colChoiceColors(tableId,colId){ const c=colsOf(tableId).find(x=>x.colId===colId); return c?choiceColorsOf(c):{}; }
+  return { refInfo, colChoices, colChoiceColors };
+}
+function applyStatusSchema(sc){
+  try{
+    const names=sc.colChoices("Stone_Order","Order_Status");
+    const colors=sc.colChoiceColors("Stone_Order","Order_Status");
+    if(names && names.length){
+      Object.keys(ORD_C).forEach(k=>delete ORD_C[k]);
+      names.forEach(n=>{ ORD_C[n]=(colors&&colors[n])||ORD_DEFAULT[n]||"#e9edf1"; });
+      ORDS=names.slice();
+    }
+  }catch(e){ console.warn("status schema load failed",e); }
+}
+
+// ============================================================
+//  DATA (live)
+// ============================================================
+async function pullTables(){
+  const [so,jd]=await Promise.all([
+    grist.docApi.fetchTable("Stone_Order"),
+    grist.docApi.fetchTable("Jobs_Detail")]);
+  state.stone=columnarToRows(so); state.jobs=columnarToRows(jd);
+  if(state.ref.product){
+    try{ const cat=await grist.docApi.fetchTable(state.ref.product.targetTableId); state.catalogue=columnarToRows(cat); }catch(e){}
+  }
+  reindex();
+}
+async function refetch(){ if(!state.grist)return; try{ await pullTables(); }catch(e){ console.warn("fetch failed",e); } render(); }
+
+// ============================================================
+//  GRIST WIRING — sample first, flip to live once Grist answers
+// ============================================================
+if(typeof grist!=="undefined"){
+  try{ grist.ready({ requiredAccess:"full" }); }catch(e){}
+  try{ grist.onRecord(()=>{}); }catch(e){}   // stay mappable to Stone_Order without erroring
+  grist.docApi.fetchTable("Stone_Order").then(async ()=>{
+    try{
+      const sc=await loadGristSchema();
+      state.ref.product=sc.refInfo("Stone_Order","Product");
+      applyStatusSchema(sc);
+    }catch(e){ console.warn("schema introspection failed",e); }
+    try{ await pullTables(); }catch(e){ console.warn("initial fetch failed",e); }
+    state.grist=true; render();
+  }).catch(()=>{});
+}
+
+// ============================================================
+//  SAMPLE DATA (standalone / preview)
+// ============================================================
+const SAMPLE_JOBS=[
+  { id:2,  Job_ID:"J0002", Client_Label:"Annie",       Job_Address:"31 Harridge St, Rosebud VIC 3939", Address_Formatted:"31 Harridge St, Rosebud VIC 3939", Stage:"Live" },
+  { id:8,  Job_ID:"J0008", Client_Label:"Home owner",  Job_Address:"1/162 Kambrook Rd, Caulfield North VIC 3161", Address_Formatted:"1/162 Kambrook Rd, Caulfield North VIC 3161", Stage:"Live" },
+  { id:14, Job_ID:"J0014", Client_Label:"Harry Aboda", Job_Address:"105 Point Nepean Rd, Dromana VIC 3936", Address_Formatted:"105 Point Nepean Rd, Dromana VIC 3936", Stage:"On hold" },
+  { id:19, Job_ID:"J0019", Client_Label:"Naz",         Job_Address:"19 Stephens St, Balwyn North VIC 3104", Address_Formatted:"19 Stephens St, Balwyn North VIC 3104", Stage:"Live" },
+  { id:23, Job_ID:"J0023", Client_Label:"Louis",       Job_Address:"11 Banksia Ct, Croydon South VIC 3136", Address_Formatted:"11 Banksia Ct, Croydon South VIC 3136", Stage:"WIP" }
+];
+const SAMPLE_CAT=[
+  {id:101,Supplier:"Lavistone",  Code:"LS303", Product_Full:"Lavistone · LS303 · Cararra Lux 20mm",   Price_Slab:700},
+  {id:102,Supplier:"YDL",        Code:"1888",  Product_Full:"YDL · 1888 · Kalala Bianco 20mm",        Price_Slab:820},
+  {id:103,Supplier:"Caesarstone",Code:"CS5100",Product_Full:"Caesarstone · CS5100 · Vanilla Noir 20mm",Price_Slab:960},
+  {id:104,Supplier:"Lavistone",  Code:"LSU401",Product_Full:"Lavistone · LSU401 · Taj Classico 20mm", Price_Slab:640},
+  {id:105,Supplier:"Caesarstone",Code:"CS4001",Product_Full:"Caesarstone · CS4001 · Fresh Concrete 20mm",Price_Slab:710},
+  {id:106,Supplier:"YDL",        Code:"YDLQ",  Product_Full:"YDL · YDLQ · Calacatta Gold 20mm",       Price_Slab:1180},
+  {id:107,Supplier:"WF",         Code:"3420",  Product_Full:"WF · Marble · Biancatto 3420x2010x20mm", Price_Slab:0},
+  {id:108,Supplier:"Zenith",     Code:"ZN12",  Product_Full:"Zenith · ZN12 · Statuario 20mm",         Price_Slab:890}
+];
+// Note: LS303 (101) is ordered on multiple jobs, so its history has several rows.
+const SAMPLE_STONE=[
+  { id:1, Job:2,  Product:101, Product_Code:"LS303", Product_Supplier:"Lavistone",  Scope_Qty:2, Ordered_Qty:2, Delivery_Qty:2, Order_Status:"6. Delivered",   Order_Date:1783296000, Delivery_Date:1784332800, INV:"INV-31861", Note:"kitchen benchtop" },
+  { id:2, Job:8,  Product:102, Product_Code:"1888",  Product_Supplier:"YDL",        Scope_Qty:2, Ordered_Qty:2, Delivery_Qty:0, Order_Status:"2.  Placed Order",Order_Date:1785196800, Delivery_Date:null, INV:"", Note:"kitchen first" },
+  { id:3, Job:8,  Product:103, Product_Code:"CS5100",Product_Supplier:"Caesarstone",Scope_Qty:2, Ordered_Qty:0, Delivery_Qty:0, Order_Status:"3. Awaiting Order",Order_Date:null, Delivery_Date:null, INV:"", Note:"" },
+  { id:4, Job:14, Product:105, Product_Code:"CS4001",Product_Supplier:"Caesarstone",Scope_Qty:60,Ordered_Qty:0, Delivery_Qty:0, Order_Status:"1. No Stock",     Order_Date:null, Delivery_Date:null, INV:"", Note:"166 slabs total" },
+  { id:5, Job:14, Product:107, Product_Code:"3420",  Product_Supplier:"WF",         Scope_Qty:8, Ordered_Qty:8, Delivery_Qty:0, Order_Status:"4. Awaiting Pickup",Order_Date:1784592000, Delivery_Date:null, INV:"", Note:"backsplash" },
+  { id:6, Job:19, Product:104, Product_Code:"LSU401",Product_Supplier:"Lavistone",  Scope_Qty:4, Ordered_Qty:4, Delivery_Qty:0, Order_Status:"7. Not Delivered Yet",Order_Date:1784592000, Delivery_Date:null, INV:"INV-32001", Note:"" },
+  { id:7, Job:19, Product:106, Product_Code:"YDLQ",  Product_Supplier:"YDL",        Scope_Qty:3, Ordered_Qty:0, Delivery_Qty:0, Order_Status:"",              Order_Date:null, Delivery_Date:null, INV:"", Note:"quote pending" },
+  { id:8, Job:23, Product:108, Product_Code:"ZN12",  Product_Supplier:"Zenith",     Scope_Qty:5, Ordered_Qty:5, Delivery_Qty:5, Order_Status:"6. Delivered",   Order_Date:1782518400, Delivery_Date:1783728000, INV:"INV-31990", Note:"" },
+  { id:9, Job:23, Product:101, Product_Code:"LS303", Product_Supplier:"Lavistone",  Scope_Qty:2, Ordered_Qty:2, Delivery_Qty:0, Order_Status:"5. On hold",     Order_Date:null, Delivery_Date:null, INV:"", Note:"client to confirm colour" },
+  { id:10,Job:14, Product:101, Product_Code:"LS303", Product_Supplier:"Lavistone",  Scope_Qty:6, Ordered_Qty:6, Delivery_Qty:6, Order_Status:"6. Delivered",   Order_Date:1781740800, Delivery_Date:1782518400, INV:"INV-31740", Note:"laundry + vanity" },
+  { id:11,Job:19, Product:101, Product_Code:"LS303", Product_Supplier:"Lavistone",  Scope_Qty:3, Ordered_Qty:3, Delivery_Qty:0, Order_Status:"4. Awaiting Pickup",Order_Date:1785801600, Delivery_Date:null, INV:"", Note:"" }
+];
+const DEMO_REF={ product:{ targetTableId:"Catalogue", labelCol:"Product_Full" } };
+window._test=function(stone,jobs,catalogue){
+  state.stone=stone||[]; state.jobs=jobs||[]; state.catalogue=catalogue||[]; reindex(); render();
+};
+
+// ============================================================
+//  BOOT
+// ============================================================
+function initSplitter(){
+  const sp=document.getElementById("splitter"), lp=document.querySelector(".search-pane");
+  if(!sp||!lp) return;
+  if(state.searchW) lp.style.flex="0 0 "+state.searchW+"px";
+  sp.addEventListener("mousedown",e=>{
+    e.preventDefault(); sp.classList.add("drag");
+    const startX=e.clientX, startW=lp.getBoundingClientRect().width;
+    const mv=ev=>{ let w=startW+(ev.clientX-startX); w=Math.max(260,Math.min(w,Math.max(320,window.innerWidth-360))); lp.style.flex="0 0 "+w+"px"; };
+    const up=()=>{ document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up); sp.classList.remove("drag");
+      state.searchW=Math.round(lp.getBoundingClientRect().width); savePrefs(); };
+    document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up);
+  });
+}
+const qInput=document.getElementById("q");
+qInput.oninput=e=>{ state.q=e.target.value; state.selectedCatId=null; render(); };
+document.getElementById("qClr").onclick=()=>{ state.q=""; qInput.value=""; state.selectedCatId=null; render(); qInput.focus(); };
+document.getElementById("choicePop").onclick=e=>e.stopPropagation();
+document.getElementById("cfgPop").onclick=e=>e.stopPropagation();
+document.getElementById("cfgBtn").onclick=e=>{ e.stopPropagation();
+  const m=document.getElementById("cfgPop"); if(m.hidden) openConfig(); else m.hidden=true; };
+document.addEventListener("click",closePops);
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closePops(); });
+
+{ const p=loadPrefs(); if(p.searchW) state.searchW=p.searchW; if(Array.isArray(p.colCfg)) state.colCfg=p.colCfg; }
+ensureColCfg();
+initSplitter();
+// Sample-first so the pane is never blank; the live wiring above flips + replaces it.
+if(!state.ref.product) state.ref.product=DEMO_REF.product;
+window._test(SAMPLE_STONE,SAMPLE_JOBS,SAMPLE_CAT);
+</script>
+</body>
+</html>

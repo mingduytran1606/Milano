@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Milano — Stone Order Calendar</title>
+<script src="https://milano.getgrist.com/grist-plugin-api.js"></script>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --ink:#1d2733; --muted:#6b7683;
+    --line:#e2e5ea; --line2:#eef1f4;
+    --accent:#16b378; --accent-soft:#eafaf2; --accent-ink:#0f7a52;
+    --danger:#e5484d;
+    --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.10);
+    --radius:14px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{ --bg:#12161b; --panel:#1a1f26; --ink:#e8edf2; --muted:#9aa6b2;
+      --line:#2a323b; --line2:#232a32;
+      --accent:#35c993; --accent-soft:#173a30; --accent-ink:#7ee0bd; --shadow:0 1px 2px rgba(0,0,0,.4);}
+  }
+  :root[data-theme="light"]{ --bg:#f6f7f9; --panel:#ffffff; --ink:#1d2733; --muted:#6b7683;
+    --line:#e2e5ea; --line2:#eef1f4; --accent:#16b378; --accent-soft:#eafaf2; --accent-ink:#0f7a52;}
+  :root[data-theme="dark"]{ --bg:#12161b; --panel:#1a1f26; --ink:#e8edf2; --muted:#9aa6b2;
+    --line:#2a323b; --line2:#232a32; --accent:#35c993; --accent-soft:#173a30; --accent-ink:#7ee0bd;}
+
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .app{height:100%;display:flex;flex-direction:column;padding:14px;gap:12px}
+
+  /* ---- top bar ---- */
+  .topbar{flex:0 0 auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .nav{display:flex;align-items:center;gap:6px}
+  .navbtn{width:32px;height:32px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+    cursor:pointer;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center}
+  .navbtn:hover{border-color:var(--accent);color:var(--accent-ink)}
+  .title{font-size:18px;font-weight:800;letter-spacing:.2px;min-width:170px}
+  .today{font:inherit;font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:9px;border:1px solid var(--line);
+    background:var(--panel);color:var(--ink);cursor:pointer}
+  .today:hover{border-color:var(--accent);color:var(--accent-ink)}
+  .spacer{flex:1 1 auto}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .seg button{border:0;background:var(--panel);color:var(--muted);padding:7px 13px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+  .seg button+button{border-left:1px solid var(--line)}
+  .seg button.on{background:var(--accent-soft);color:var(--accent-ink);font-weight:700}
+  .assign{font:inherit;font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:9px;border:1px solid var(--line);
+    background:var(--panel);color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+  .assign:hover{border-color:var(--accent)}
+  .assign.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink)}
+  .legend{display:flex;gap:8px}
+  .lg{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:5px 11px;border-radius:999px;
+    border:1px solid var(--line);background:var(--panel);color:var(--muted);cursor:pointer;user-select:none}
+  .lg .sw{width:11px;height:11px;border-radius:3px;flex:0 0 auto}
+  .lg.on{color:var(--ink);border-color:var(--accent)}
+  .lg.off{opacity:.5;text-decoration:line-through}
+  .lg .n{font-variant-numeric:tabular-nums;color:var(--muted)}
+
+  /* ---- body: calendar + jobs sidebar ---- */
+  .body{flex:1 1 auto;min-height:0;display:flex;gap:12px}
+  .body.noside .sidebar{display:none}
+  .sidebar{flex:0 0 260px;display:flex;flex-direction:column;min-height:0;
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+  .side-head{flex:0 0 auto;padding:12px 12px 10px;display:flex;flex-direction:column;gap:9px;border-bottom:1px solid var(--line2)}
+  .side-title{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
+  .side-title .jc-count{background:var(--line2);color:var(--muted);border-radius:999px;font-size:11px;padding:1px 8px;font-weight:700}
+  .ssearch{position:relative}
+  .ssearch input{width:100%;font:inherit;font-size:12.5px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px 8px 30px}
+  .ssearch input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+  .ssearch svg{position:absolute;left:9px;top:9px;width:15px;height:15px;stroke:var(--muted);fill:none}
+  .job-list{flex:1 1 auto;min-height:0;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:7px}
+  .job{border:1px solid var(--line);border-radius:11px;padding:9px 10px;cursor:pointer;display:flex;flex-direction:column;gap:5px}
+  .job:hover{border-color:var(--accent)}
+  .job.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--accent-soft)}
+  .job .jc{font-weight:700;font-size:13px;line-height:1.25}
+  .job .ja{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .job .jm{display:flex;align-items:center;gap:10px;font-size:11px;color:var(--muted)}
+  .job .jm .k{display:inline-flex;align-items:center;gap:4px}
+  .job .jm .kd{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .job .avs{margin-left:auto;display:flex}
+  .job .avs .av{width:19px;height:19px;font-size:9px;margin-left:-5px;border:1.5px solid var(--panel)}
+  .side-empty{color:var(--muted);font-size:12px;text-align:center;padding:20px 8px}
+
+  /* ---- calendar grid ---- */
+  .cal{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+  .dow{flex:0 0 auto;display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--line)}
+  .dow span{padding:8px 6px;text-align:center;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .grid{flex:1 1 auto;display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:1fr;overflow-y:auto}
+  .cell{border-right:1px solid var(--line2);border-bottom:1px solid var(--line2);min-height:104px;padding:5px 6px;
+    display:flex;flex-direction:column;gap:3px;overflow:hidden}
+  .cell:nth-child(7n){border-right:0}
+  .cell.out{background:var(--bg)}
+  .cell.out .dn{opacity:.4}
+  .cell.wknd{background:color-mix(in srgb,var(--bg) 55%,var(--panel))}
+  .drow{display:flex;align-items:center;gap:4px}
+  .dn{font-size:11.5px;font-weight:700;color:var(--muted);width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center}
+  .cell.today .dn{background:var(--accent);color:#fff;border-radius:50%}
+  .dsum{margin-left:auto;font-size:9.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+  .ev{font-size:var(--ev-card-font,10.5px);line-height:1.32;border-radius:6px;padding:2px 6px;cursor:pointer;overflow:hidden}
+  .ev strong{font-weight:700}
+  .ev em{font-style:italic;color:var(--muted)}
+  /* templated card lines (shared by event chips + job cards) */
+  .cline{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cdivider{height:1px;background:var(--line2);margin:3px 0}
+  .cbar{border-radius:5px;padding:0 5px;display:inline-block}
+  .cpill{display:inline-flex;align-items:center;gap:4px;border-radius:20px;padding:0 7px;font-size:.92em;font-weight:700;color:var(--ink)}
+  .cpill .cpd{width:6px;height:6px;border-radius:50%;flex:0 0 auto}
+  .avwrap{display:inline-flex;vertical-align:-4px}
+  .avwrap .av{width:16px;height:16px;font-size:8.5px;margin-left:-4px;border:1.5px solid var(--panel)}
+  .avwrap .av:first-child{margin-left:0}
+  .jk{display:inline-flex;align-items:center;gap:4px}
+  .jk .kd{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .ev.ordered{background:#fdf6c8}
+  .ev.delivered{background:#dcf7d6}
+  @media (prefers-color-scheme:dark){ .ev.ordered{background:#3a380f} .ev.delivered{background:#173a24} }
+  :root[data-theme="dark"] .ev.ordered{background:#3a380f}
+  :root[data-theme="dark"] .ev.delivered{background:#173a24}
+  :root[data-theme="light"] .ev.ordered{background:#fdf6c8}
+  :root[data-theme="light"] .ev.delivered{background:#dcf7d6}
+  .more{font-size:10px;font-weight:600;color:var(--accent-ink);cursor:pointer;padding:1px 2px}
+  .more:hover{text-decoration:underline}
+
+  /* week view: single tall row, scroll within a day */
+  .grid.week{grid-auto-rows:1fr}
+  .grid.week .cell{overflow-y:auto;min-height:0}
+  /* agenda view: vertical list of days */
+  .agenda{flex:1 1 auto;min-height:0;overflow-y:auto;display:block;background:var(--panel);
+    border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .ag-day{display:flex;gap:14px;align-items:flex-start;padding:11px 14px;border-bottom:1px solid var(--line2)}
+  .ag-date{flex:0 0 130px;font-size:12.5px;font-weight:700;color:var(--muted)}
+  .ag-date .tdy{display:inline-block;margin-top:3px;font-size:10px;color:#fff;background:var(--accent);border-radius:5px;padding:0 6px}
+  .ag-evs{flex:1 1 auto;display:flex;flex-direction:column;gap:5px;min-width:0}
+  .ag-empty{color:var(--muted);text-align:center;padding:40px;font-size:13px}
+
+  /* assignee menu rows (reuse .pop) */
+  .cprow{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:12.5px}
+  .cprow:hover,.cprow.on{background:var(--line2)}
+  .cprow.on{color:var(--accent-ink);font-weight:600}
+  .cprow .rtick{margin-left:auto;color:var(--accent-ink);font-weight:800}
+  .av{width:22px;height:22px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+    font-size:10px;font-weight:700;color:#fff}
+
+  /* ---- day popover ---- */
+  .pop{position:fixed;z-index:60;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    box-shadow:0 14px 36px rgba(16,24,40,.24);padding:10px 12px;min-width:240px;max-width:320px;max-height:70vh;overflow:auto}
+  .pop[hidden]{display:none}
+  .pop h4{margin:0 0 8px;font-size:12px;font-weight:800}
+  .pev{padding:7px 0;border-top:1px solid var(--line2)}
+  .pev:first-of-type{border-top:0}
+  .pev .pline{display:flex;align-items:center;gap:6px}
+  .pev .kind{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;border-radius:5px;padding:1px 6px}
+  .pev .kind.ordered{background:#fdf6c8;color:#7a5c00}
+  .pev .kind.delivered{background:#dcf7d6;color:#0f7a52}
+  .pev .pname{font-weight:700;font-size:12.5px}
+  .pev .pmeta{font-size:11.5px;color:var(--muted);margin-top:2px}
+
+  .job{font-size:var(--job-card-font,12.5px)}
+
+  /* ---- card customisation modal ---- */
+  .modal{position:fixed;inset:0;background:rgba(16,24,40,.42);z-index:80;display:none;align-items:center;justify-content:center;padding:20px}
+  .modal.open{display:flex}
+  .modal-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);
+    width:min(560px,96vw);max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+  .modal-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line2)}
+  .modal-close{margin-left:auto;cursor:pointer;font-size:20px;color:var(--muted);line-height:1;padding:2px 6px;border-radius:6px}
+  .modal-close:hover{background:var(--line2);color:var(--ink)}
+  .ce-tabs{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .ce-tab{border:0;background:var(--panel);color:var(--muted);padding:6px 12px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+  .ce-tab+.ce-tab{border-left:1px solid var(--line)}
+  .ce-tab.on{background:var(--accent-soft);color:var(--accent-ink);font-weight:700}
+  .ce-body{padding:14px;overflow:auto}
+  .ce-note{font-size:11.5px;color:var(--muted);margin-bottom:9px;line-height:1.5}
+  .ce-ta{width:100%;min-height:92px;font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink);
+    background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;resize:vertical;outline:none}
+  .ce-ta:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+  .ce-tokens{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .ce-tok{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);border-radius:8px;
+    padding:4px 8px;cursor:pointer;font:inherit;font-size:11px;color:var(--ink)}
+  .ce-tok:hover{border-color:var(--accent);background:var(--accent-soft)}
+  .ce-tok code{font-family:ui-monospace,Menlo,monospace;font-weight:700;color:var(--accent-ink)}
+  .ce-tok span{color:var(--muted)}
+  .ce-reset{margin-top:12px;font-size:12px;color:var(--accent-ink);cursor:pointer;display:inline-block}
+  .ce-reset:hover{text-decoration:underline}
+  .ce-fontrow{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12.5px}
+  .ce-flabel{color:var(--muted);font-weight:600;margin-right:auto}
+  .ce-fbtn{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;font-size:15px}
+  .ce-fbtn:hover{border-color:var(--accent)}
+  .ce-fval{font-variant-numeric:tabular-nums;min-width:44px;text-align:center}
+  .ce-foot{margin-top:14px;border-top:1px solid var(--line2);padding-top:12px}
+  .ce-scope{font-size:11.5px;color:var(--muted);margin-bottom:8px}
+  .ce-btnrow{display:flex;gap:8px;justify-content:flex-end}
+  .ce-save{font:inherit;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:9px;cursor:pointer;border:1px solid var(--line)}
+  .ce-save.ghost{background:var(--panel);color:var(--ink)}
+  .ce-save.ghost:hover{background:var(--line2)}
+  .ce-save.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .ce-save.primary:hover{filter:brightness(1.06)}
+
+  .demo-tag{position:fixed;bottom:9px;left:11px;font-size:10px;color:var(--muted);background:var(--panel);
+    border:1px solid var(--line);border-radius:20px;padding:2px 9px;opacity:.75;z-index:40}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="nav">
+      <button class="navbtn" id="prev" title="Previous month">‹</button>
+      <button class="navbtn" id="next" title="Next month">›</button>
+    </div>
+    <div class="title" id="title">—</div>
+    <button class="today" id="todayBtn">Today</button>
+    <div class="spacer"></div>
+    <div class="seg" id="viewSeg">
+      <button data-v="month" class="on">Month</button>
+      <button data-v="week">Week</button>
+      <button data-v="agenda">Agenda</button>
+    </div>
+    <button class="assign" id="assignBtn">All assignees ▾</button>
+    <div class="legend">
+      <span class="lg on" id="lgOrdered"><span class="sw" style="background:#f2df3a"></span>Ordered <span class="n" id="nOrdered">0</span></span>
+      <span class="lg on" id="lgDelivered"><span class="sw" style="background:#7ad66f"></span>Delivered <span class="n" id="nDelivered">0</span></span>
+    </div>
+    <button class="assign" id="cardsBtn" title="Customise how cards appear">⚙ Cards</button>
+    <button class="assign" id="btnJobs" title="Show / hide the jobs panel">▦ Jobs</button>
+  </div>
+  <div class="body" id="body">
+    <div class="cal">
+      <div class="dow" id="dow"></div>
+      <div class="grid" id="grid"></div>
+    </div>
+    <div class="sidebar" id="sidebar">
+      <div class="side-head">
+        <div class="side-title">Jobs <span class="jc-count" id="jobCount">0</span></div>
+        <div class="ssearch">
+          <svg viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="jobSearch" type="text" placeholder="Search client, address, stone, status…" autocomplete="off">
+        </div>
+      </div>
+      <div class="job-list" id="jobList"></div>
+    </div>
+  </div>
+</div>
+
+<div class="pop" id="dayPop" hidden></div>
+<div class="pop" id="assignPop" hidden></div>
+<div class="modal" id="cardModal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div class="ce-tabs">
+        <button class="ce-tab on" data-tab="event">Event card</button>
+        <button class="ce-tab" data-tab="job">Job card</button>
+      </div>
+      <span class="modal-close" id="cardClose">&times;</span>
+    </div>
+    <div class="ce-body" id="ceBody"></div>
+  </div>
+</div>
+<div class="demo-tag" id="demoTag" hidden>demo data</div>
+
+<script>
+"use strict";
+/* ============================================================
+   Milano — Stone Order Calendar widget
+   Plots each Stone_Order line on a month calendar:
+     • ordered but not delivered  → placed on its ORDER date
+     • delivered                  → placed on its DELIVERY date
+   Shares the Inbox / Catalogue foundation: design tokens, the
+   Order_Status model, and the Grist read plumbing.
+   ============================================================ */
+
+// ---- status model ----
+const ORD_DEFAULT = {
+  "2.  Placed Order":"#FEF47A","3. Awaiting Order":"#FED6FB","6. Delivered":"#98FD90",
+  "4. Awaiting Pickup":"#75B5FC","7. Not Delivered Yet":"#CCFEFE","5. On hold":"#FEE7C3",
+  "1. No Stock":"#FD8182","Cancelled":"#DCDCDC","Delivered by WF":"#E1FEDE",
+  "Delivered by Aboda":"#E1FEDE","Delivered by Client":"#E1FEDE","Return":"#CCFEFE","N/A":"#e9edf1"};
+const ORD_C = Object.assign({}, ORD_DEFAULT);
+const statusColor = s => ORD_C[s] || "#e9edf1";
+const statusLabel = s => (s==null||s==="") ? "To sort" : s;
+const SPECIAL_COL = /^(manualSort|gristHelper_|id$)/;
+function isDeliveredStatus(r){ const low=String(r.Order_Status||"").toLowerCase(); return /deliver/.test(low) && !/not deliver/.test(low); }
+
+// ---- generic helpers ----
+const $=(t,c,txt)=>{const e=document.createElement(t); if(c)e.className=c; if(txt!=null)e.textContent=txt; return e;};
+function refId(v){ if(v==null)return null; if(typeof v==="number")return v;
+  if(Array.isArray(v))return v[2]; if(typeof v==="object")return v.rowId!=null?v.rowId:v.id; return v; }
+function toDate(v){ if(v==null||v==="")return null;
+  if(typeof v==="number")return new Date(v*1000);
+  if(v instanceof Date)return v; const d=new Date(v); return isNaN(d)?null:d; }
+function fmtDMY(v){ const d=toDate(v); if(!d)return "—";
+  return String(d.getDate()).padStart(2,"0")+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+d.getFullYear(); }
+const num=v=>{ const n=Number(v); return isFinite(n)?n:0; };
+function ymd(d){ return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate(); }
+function columnarToRows(t){ if(!t||!t.id)return []; return t.id.map((id,i)=>{const o={id}; for(const k in t)if(k!=="id")o[k]=t[k][i]; return o;}); }
+function hexRgb(h){ h=String(h||"").replace("#",""); if(h.length===3)h=h.split("").map(c=>c+c).join("");
+  return {r:parseInt(h.slice(0,2),16)||0,g:parseInt(h.slice(2,4),16)||0,b:parseInt(h.slice(4,6),16)||0}; }
+function softTint(hex){ const {r,g,b}=hexRgb(hex||"#cfd4d1");
+  return { bg:"rgb("+Math.round(r+(255-r)*.72)+","+Math.round(g+(255-g)*.72)+","+Math.round(b+(255-b)*.72)+")",
+           dot:"rgb("+Math.round(r*.66)+","+Math.round(g*.66)+","+Math.round(b*.66)+")" }; }
+function txtNode(s){ return (s==null||s==="")?null:document.createTextNode(String(s)); }
+
+const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DOW=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+// ---- state ----
+const state={
+  stone:[], jobs:[], catalogue:[], grist:false,
+  ref:{ product:null },
+  cursor:new Date(),                    // any day in the viewed range
+  view:"month",                         // month | week | agenda
+  assignee:null,                        // null = all assignees
+  jobFilter:null,                       // null = all jobs (sidebar selection)
+  jobQ:"", sideOpen:true,
+  show:{ ordered:true, delivered:true },
+  jobById:{}, catById:{}
+};
+window._stonecal=state;
+
+// ---- customisable card templates (mirrors the installations calendar) ----
+// Markdown-ish: **bold**, *italic*, {token}, ==coloured bar==, --- divider, \n = new line.
+const DEFAULT_EVENT_CARD='**{client}** · {product}';
+const DEFAULT_JOB_CARD='**{client}**\n{address}\n{ordered} {delivered} {assigned}';
+let eventCardTpl=DEFAULT_EVENT_CARD, jobCardTpl=DEFAULT_JOB_CARD;
+let cardScope='everyone', eventCardFont=10.5, jobCardFont=12.5;
+const CARD_LS='milano_stonecal_cards';
+const EVENT_TOKENS={ client:'Client', job:'Job ID', address:'Address', product:'Product', supplier:'Supplier',
+  code:'Product code', status:'Status pill', kind:'Ordered / Delivered', ordered:'Ordered qty', delivered:'Delivered qty',
+  orderdate:'Order date', deliverydate:'Delivery date', inv:'Invoice #', note:'Note', price:'$ / slab', assigned:'Assignee avatars' };
+const JOB_TOKENS={ client:'Client', address:'Address', job:'Job ID', orders:'Order count', ordered:'# ordered', delivered:'# delivered', assigned:'Assignee avatars' };
+function applyCardFonts(){ document.documentElement.style.setProperty("--ev-card-font",eventCardFont+"px");
+  document.documentElement.style.setProperty("--job-card-font",jobCardFont+"px"); }
+function loadLocalCards(){ try{ return JSON.parse(localStorage.getItem(CARD_LS)||"{}")||{}; }catch(e){ return {}; } }
+function saveLocalCards(){ try{ localStorage.setItem(CARD_LS,JSON.stringify({event:eventCardTpl,job:jobCardTpl,scope:cardScope,ef:eventCardFont,jf:jobCardFont})); }catch(e){} }
+function publishCards(){ try{ grist.setOption("eventCardTpl",eventCardTpl); grist.setOption("jobCardTpl",jobCardTpl);
+  grist.setOption("eventCardFont",eventCardFont); grist.setOption("jobCardFont",jobCardFont); }catch(e){} }
+function applyGristOptions(opts){ if(!opts)return;
+  const mod=document.getElementById("cardModal"); const editing=mod&&mod.classList.contains("open");
+  if(cardScope!=="me" && !editing){
+    if(typeof opts.eventCardTpl==="string") eventCardTpl=opts.eventCardTpl;
+    if(typeof opts.jobCardTpl==="string") jobCardTpl=opts.jobCardTpl;
+    if(typeof opts.eventCardFont==="number") eventCardFont=opts.eventCardFont;
+    if(typeof opts.jobCardFont==="number") jobCardFont=opts.jobCardFont;
+    applyCardFonts(); render();
+  }
+}
+
+// ---- lookups ----
+function reindex(){ state.jobById={}; state.jobs.forEach(j=>state.jobById[j.id]=j);
+  state.catById={}; state.catalogue.forEach(c=>state.catById[c.id]=c); }
+function jobFor(r){ return state.jobById[refId(r.Job)]||null; }
+function catFor(r){ return state.catById[refId(r.Product)]||null; }
+// Assignees live on the job as a Grist ChoiceList (["L", ...names]).
+function choiceList(v){ if(Array.isArray(v)) return (v[0]==="L"?v.slice(1):v.filter(x=>typeof x==="string"));
+  return (typeof v==="string"&&v)?[v]:[]; }
+function assigneesOf(r){ const j=jobFor(r); return j?choiceList(j.Assigned_To):[]; }
+function allAssignees(){ const s=new Set(); (state.jobs||[]).forEach(j=>choiceList(j.Assigned_To).forEach(a=>a&&s.add(a)));
+  return [...s].sort((a,b)=>String(a).toLowerCase().localeCompare(String(b).toLowerCase())); }
+// Stable colour per assignee (for the avatar chips in the menu).
+function avatarColor(name){ let h=0; const s=String(name||""); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0;
+  return "hsl("+(h%360)+",55%,45%)"; }
+function initials(name){ return String(name||"?").trim().split(/\s+/).map(w=>w[0]).slice(0,2).join("").toUpperCase()||"?"; }
+function stoneLabel(r){ const c=catFor(r);
+  if(c && c.Product_Full && String(c.Product_Full).trim()) return String(c.Product_Full).trim();
+  if(r.Product_Code) return [r.Product_Supplier,r.Product_Code].filter(Boolean).join(" · ");
+  return r.Product_Supplier || r.Stone || "Stone"; }
+function jobClient(j){ return j ? ((String(j.Client_Label||"")).trim() || (String(j.Job_Address||"")).trim() || j.Job_ID || ("#"+j.id)) : "—"; }
+function jobCode(j){ return j ? (j.Job_ID || ("#"+j.id)) : ""; }
+
+// Map a stone line to its calendar date per the rule:
+// delivered → delivery date; otherwise (ordered/pending) → order date.
+function calDateOf(r){
+  if(isDeliveredStatus(r) && toDate(r.Delivery_Date)) return { date:toDate(r.Delivery_Date), kind:"delivered" };
+  if(toDate(r.Order_Date)) return { date:toDate(r.Order_Date), kind:"ordered" };
+  return null;
+}
+function passAssignee(r){ return !state.assignee || assigneesOf(r).includes(state.assignee); }
+function passJob(r){ return !state.jobFilter || refId(r.Job)===state.jobFilter; }
+// Every event indexed by ymd (respecting assignee + job filters; show-toggle applied at render).
+function buildEventIndex(){
+  const byYmd={};
+  (state.stone||[]).forEach(r=>{ const cd=calDateOf(r); if(!cd) return; if(!passAssignee(r)||!passJob(r)) return;
+    (byYmd[ymd(cd.date)]=byYmd[ymd(cd.date)]||[]).push({r,kind:cd.kind,date:cd.date}); });
+  return byYmd;
+}
+function eventsOn(byYmd,d){
+  return (byYmd[ymd(d)]||[]).filter(e=>state.show[e.kind])
+    .sort((a,b)=>(a.kind===b.kind?0:a.kind==="ordered"?-1:1));
+}
+function addDays(d,n){ return new Date(d.getFullYear(),d.getMonth(),d.getDate()+n); }
+function weekStart(d){ return addDays(d,-((d.getDay()+6)%7)); }   // Monday
+
+// ============================================================
+//  RENDER
+// ============================================================
+function render(){
+  reindex();
+  document.getElementById("demoTag").hidden=state.grist;
+  ["month","week","agenda"].forEach(v=>{
+    const b=document.querySelector('#viewSeg button[data-v="'+v+'"]'); if(b) b.classList.toggle("on",state.view===v);
+  });
+  const ab=document.getElementById("assignBtn");
+  ab.textContent=(state.assignee||"All assignees")+" ▾"; ab.classList.toggle("on",!!state.assignee);
+
+  const byYmd=buildEventIndex();
+
+  // legend counts over the visible range (respecting assignee, ignoring show-toggle)
+  const range=visibleRange();
+  let nOrd=0,nDel=0;
+  for(let d=new Date(range.start);d<range.end;d=addDays(d,1)){
+    (byYmd[ymd(d)]||[]).forEach(e=>{ if(e.kind==="ordered")nOrd++; else nDel++; });
+  }
+  document.getElementById("nOrdered").textContent=nOrd;
+  document.getElementById("nDelivered").textContent=nDel;
+  document.getElementById("lgOrdered").classList.toggle("off",!state.show.ordered);
+  document.getElementById("lgDelivered").classList.toggle("off",!state.show.delivered);
+
+  document.getElementById("title").textContent=rangeTitle();
+  const dow=document.getElementById("dow");
+  dow.style.display=(state.view==="agenda")?"none":"";
+  dow.innerHTML=""; if(state.view!=="agenda") DOW.forEach(d=>dow.appendChild($("span",null,d)));
+
+  if(state.view==="agenda") renderAgenda(byYmd);
+  else renderGrid(byYmd);
+  renderSidebar();
+}
+// Right-hand jobs search panel — mirrors the installations calendar's jobs sidebar.
+function jobStoneStats(jid){
+  let n=0,ord=0,del=0;
+  (state.stone||[]).forEach(r=>{ if(refId(r.Job)!==jid) return; n++; const cd=calDateOf(r); if(!cd) return; if(cd.kind==="delivered")del++; else ord++; });
+  return {n,ord,del};
+}
+function renderSidebar(){
+  document.getElementById("body").classList.toggle("noside",!state.sideOpen);
+  const btn=document.getElementById("btnJobs"); btn.classList.toggle("on",state.sideOpen);
+  if(!state.sideOpen) return;
+  const list=document.getElementById("jobList"); list.innerHTML="";
+  const q=(state.jobQ||"").trim().toLowerCase();
+  const jobs=(state.jobs||[]).filter(j=>(state.stone||[]).some(r=>refId(r.Job)===j.id));
+  const hay=j=>{ let s=[jobClient(j),j.Job_Address,j.Address_Formatted,j.Job_ID].filter(Boolean).join(" ");
+    (state.stone||[]).forEach(r=>{ if(refId(r.Job)===j.id) s+=" "+stoneLabel(r)+" "+(r.Product_Supplier||"")+" "+(r.Order_Status||""); });
+    return s.toLowerCase(); };
+  const shown=jobs.filter(j=>!q||hay(j).includes(q)).sort((a,b)=>jobClient(a).localeCompare(jobClient(b)));
+  document.getElementById("jobCount").textContent=shown.length;
+  if(!shown.length){ list.appendChild($("div","side-empty",q?"No jobs match “"+state.jobQ+"”.":"No jobs with stone orders.")); return; }
+  shown.forEach(j=>{
+    const card=$("div","job"+(state.jobFilter===j.id?" on":""));
+    renderCardTemplate(jobCardTpl, jobCardTokens(j), card, {});
+    card.title=jobClient(j);
+    card.onclick=()=>{ state.jobFilter=(state.jobFilter===j.id?null:j.id); render(); };
+    list.appendChild(card);
+  });
+}
+function visibleRange(){
+  if(state.view==="week"){ const s=weekStart(state.cursor); return { start:s, end:addDays(s,7) }; }
+  if(state.view==="agenda"){ const s=new Date(state.cursor.getFullYear(),state.cursor.getMonth(),1);
+    return { start:s, end:new Date(state.cursor.getFullYear(),state.cursor.getMonth()+1,1) }; }
+  const first=new Date(state.cursor.getFullYear(),state.cursor.getMonth(),1);
+  const s=addDays(first,-((first.getDay()+6)%7)); return { start:s, end:addDays(s,42) };
+}
+function rangeTitle(){
+  if(state.view==="week"){ const s=weekStart(state.cursor), e=addDays(s,6);
+    const sameM=s.getMonth()===e.getMonth();
+    return s.getDate()+(sameM?"":" "+MONTHS[s.getMonth()].slice(0,3))+" – "+e.getDate()+" "+MONTHS[e.getMonth()].slice(0,3)+" "+e.getFullYear(); }
+  return MONTHS[state.cursor.getMonth()]+" "+state.cursor.getFullYear();
+}
+function renderGrid(byYmd){
+  const grid=document.getElementById("grid"); grid.className="grid"+(state.view==="week"?" week":""); grid.innerHTML="";
+  const week=state.view==="week";
+  const start=week?weekStart(state.cursor):visibleRange().start;
+  const n=week?7:42;
+  const todayK=ymd(new Date()), curM=state.cursor.getMonth();
+  for(let i=0;i<n;i++){
+    const d=addDays(start,i);
+    const inMonth=week?true:(d.getMonth()===curM);
+    const wknd=(d.getDay()===0||d.getDay()===6);
+    const cell=$("div","cell"+(inMonth?"":" out")+(wknd?" wknd":"")+(ymd(d)===todayK?" today":""));
+    const drow=$("div","drow");
+    drow.appendChild($("span","dn",String(d.getDate())));
+    const evs=eventsOn(byYmd,d);
+    if(evs.length) drow.appendChild($("span","dsum",String(evs.length)));
+    cell.appendChild(drow);
+    const CAP=week?99:4;
+    evs.slice(0,CAP).forEach(e=>cell.appendChild(eventChip(e)));
+    if(evs.length>CAP){ const more=$("div","more","+"+(evs.length-CAP)+" more");
+      more.onclick=ev=>{ ev.stopPropagation(); openDay(d,evs,more); }; cell.appendChild(more); }
+    if(evs.length) cell.onclick=()=>openDay(d,evs,cell);
+    grid.appendChild(cell);
+  }
+}
+function renderAgenda(byYmd){
+  const grid=document.getElementById("grid"); grid.className="agenda"; grid.innerHTML="";
+  const r=visibleRange(); const todayK=ymd(new Date()); let any=false;
+  for(let d=new Date(r.start); d<r.end; d=addDays(d,1)){
+    const evs=eventsOn(byYmd,d); if(!evs.length) continue; any=true;
+    const row=$("div","ag-day");
+    const dc=$("div","ag-date"); dc.appendChild(document.createTextNode(DOW[(d.getDay()+6)%7]+" "+d.getDate()+" "+MONTHS[d.getMonth()].slice(0,3)));
+    if(ymd(d)===todayK) dc.appendChild($("div","tdy","Today"));
+    row.appendChild(dc);
+    const box=$("div","ag-evs"); evs.forEach(e=>box.appendChild(eventChip(e))); row.appendChild(box);
+    grid.appendChild(row);
+  }
+  if(!any) grid.appendChild($("div","ag-empty","No stone orders "+(state.assignee?("for "+state.assignee+" "):"")+"in "+MONTHS[state.cursor.getMonth()]+" "+state.cursor.getFullYear()+"."));
+}
+// ---- template engine (markdown-ish → DOM), ported from the installations calendar ----
+function renderCardTemplate(str,tokens,host,ctx){
+  const added=[];
+  String(str==null?"":str).split("\n").forEach(lineStr=>{
+    if(/^\s*(-{3,}|—+|\*{3,})\s*$/.test(lineStr)){ const hr=$("div","cdivider"); host.appendChild(hr); added.push(hr); return; }
+    const line=$("div","cline"); const stats={tokens:0,filled:0};
+    renderCardInline(lineStr,tokens,line,ctx,stats);
+    if(stats.tokens>0 && stats.filled===0) return;             // whole line was empty tokens → drop
+    while(line.firstChild&&line.firstChild.nodeType===3&&!line.firstChild.textContent.trim()) line.removeChild(line.firstChild);
+    while(line.lastChild&&line.lastChild.nodeType===3&&!line.lastChild.textContent.trim()) line.removeChild(line.lastChild);
+    host.appendChild(line); added.push(line);
+  });
+  added.forEach((el,i)=>{ if(!el.classList.contains("cdivider"))return; let after=false;
+    for(let k=i+1;k<added.length;k++){ const n=added[k]; if(n.classList.contains("cdivider"))break; if(n.textContent.trim()||n.children.length){after=true;break;} }
+    if(!after&&el.parentNode) el.parentNode.removeChild(el); });
+}
+function renderCardInline(str,tokens,host,ctx,stats){
+  const re=/\*\*([^*]+)\*\*|\*([^*]+)\*|==([^=]+)==|\{([a-z_]+)\}|([^{*=]+)|([\s\S])/g; let m;
+  const has=el=>el.textContent.trim()||el.children.length;
+  while((m=re.exec(str))){
+    if(m[1]!=null){ const b=document.createElement("strong"); renderCardInline(m[1],tokens,b,ctx,stats); if(has(b))host.appendChild(b); }
+    else if(m[2]!=null){ const it=document.createElement("em"); renderCardInline(m[2],tokens,it,ctx,stats); if(has(it))host.appendChild(it); }
+    else if(m[3]!=null){ const bar=$("span","cbar"); if(ctx&&ctx.bar){ bar.style.background=ctx.bar.fill||"var(--line)"; bar.style.color=ctx.bar.text||"var(--ink)"; }
+      renderCardInline(m[3],tokens,bar,ctx,stats); if(has(bar))host.appendChild(bar); }
+    else if(m[4]!=null){ const fn=tokens[m[4]];
+      if(fn){ if(stats)stats.tokens++; const el=fn(); if(el!=null){ if(stats)stats.filled++; host.appendChild(typeof el==="string"?document.createTextNode(el):el); } }
+      else host.appendChild(document.createTextNode("{"+m[4]+"}")); }
+    else host.appendChild(document.createTextNode(m[5]!=null?m[5]:m[6]));
+  }
+}
+function pillEl(s){ const t=softTint(statusColor(s)); const p=$("span","cpill"); p.style.background=t.bg;
+  const d=$("span","cpd"); d.style.background=t.dot; p.appendChild(d); p.appendChild(document.createTextNode(statusLabel(s))); return p; }
+function avatarsEl(list){ if(!list||!list.length)return null; const w=$("span","avwrap");
+  list.slice(0,4).forEach(n=>{ if(!n)return; const a=$("span","av"); a.style.background=avatarColor(n); a.textContent=initials(n); a.title=n; w.appendChild(a); }); return w; }
+function countEl(text,color){ const s=$("span","jk"); const d=$("span","kd"); d.style.background=color; s.appendChild(d); s.appendChild(document.createTextNode(text)); return s; }
+function priceOf(r){ const c=catFor(r); const v=(r.Product_Price_slab!=null&&r.Product_Price_slab!=="")?r.Product_Price_slab:(c?c.Price_Slab:null);
+  return (v!=null&&v!=="")?("$"+v):null; }
+function eventCardTokens(e){
+  const r=e.r, j=jobFor(r);
+  return {
+    client:()=>txtNode(jobClient(j)),
+    job:()=>txtNode(jobCode(j)),
+    address:()=>txtNode((String((j&&(j.Address_Formatted||j.Job_Address))||"")).trim()||null),
+    product:()=>txtNode(stoneLabel(r)),
+    supplier:()=>txtNode(r.Product_Supplier||(catFor(r)&&catFor(r).Supplier)||null),
+    code:()=>txtNode(r.Product_Code||null),
+    status:()=>pillEl(r.Order_Status),
+    kind:()=>txtNode(e.kind==="delivered"?"Delivered":"Ordered"),
+    ordered:()=>txtNode(num(r.Ordered_Qty)?("Ord "+num(r.Ordered_Qty)):null),
+    delivered:()=>txtNode(num(r.Delivery_Qty)?("Deliv "+num(r.Delivery_Qty)):null),
+    orderdate:()=>txtNode(toDate(r.Order_Date)?fmtDMY(r.Order_Date):null),
+    deliverydate:()=>txtNode(toDate(r.Delivery_Date)?fmtDMY(r.Delivery_Date):null),
+    inv:()=>txtNode(r.INV||null),
+    note:()=>txtNode(r.Note||null),
+    price:()=>txtNode(priceOf(r)),
+    assigned:()=>avatarsEl(assigneesOf(r))
+  };
+}
+function jobCardTokens(j){
+  const st=jobStoneStats(j.id);
+  return {
+    client:()=>txtNode(jobClient(j)),
+    address:()=>txtNode((String(j.Address_Formatted||j.Job_Address||"")).trim()||null),
+    job:()=>txtNode(jobCode(j)),
+    orders:()=>txtNode(st.n?(st.n+" order"+(st.n===1?"":"s")):null),
+    ordered:()=>st.ord?countEl(st.ord+" ordered","#f2df3a"):null,
+    delivered:()=>st.del?countEl(st.del+" delivered","#7ad66f"):null,
+    assigned:()=>avatarsEl(choiceList(j.Assigned_To))
+  };
+}
+function kindBar(kind){ return kind==="delivered"?{fill:"#7ad66f",text:"#0f2e18"}:{fill:"#f2df3a",text:"#4a3f00"}; }
+
+function eventChip(e){
+  const r=e.r, j=jobFor(r);
+  const chip=$("div","ev "+e.kind);
+  renderCardTemplate(eventCardTpl, eventCardTokens(e), chip, { bar:kindBar(e.kind) });
+  chip.title=(e.kind==="delivered"?"Delivered ":"Ordered ")+fmtDMY(e.date)+"\n"+jobClient(j)+" ("+jobCode(j)+")\n"+stoneLabel(r)
+    +"\nStatus: "+statusLabel(r.Order_Status)+" · Ord "+num(r.Ordered_Qty)+" / Deliv "+num(r.Delivery_Qty);
+  chip.onclick=ev=>{ ev.stopPropagation(); openDay(e.date,[e],chip); };
+  return chip;
+}
+
+// ---- card editor modal ----
+let cardTab="event";
+function openCardEditor(tab){ if(tab)cardTab=tab; document.getElementById("cardModal").classList.add("open"); renderCardEditor(); }
+function closeCardEditor(){ document.getElementById("cardModal").classList.remove("open"); }
+function renderCardEditor(){
+  const isEvent=cardTab==="event";
+  [].forEach.call(document.querySelectorAll("#cardModal .ce-tab"),b=>b.classList.toggle("on",b.dataset.tab===cardTab));
+  const body=document.getElementById("ceBody"); body.innerHTML="";
+  const tokens=isEvent?EVENT_TOKENS:JOB_TOKENS;
+  const note=$("div","ce-note");
+  note.textContent=(isEvent?"The chips on the calendar grid. ":"The cards in the right-hand jobs list. ")
+    +"Use **bold**, *italic*, {tokens}, line breaks, --- for a divider, and ==wrap== for a coloured bar. Applies to every "+(isEvent?"event.":"job.");
+  body.appendChild(note);
+  const ta=document.createElement("textarea"); ta.className="ce-ta"; ta.spellcheck=false;
+  ta.value=isEvent?eventCardTpl:jobCardTpl;
+  function commit(){ if(isEvent)eventCardTpl=ta.value; else jobCardTpl=ta.value; saveLocalCards(); render(); }
+  ta.addEventListener("input",commit); body.appendChild(ta);
+  const toks=$("div","ce-tokens");
+  const insert=(text,caretBack)=>{ const s=ta.selectionStart||0,en=ta.selectionEnd||0;
+    ta.value=ta.value.slice(0,s)+text+ta.value.slice(en); ta.focus();
+    ta.selectionStart=ta.selectionEnd=s+text.length-(caretBack||0); commit(); };
+  Object.keys(tokens).forEach(k=>{ const chip=document.createElement("button"); chip.type="button"; chip.className="ce-tok";
+    chip.innerHTML="<code>{"+k+"}</code><span>"+tokens[k]+"</span>"; chip.title="Insert {"+k+"}";
+    chip.addEventListener("click",()=>insert("{"+k+"}")); toks.appendChild(chip); });
+  const divChip=document.createElement("button"); divChip.type="button"; divChip.className="ce-tok";
+  divChip.innerHTML="<code>---</code><span>Divider</span>"; divChip.addEventListener("click",()=>{
+    const s=ta.selectionStart||0; const pre=(s>0&&ta.value[s-1]!=="\n")?"\n":""; insert(pre+"---\n"); }); toks.appendChild(divChip);
+  const barChip=document.createElement("button"); barChip.type="button"; barChip.className="ce-tok";
+  barChip.innerHTML="<code>== ==</code><span>Coloured bar</span>"; barChip.addEventListener("click",()=>{
+    const s=ta.selectionStart||0,en=ta.selectionEnd||0; const inner=ta.value.slice(s,en)||"{client}";
+    ta.value=ta.value.slice(0,s)+"=="+inner+"=="+ta.value.slice(en); ta.focus(); ta.selectionStart=s+2; ta.selectionEnd=s+2+inner.length; commit(); }); toks.appendChild(barChip);
+  body.appendChild(toks);
+  const reset=$("div","ce-reset","↩ Reset this card to default");
+  reset.addEventListener("click",()=>{ if(isEvent)eventCardTpl=DEFAULT_EVENT_CARD; else jobCardTpl=DEFAULT_JOB_CARD; saveLocalCards(); render(); renderCardEditor(); });
+  body.appendChild(reset);
+  const fRow=$("div","ce-fontrow"); fRow.appendChild($("span","ce-flabel","Text size"));
+  const fVal=$("span","ce-fval"); const showF=()=>fVal.textContent=(isEvent?eventCardFont:jobCardFont)+"px";
+  const stepF=d=>{ let cur=isEvent?eventCardFont:jobCardFont; cur=Math.max(9,Math.min(20,Math.round((cur+d)*10)/10));
+    if(isEvent)eventCardFont=cur; else jobCardFont=cur; applyCardFonts(); saveLocalCards(); showF(); render(); };
+  const fMinus=document.createElement("button"); fMinus.type="button"; fMinus.className="ce-fbtn"; fMinus.textContent="−"; fMinus.onclick=()=>stepF(-0.5);
+  const fPlus=document.createElement("button"); fPlus.type="button"; fPlus.className="ce-fbtn"; fPlus.textContent="+"; fPlus.onclick=()=>stepF(0.5);
+  showF(); fRow.appendChild(fMinus); fRow.appendChild(fVal); fRow.appendChild(fPlus); body.appendChild(fRow);
+  const foot=$("div","ce-foot"); const scopeNote=$("div","ce-scope");
+  const setNote=msg=>scopeNote.textContent=msg||(cardScope==="me"?"Using your own design (just for you).":"Following the shared design (everyone sees it).");
+  setNote(); foot.appendChild(scopeNote);
+  const row=$("div","ce-btnrow");
+  const bMe=document.createElement("button"); bMe.type="button"; bMe.className="ce-save ghost"; bMe.textContent="Save just for me";
+  bMe.onclick=()=>{ cardScope="me"; saveLocalCards(); setNote("Saved — just for you."); };
+  const bAll=document.createElement("button"); bAll.type="button"; bAll.className="ce-save primary"; bAll.textContent="Save for everyone";
+  bAll.onclick=()=>{ cardScope="everyone"; publishCards(); saveLocalCards(); setNote("Saved — shared with everyone."); };
+  row.appendChild(bMe); row.appendChild(bAll); foot.appendChild(row); body.appendChild(foot);
+}
+function openDay(d,evs,anchor){
+  const m=document.getElementById("dayPop"); m.innerHTML="";
+  m.appendChild($("h4",null,DOW[(d.getDay()+6)%7]+" "+d.getDate()+" "+MONTHS[d.getMonth()]+" "+d.getFullYear()));
+  evs.forEach(e=>{
+    const r=e.r, j=jobFor(r);
+    const pev=$("div","pev");
+    const line=$("div","pline");
+    const k=$("span","kind "+e.kind, e.kind==="delivered"?"Delivered":"Ordered"); line.appendChild(k);
+    line.appendChild($("span","pname",jobClient(j)));
+    pev.appendChild(line);
+    pev.appendChild($("div","pmeta",stoneLabel(r)+" · "+jobCode(j)));
+    pev.appendChild($("div","pmeta","Status "+statusLabel(r.Order_Status)+" · Ordered "+num(r.Ordered_Qty)+" · Delivered "+num(r.Delivery_Qty)
+      +(e.kind==="delivered"?(" · Delivered "+fmtDMY(r.Delivery_Date)):(" · Ordered "+fmtDMY(r.Order_Date)))));
+    m.appendChild(pev);
+  });
+  closePops(); m.hidden=false; positionPop(m,anchor,300);
+}
+function positionPop(el,anchor,w){
+  const rc=anchor.getBoundingClientRect();
+  el.style.left=Math.max(8,Math.min(rc.left,window.innerWidth-(w||260)-12))+"px";
+  const below=rc.bottom+6, h=el.offsetHeight||280;
+  el.style.top=(below+h>window.innerHeight-8 ? Math.max(8,rc.top-h-6) : below)+"px";
+}
+function closePops(){ ["dayPop","assignPop"].forEach(id=>{const e=document.getElementById(id); if(e)e.hidden=true;}); }
+function openAssignMenu(){
+  const m=document.getElementById("assignPop"); m.innerHTML="";
+  const mk=(name)=>{ const on=(state.assignee===name)||(name===null&&!state.assignee);
+    const row=$("div","cprow"+(on?" on":""));
+    const a=$("span","av");
+    if(name===null){ a.style.background="var(--muted)"; a.textContent="∗"; } else { a.style.background=avatarColor(name); a.textContent=initials(name); }
+    row.appendChild(a); row.appendChild(document.createTextNode(name===null?"All assignees":name));
+    if(on) row.appendChild($("span","rtick","✓"));
+    row.onmousedown=e=>{ e.preventDefault(); state.assignee=name; closePops(); render(); };
+    return row; };
+  m.appendChild(mk(null));
+  const names=allAssignees();
+  names.forEach(n=>m.appendChild(mk(n)));
+  if(!names.length) m.appendChild($("div","ag-empty","No assignees on any job."));
+  closePops(); m.hidden=false; positionPop(m,document.getElementById("assignBtn"),220);
+}
+
+// ============================================================
+//  SCHEMA + DATA (live)
+// ============================================================
+async function loadGristSchema(){
+  const [T,C]=await Promise.all([grist.docApi.fetchTable("_grist_Tables"), grist.docApi.fetchTable("_grist_Tables_column")]);
+  const tables=columnarToRows(T), cols=columnarToRows(C);
+  const tableById={}; tables.forEach(t=>tableById[t.tableId]=t);
+  const colByRowId={}; cols.forEach(c=>colByRowId[c.id]=c);
+  const colsOf=tid=>{ const t=tableById[tid]; return t?cols.filter(c=>c.parentId===t.id):[]; };
+  const isEditable=c=>!c.isFormula && c.colId && !SPECIAL_COL.test(c.colId);
+  const bestLabelCol=tid=>{ const cs=colsOf(tid).filter(isEditable);
+    return ((cs.find(c=>/full|name|title|label|desc/i.test(c.colId))||cs.find(c=>(c.type||"").startsWith("Text"))||cs[0]||{}).colId)||null; };
+  function refInfo(parentTableId,colId){
+    const col=colsOf(parentTableId).find(c=>c.colId===colId); if(!col)return null;
+    const mt=/^Ref(?:List)?:(.+)$/.exec(col.type||""); if(!mt)return null;
+    const targetTableId=mt[1], vis=col.visibleCol&&colByRowId[col.visibleCol];
+    return { colId, targetTableId, labelCol:(vis&&vis.colId)||bestLabelCol(targetTableId) };
+  }
+  return { refInfo };
+}
+async function pullTables(){
+  const [so,jd]=await Promise.all([grist.docApi.fetchTable("Stone_Order"), grist.docApi.fetchTable("Jobs_Detail")]);
+  state.stone=columnarToRows(so); state.jobs=columnarToRows(jd);
+  if(state.ref.product){ try{ const cat=await grist.docApi.fetchTable(state.ref.product.targetTableId); state.catalogue=columnarToRows(cat); }catch(e){} }
+  reindex();
+}
+async function refetch(){ if(!state.grist)return; try{ await pullTables(); }catch(e){ console.warn("fetch failed",e); } render(); }
+
+if(typeof grist!=="undefined"){
+  try{ grist.ready({ requiredAccess:"full" }); }catch(e){}
+  try{ grist.onRecord(()=>{}); }catch(e){}
+  try{ grist.onOptions(applyGristOptions); }catch(e){}   // adopt the shared card design
+  grist.docApi.fetchTable("Stone_Order").then(async ()=>{
+    try{ const sc=await loadGristSchema(); state.ref.product=sc.refInfo("Stone_Order","Product"); }catch(e){ console.warn("schema failed",e); }
+    try{ await pullTables(); }catch(e){ console.warn("initial fetch failed",e); }
+    state.grist=true; render();
+  }).catch(()=>{});
+}
+
+// ============================================================
+//  SAMPLE DATA (standalone / preview)
+// ============================================================
+const SAMPLE_JOBS=[
+  { id:2,  Job_ID:"J0002", Client_Label:"Annie",       Job_Address:"31 Harridge St, Rosebud VIC 3939",           Assigned_To:["L","Minh"] },
+  { id:8,  Job_ID:"J0008", Client_Label:"Home owner",  Job_Address:"1/162 Kambrook Rd, Caulfield North VIC 3161", Assigned_To:["L","Bea"] },
+  { id:14, Job_ID:"J0014", Client_Label:"Harry Aboda", Job_Address:"105 Point Nepean Rd, Dromana VIC 3936",       Assigned_To:["L","Minh","Bea"] },
+  { id:19, Job_ID:"J0019", Client_Label:"Naz",         Job_Address:"19 Stephens St, Balwyn North VIC 3104",       Assigned_To:["L","Kevin"] },
+  { id:23, Job_ID:"J0023", Client_Label:"Louis",       Job_Address:"11 Banksia Ct, Croydon South VIC 3136",       Assigned_To:["L","Bea"] }
+];
+const SAMPLE_CAT=[
+  {id:101,Supplier:"Lavistone",  Code:"LS303", Product_Full:"Lavistone · LS303 · Cararra Lux 20mm"},
+  {id:102,Supplier:"YDL",        Code:"1888",  Product_Full:"YDL · 1888 · Kalala Bianco 20mm"},
+  {id:103,Supplier:"Caesarstone",Code:"CS5100",Product_Full:"Caesarstone · CS5100 · Vanilla Noir 20mm"},
+  {id:104,Supplier:"Lavistone",  Code:"LSU401",Product_Full:"Lavistone · LSU401 · Taj Classico 20mm"},
+  {id:107,Supplier:"WF",         Code:"3420",  Product_Full:"WF · Marble · Biancatto 20mm"}
+];
+// Dates chosen around July 2026 so the sample month is populated.
+const D=(y,m,d)=>Math.floor(Date.UTC(y,m-1,d)/1000);
+const SAMPLE_STONE=[
+  { id:1, Job:2,  Product:101, Product_Code:"LS303", Product_Supplier:"Lavistone",  Ordered_Qty:2, Delivery_Qty:2, Order_Status:"6. Delivered",     Order_Date:D(2026,7,5),  Delivery_Date:D(2026,7,18) },
+  { id:2, Job:8,  Product:102, Product_Code:"1888",  Product_Supplier:"YDL",        Ordered_Qty:2, Delivery_Qty:0, Order_Status:"2.  Placed Order",  Order_Date:D(2026,7,9),  Delivery_Date:null },
+  { id:3, Job:8,  Product:103, Product_Code:"CS5100",Product_Supplier:"Caesarstone",Ordered_Qty:2, Delivery_Qty:0, Order_Status:"7. Not Delivered Yet",Order_Date:D(2026,7,9), Delivery_Date:null },
+  { id:5, Job:14, Product:107, Product_Code:"3420",  Product_Supplier:"WF",         Ordered_Qty:8, Delivery_Qty:0, Order_Status:"4. Awaiting Pickup", Order_Date:D(2026,7,15), Delivery_Date:null },
+  { id:6, Job:19, Product:104, Product_Code:"LSU401",Product_Supplier:"Lavistone",  Ordered_Qty:4, Delivery_Qty:4, Order_Status:"6. Delivered",     Order_Date:D(2026,7,2),  Delivery_Date:D(2026,7,22) },
+  { id:8, Job:23, Product:101, Product_Code:"LS303", Product_Supplier:"Lavistone",  Ordered_Qty:5, Delivery_Qty:5, Order_Status:"6. Delivered",     Order_Date:D(2026,6,28), Delivery_Date:D(2026,7,10) },
+  { id:9, Job:23, Product:104, Product_Code:"LSU401",Product_Supplier:"Lavistone",  Ordered_Qty:2, Delivery_Qty:0, Order_Status:"3. Awaiting Order", Order_Date:D(2026,7,24), Delivery_Date:null }
+];
+const DEMO_REF={ product:{ targetTableId:"Catalogue", labelCol:"Product_Full" } };
+window._test=function(stone,jobs,catalogue,y,m){
+  state.stone=stone||[]; state.jobs=jobs||[]; state.catalogue=catalogue||[];
+  if(y!=null){ state.cursor=new Date(y,m,15); } reindex(); render();
+};
+
+// ============================================================
+//  BOOT
+// ============================================================
+function go(delta){
+  if(state.view==="week") state.cursor=addDays(state.cursor,7*delta);
+  else state.cursor=new Date(state.cursor.getFullYear(),state.cursor.getMonth()+delta,1);
+  render();
+}
+document.getElementById("prev").onclick=()=>go(-1);
+document.getElementById("next").onclick=()=>go(1);
+document.getElementById("todayBtn").onclick=()=>{ state.cursor=new Date(); render(); };
+document.getElementById("viewSeg").onclick=e=>{ const b=e.target.closest("button"); if(!b)return; state.view=b.dataset.v; render(); };
+document.getElementById("assignBtn").onclick=e=>{ e.stopPropagation(); openAssignMenu(); };
+document.getElementById("assignPop").onclick=e=>e.stopPropagation();
+document.getElementById("lgOrdered").onclick=()=>{ state.show.ordered=!state.show.ordered; render(); };
+document.getElementById("lgDelivered").onclick=()=>{ state.show.delivered=!state.show.delivered; render(); };
+document.getElementById("btnJobs").onclick=()=>{ state.sideOpen=!state.sideOpen; render(); };
+document.getElementById("jobSearch").oninput=e=>{ state.jobQ=e.target.value; renderSidebar(); };
+document.getElementById("cardsBtn").onclick=e=>{ e.stopPropagation(); openCardEditor(); };
+document.getElementById("cardClose").onclick=closeCardEditor;
+document.getElementById("cardModal").onclick=e=>{ if(e.target.id==="cardModal") closeCardEditor(); };
+[].forEach.call(document.querySelectorAll("#cardModal .ce-tab"),b=>b.onclick=()=>{ cardTab=b.dataset.tab; renderCardEditor(); });
+document.getElementById("dayPop").onclick=e=>e.stopPropagation();
+document.addEventListener("click",closePops);
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closePops(); });
+
+// restore any personal card design
+{ const lc=loadLocalCards();
+  if(typeof lc.event==="string") eventCardTpl=lc.event;
+  if(typeof lc.job==="string") jobCardTpl=lc.job;
+  if(lc.scope==="me"||lc.scope==="everyone") cardScope=lc.scope;
+  if(typeof lc.ef==="number") eventCardFont=lc.ef;
+  if(typeof lc.jf==="number") jobCardFont=lc.jf;
+  applyCardFonts(); }
+if(!state.ref.product) state.ref.product=DEMO_REF.product;
+// sample-first so the grid is never blank; live wiring above flips + replaces it.
+window._test(SAMPLE_STONE,SAMPLE_JOBS,SAMPLE_CAT);
+</script>
+</body>
+</html>

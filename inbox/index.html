@@ -396,9 +396,8 @@
   /* ---------- product cell + picker ---------- */
   .line .prod{cursor:pointer}
   .prod .nmrow{display:flex;align-items:center;gap:5px;min-width:0}
-  .prod .nmrow .stone-check{flex:0 0 auto;width:14px;height:14px;border:1.5px solid var(--line);border-radius:4px;cursor:pointer;opacity:.45}
-  .line:hover .prod .nmrow .stone-check{opacity:.85}
-  .prod .nmrow .stone-check.on{background:var(--accent);border-color:var(--accent);opacity:1}
+  .prod .nmrow .stone-check{flex:0 0 auto;width:15px;height:15px;border:1.5px solid #000;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1;color:transparent;user-select:none}
+  .prod .nmrow .stone-check.on{background:var(--accent);border-color:var(--accent);color:#fff}
   .movesel{margin-left:10px;cursor:pointer}
   .prod .nmrow .nm{min-width:0;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
   .pencil{flex:0 0 auto;cursor:pointer;color:var(--muted);opacity:.4;font-size:12px;line-height:1;transition:opacity .1s}
@@ -2694,8 +2693,9 @@ function renderDetail(){
     const prod=$("div","prod");
     const nmrow=$("div","nmrow");
     if(ghost){   // relocation controls only under the Ghost Job
-      const cb=$("span","stone-check"+(stoneSel.has(r.id)?" on":"")); cb.title="Select to move to another job";
+      const cb=$("span","stone-check"+(stoneSel.has(r.id)?" on":"")); cb.title="Select to move to another job"; cb.textContent="✓";
       cb.onclick=e=>{ e.stopPropagation(); if(stoneSel.has(r.id))stoneSel.delete(r.id); else stoneSel.add(r.id); renderDetail(); };
+      cb.ondblclick=e=>{ e.stopPropagation(); e.preventDefault(); };   // don't let a double-tick open the product picker
       nmrow.appendChild(cb);
     }
     const nm = stoneProductLabel(r);
@@ -2711,6 +2711,7 @@ function renderDetail(){
     if(ghost){
       const mvb=$("span","pencil movejob"); mvb.textContent="⇄"; mvb.title="Move this stone line to another job";
       mvb.onclick=e=>{ e.stopPropagation(); openJobPicker([r],mvb); };
+      mvb.ondblclick=e=>{ e.stopPropagation(); e.preventDefault(); };   // don't let a double-click open the product picker
       nmrow.appendChild(mvb);
     }
     prod.appendChild(nmrow);

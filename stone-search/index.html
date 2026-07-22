@@ -126,6 +126,12 @@
   .chart-h .ssub{font-size:11.5px;color:var(--muted)}
   .chart-scroll{overflow-x:auto;padding-bottom:2px}
   .chart{display:flex;align-items:flex-end;gap:12px;min-height:152px;padding:2px}
+  .chart.daily{gap:4px}
+  .chart.daily .bar{width:15px;border-radius:4px 4px 0 0}
+  .chart.daily .bar-v{font-size:9px}
+  .chart.daily .bar-x{font-size:9px}
+  .bar-col.zero{cursor:default}
+  .bar-col.zero .bar-x{opacity:.45}
   .bar-col{display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;flex:0 0 auto}
   .bar-col .bar-v{font-size:11px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
   .bar{width:30px;min-height:2px;display:flex;flex-direction:column;justify-content:flex-end;
@@ -517,50 +523,54 @@ function renderDetail(){
   stats.appendChild(stat(delivered,"slabs delivered"));
   s3.appendChild(stats);
 
-  // histogram — ordered slabs per month across the whole supplier, this stone highlighted
+  // histogram — daily ordered slabs for the selected month across the whole supplier
   s3.appendChild(histogram(c));
   app.appendChild(s3);
 }
 
-// Stacked column chart: for each month, total slabs ordered across ALL of this
-// product's supplier, split into "this stone" (highlighted) + "other <supplier>".
-// Clicking a bar selects that month above.
-function supplierMonthly(c){
-  const sup=c.Supplier||"";
-  const curId=c.id;
-  const byMonth={};
+// Daily stacked column chart for the SELECTED month: one bar per calendar day,
+// height = slabs ordered that day across ALL of this product's supplier, split
+// into "this stone" (highlighted) + "other <supplier>". Follows the month pills.
+function supplierDaily(c,monthKey){
+  const sup=c.Supplier||"", curId=c.id;
+  const year=Math.floor(monthKey/100), month=monthKey%100;
+  const lastDay=new Date(year,month,0).getDate();
+  const days=[]; for(let i=1;i<=lastDay;i++) days.push({day:i,cur:0,other:0});
   (state.stone||[]).forEach(r=>{
     if(supplierFor(r)!==sup) return;
-    const k=monthKeyOf(r); if(k==null) return;        // dated orders only
+    const dt=toDate(r.Order_Date); if(!dt) return;
+    if(dt.getFullYear()!==year || (dt.getMonth()+1)!==month) return;
     const q=num(r.Ordered_Qty); if(q<=0) return;
-    const m=byMonth[k]||(byMonth[k]={key:k,cur:0,other:0});
-    if(refId(r.Product)===curId) m.cur+=q; else m.other+=q;
+    const idx=dt.getDate()-1; if(idx<0||idx>=days.length) return;
+    if(refId(r.Product)===curId) days[idx].cur+=q; else days[idx].other+=q;
   });
-  return Object.keys(byMonth).map(k=>byMonth[k]).sort((a,b)=>a.key-b.key);   // oldest → newest
+  return days;
 }
 function histogram(c){
   const box=$("div","hist-chart");
+  const sel=state.selectedMonth;
+  const supTxt=(c.Supplier?("all "+c.Supplier+" orders · "):"")+"this stone highlighted";
   const head=$("div","chart-h");
-  head.appendChild($("span","st","Ordered by month"));
-  if(c.Supplier) head.appendChild($("span","ssub","all "+c.Supplier+" orders · this stone highlighted"));
+  head.appendChild($("span","st","Ordered by day"));
+  head.appendChild($("span","ssub",(typeof sel==="number"?monthLabelOf(sel)+" · ":"")+supTxt));
   box.appendChild(head);
 
-  const data=supplierMonthly(c);
-  if(!data.length){ box.appendChild($("div","hist-none","No dated orders to chart yet.")); return box; }
+  if(typeof sel!=="number"){ box.appendChild($("div","hist-none","Pick a month above to see its daily breakdown.")); return box; }
+  const data=supplierDaily(c,sel);
+  if(!data.some(d=>d.cur+d.other>0)){ box.appendChild($("div","hist-none","No "+(c.Supplier?c.Supplier+" ":"")+"orders in "+monthLabelOf(sel)+".")); return box; }
   const max=Math.max(1,...data.map(d=>d.cur+d.other));
   const H=118;
-  const scroll=$("div","chart-scroll"); const chart=$("div","chart");
+  const scroll=$("div","chart-scroll"); const chart=$("div","chart daily");
   data.forEach(d=>{
     const total=d.cur+d.other;
-    const col=$("div","bar-col"+(d.key===state.selectedMonth?" sel":""));
-    col.title=monthLabelOf(d.key)+" — "+total+" slab"+(total===1?"":"s")+" ordered ("+d.cur+" this stone, "+d.other+" other)";
-    col.appendChild($("div","bar-v",String(total)));
+    const col=$("div","bar-col"+(total?"":" zero"));
+    col.title=d.day+" "+monthLabelOf(sel)+(total?(" — "+total+" slab"+(total===1?"":"s")+" ("+d.cur+" this stone, "+d.other+" other)"):" — no orders");
+    col.appendChild($("div","bar-v",total?String(total):""));
     const bar=$("div","bar");
     if(d.cur>0){ const s=$("div","seg cur"); s.style.height=Math.max(2,d.cur/max*H)+"px"; bar.appendChild(s); }
     if(d.other>0){ const s=$("div","seg other"); s.style.height=Math.max(2,d.other/max*H)+"px"; bar.appendChild(s); }
     col.appendChild(bar);
-    col.appendChild($("div","bar-x",monthPillLabel(d.key)));
-    col.onclick=()=>{ state.selectedMonth=d.key; renderDetail(); };
+    col.appendChild($("div","bar-x",String(d.day)));
     chart.appendChild(col);
   });
   scroll.appendChild(chart); box.appendChild(scroll);

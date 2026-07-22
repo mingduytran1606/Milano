@@ -78,16 +78,14 @@
   .splitter:hover::after,.splitter.drag::after{background:var(--accent)}
 
   /* ---------- history (right) ---------- */
-  .detail-pane{flex:1 1 auto;min-width:0;overflow-y:auto;
-    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
-    box-shadow:var(--shadow);padding:18px 20px}
-  .detail-empty{height:100%;display:flex;align-items:center;justify-content:center;color:var(--muted);
-    text-align:center;font-size:13px;padding:30px}
+  .detail-pane{flex:1 1 auto;min-width:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px}
+  .detail-empty{flex:1 1 auto;display:flex;align-items:center;justify-content:center;color:var(--muted);
+    text-align:center;font-size:13px;padding:40px;
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
 
-  /* three stacked sections: profile · active orders · monthly history */
-  .section{padding:16px 0}
-  .section:first-child{padding-top:0}
-  .section+.section{border-top:1px solid var(--line)}
+  /* three separate panels: profile · active orders · monthly history */
+  .section{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:15px 17px}
   .section-h{display:flex;align-items:baseline;gap:9px;margin-bottom:11px}
   .section-h .st{font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink)}
   .section-h .sc{font-size:11px;font-weight:700;color:var(--accent-ink);background:var(--accent-soft);border-radius:999px;padding:1px 8px}

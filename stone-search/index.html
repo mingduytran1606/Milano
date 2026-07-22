@@ -92,6 +92,17 @@
   .prod-price{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
   .prod-price small{font-size:11px;font-weight:600;color:var(--muted);display:block;text-align:right;letter-spacing:.03em;text-transform:uppercase}
 
+  /* ---------- month picker pills ---------- */
+  .mrow{display:flex;gap:7px;flex-wrap:wrap;margin:16px 0 4px}
+  .mpill{font:inherit;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;
+    border:1px solid var(--line);background:var(--panel);color:var(--ink);font-size:12.5px;font-weight:600;cursor:pointer;
+    white-space:nowrap}
+  .mpill:hover{border-color:var(--accent)}
+  .mpill.empty{color:var(--muted)}
+  .mpill.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .mpill .mp-n{font-size:10.5px;font-weight:700;background:var(--line2);color:var(--muted);border-radius:999px;padding:0 6px;line-height:16px}
+  .mpill.on .mp-n{background:rgba(255,255,255,.28);color:#fff}
+
   .hist-stats{display:flex;gap:9px;flex-wrap:wrap;margin:14px 0 6px}
   .stat{flex:1 1 120px;min-width:110px;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:8px 12px}
   .stat .sv{font-size:20px;font-weight:800;line-height:1.15;font-variant-numeric:tabular-nums}
@@ -107,13 +118,6 @@
   .htbl-head{background:var(--bg);border-bottom:1px solid var(--line);border-radius:12px 12px 0 0}
   .htbl-head .hh{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);white-space:nowrap}
   .htbl-head .hh.n{text-align:right}
-  /* month section bar — full width above its rows */
-  .hmonth{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--accent-soft);
-    border-top:1px solid var(--line);border-bottom:1px solid var(--line2)}
-  .hmonth .hm-name{font-weight:700;font-size:12.5px;color:var(--accent-ink);flex:0 0 auto}
-  .hmonth .hm-sum{display:flex;gap:12px;font-size:11.5px;color:var(--muted);flex:0 0 auto;margin-left:4px}
-  .hmonth .hm-sep{color:var(--line);flex:0 0 auto}
-  .hmonth .hm-sum b{color:var(--ink);font-variant-numeric:tabular-nums}
   .hrow{border-top:1px solid var(--line2)}
   .hrow:hover{background:var(--line2)}
   .hjob{display:flex;align-items:center;gap:7px;min-width:0}
@@ -243,7 +247,7 @@ const LSKEY="milano_catalogue_prefs_v1";
 const state={
   stone:[], jobs:[], catalogue:[], grist:false,
   ref:{ product:null },
-  q:"", selectedCatId:null, searchW:null,
+  q:"", selectedCatId:null, selectedMonth:null, searchW:null,
   jobById:{}, catById:{}, ordersByCat:{}
 };
 window._catsearch=state;
@@ -355,13 +359,43 @@ function renderDetail(){
   price.appendChild($("small",null,"per slab")); head.appendChild(price);
   app.appendChild(head);
 
-  // ---- history ----
-  const orders=ordersFor(c.id).slice().sort((a,b)=>{
-    const da=+toDate(a.Order_Date)||0, db=+toDate(b.Order_Date)||0;
-    return db-da || (b.id||0)-(a.id||0);          // most recent order first
-  });
+  // ---- month picker (pills) — default to the current month ----
+  const allOrders=ordersFor(c.id);
+  const curKey=currentMonthKey();
+  const keySet=new Set(allOrders.map(monthKeyOf).filter(k=>k!=null));
+  keySet.add(curKey);                                  // this month is always offered
+  const monthKeys=[...keySet].sort((a,b)=>b-a);        // newest first
+  const hasUndated=allOrders.some(r=>monthKeyOf(r)==null);
 
-  // stats strip
+  // resolve the active selection against what this product actually has
+  let sel=state.selectedMonth;
+  if(sel==="undated"){ if(!hasUndated) sel=curKey; }
+  else if(!(typeof sel==="number" && keySet.has(sel))) sel=curKey;
+  state.selectedMonth=sel;
+
+  const countIn=k=>allOrders.filter(r=>monthKeyOf(r)===k).length;
+  const mrow=$("div","mrow");
+  monthKeys.forEach(k=>{
+    const p=$("button","mpill"+(sel===k?" on":"")+(countIn(k)?"":" empty"));
+    p.appendChild($("span","mp-name",monthPillLabel(k)));
+    const n=countIn(k); if(n) p.appendChild($("span","mp-n",String(n)));
+    p.onclick=()=>{ state.selectedMonth=k; renderDetail(); };
+    mrow.appendChild(p);
+  });
+  if(hasUndated){
+    const p=$("button","mpill"+(sel==="undated"?" on":""));
+    p.appendChild($("span","mp-name","No date"));
+    p.appendChild($("span","mp-n",String(allOrders.filter(r=>monthKeyOf(r)==null).length)));
+    p.onclick=()=>{ state.selectedMonth="undated"; renderDetail(); };
+    mrow.appendChild(p);
+  }
+  app.appendChild(mrow);
+
+  // orders in the selected month, most-recent first
+  const orders=allOrders.filter(r=> sel==="undated" ? monthKeyOf(r)==null : monthKeyOf(r)===sel)
+    .slice().sort((a,b)=>{ const da=+toDate(a.Order_Date)||0, db=+toDate(b.Order_Date)||0; return db-da || (b.id||0)-(a.id||0); });
+
+  // ---- scoreboard (for the selected month) ----
   const jobs=new Set(orders.map(r=>refId(r.Job)).filter(v=>v!=null));
   const ordered=orders.reduce((s,r)=>s+num(r.Ordered_Qty),0);
   const delivered=orders.reduce((s,r)=>s+num(r.Delivery_Qty),0);
@@ -372,41 +406,24 @@ function renderDetail(){
   stats.appendChild(stat(delivered,"slabs delivered"));
   app.appendChild(stats);
 
-  app.appendChild($("div","hist-h","Order history"));
-  if(!orders.length){ app.appendChild($("div","hist-none","This product has never been ordered on a job yet.")); return; }
-
-  // Group by order-date month (orders already sorted most-recent first);
-  // undated orders fall into a trailing "No order date" section.
-  const groups=[]; const gmap={};
-  orders.forEach(r=>{ const k=monthKeyOf(r); let g=gmap[k];
-    if(!g){ g={key:k,rows:[]}; gmap[k]=g; groups.push(g); } g.rows.push(r); });
-  groups.sort((a,b)=>{ if(a.key==null)return 1; if(b.key==null)return -1; return b.key-a.key; });
-
+  // ---- history (selected month) ----
+  const selLabel = sel==="undated" ? "orders with no order date" : monthLabelOf(sel);
+  if(!orders.length){ app.appendChild($("div","hist-none","No orders for this product in "+selLabel+".")); return; }
   const wrap=$("div","htbl-wrap"); const tbl=$("div","htbl");
   const thead=$("div","hgridrow htbl-head");
   [["Job / client",""],["Status",""],["Ord","n"],["Order date",""],["Deliv","n"],["Delivery date",""],["INV",""],["Note",""]]
     .forEach(([t,cls])=>thead.appendChild($("span","hh"+(cls?" "+cls:""),t)));
   tbl.appendChild(thead);
-
-  groups.forEach(g=>{
-    const ord=g.rows.reduce((s,r)=>s+num(r.Ordered_Qty),0);
-    const del=g.rows.reduce((s,r)=>s+num(r.Delivery_Qty),0);
-    const mb=$("div","hmonth");
-    mb.appendChild($("span","hm-name",monthLabelOf(g.key)));
-    const sum=$("span","hm-sum");
-    sum.appendChild($("span",null,g.rows.length+" order"+(g.rows.length===1?"":"s")));
-    const so=$("span"); so.appendChild(document.createTextNode("ordered ")); so.appendChild($("b",null,String(ord))); sum.appendChild(so);
-    const sd=$("span"); sd.appendChild(document.createTextNode("delivered ")); sd.appendChild($("b",null,String(del))); sum.appendChild(sd);
-    mb.appendChild(sum);
-    tbl.appendChild(mb);
-    g.rows.forEach(r=>tbl.appendChild(historyRow(r)));
-  });
+  orders.forEach(r=>tbl.appendChild(historyRow(r)));
   wrap.appendChild(tbl); app.appendChild(wrap);
 }
 
 const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+const MONTHS_SHORT=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 function monthKeyOf(r){ const d=toDate(r.Order_Date); if(!d) return null; return d.getFullYear()*100+(d.getMonth()+1); }
 function monthLabelOf(key){ if(key==null) return "No order date"; return MONTHS[(key%100)-1]+" "+Math.floor(key/100); }
+function monthPillLabel(key){ return MONTHS_SHORT[(key%100)-1]+" "+Math.floor(key/100); }
+function currentMonthKey(){ const d=new Date(); return d.getFullYear()*100+(d.getMonth()+1); }
 
 function stat(v,label){ const s=$("div","stat"); s.appendChild($("div","sv",String(v))); s.appendChild($("div","sl",label)); return s; }
 

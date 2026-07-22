@@ -327,15 +327,15 @@
   .field input,.field textarea{font:inherit;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:9px;padding:7px 9px;width:100%}
   .field textarea{resize:vertical;min-height:52px}
   .field .ro{color:var(--ink);font-weight:500}
-  .stone-head{display:grid;grid-template-columns:minmax(0,1.15fr) 150px 44px 44px 44px 66px minmax(0,1fr);gap:8px;padding:0 0 8px}
+  .stone-head{display:grid;grid-template-columns:minmax(0,1.15fr) 150px 44px 44px 44px 120px 120px 66px minmax(0,1fr);gap:8px;padding:0 0 8px}
   .stonecard .card-body{overflow-x:auto}
-  .stonecard .stone-head,.stonecard .line{grid-template-columns:var(--stone-grid, minmax(140px,1.15fr) 150px 44px 44px 44px 66px minmax(120px,1fr));min-width:640px}
+  .stonecard .stone-head,.stonecard .line{grid-template-columns:var(--stone-grid, minmax(140px,1.15fr) 150px 44px 44px 44px 120px 120px 66px minmax(120px,1fr));min-width:900px}
   .stone-head span{position:relative;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
   .stone-head .col-rz{position:absolute;top:-2px;right:-8px;width:11px;bottom:-6px;cursor:col-resize;z-index:3}
   .stone-head .col-rz::after{content:"";position:absolute;left:5px;top:0;bottom:0;width:1px;background:transparent}
   .stone-head .col-rz:hover::after{background:var(--accent)}
-  .stone-head span:nth-child(3),.stone-head span:nth-child(4),.stone-head span:nth-child(5),.stone-head span:nth-child(6){text-align:right}
-  .line{position:relative;display:grid;grid-template-columns:minmax(0,1.15fr) 150px 44px 44px 44px 66px minmax(0,1fr);gap:8px;align-items:start;padding:11px 0;border-top:1px solid var(--line2)}
+  .stone-head span:nth-child(3),.stone-head span:nth-child(4),.stone-head span:nth-child(5),.stone-head span:nth-child(8){text-align:right}
+  .line{position:relative;display:grid;grid-template-columns:minmax(0,1.15fr) 150px 44px 44px 44px 120px 120px 66px minmax(0,1fr);gap:8px;align-items:start;padding:11px 0;border-top:1px solid var(--line2)}
   .line-del{position:absolute;top:4px;right:-2px;z-index:4;color:var(--danger);cursor:pointer;opacity:0;font-weight:700;font-size:14px;line-height:1;padding:1px 4px}
   .line:hover .line-del{opacity:.45}
   .line .line-del:hover{opacity:1}
@@ -350,6 +350,10 @@
   .line .sdline:hover{color:var(--ink);border-bottom-color:var(--line)}
   .line .statusdate input{font:inherit;font-size:12px;color:var(--ink);background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:4px 2px;max-width:100%}
   .line .statusdate input:focus{outline:none;border-bottom-color:var(--accent)}
+  .line .statusage{font-size:11.5px;color:var(--muted);font-style:italic}
+  .line .ldate{margin-top:3px}
+  .line .ldateinp{width:100%;max-width:118px;font:inherit;font-size:12px;color:var(--ink);background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:4px 2px}
+  .line .ldateinp:focus{outline:none;border-bottom-color:var(--accent)}
   .line .lqty{width:100%;margin-top:5px;font:inherit;color:var(--ink);background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:5px 2px;text-align:right;font-variant-numeric:tabular-nums}
   .line .lqty:focus{outline:none;border-bottom-color:var(--accent)}
   .line .lprice{display:flex;flex-wrap:nowrap;justify-content:flex-end;align-items:center;gap:3px;margin-top:5px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -785,7 +789,7 @@ function observeStoneNote(el){
 }
 // Apply persisted stone-order column widths (fixed px once the user has dragged any).
 function applyStoneGrid(cardEl){
-  if(state.stoneColW && state.stoneColW.length===7){
+  if(state.stoneColW && state.stoneColW.length===9){
     cardEl.style.setProperty("--stone-grid", state.stoneColW.map(w=>w+"px").join(" "));
   } else { cardEl.style.removeProperty("--stone-grid"); }
 }
@@ -1245,12 +1249,30 @@ function isDeliveredStatus(r){ const low=String(r.Order_Status||"").toLowerCase(
 function autoStatus(r){
   const s=String(r.Order_Status||""), low=s.toLowerCase();
   const isDelivered = isDeliveredStatus(r);
-  const oq=Number(r.Ordered_Qty)||0, dq=Number(r.Delivery_Qty)||0;
-  // Substring test: real statuses are prefixed ("5. On hold", "8. Cancelled"), so an exact-match
-  // list never caught them and would revert a deliberate On hold / Cancelled / Return to Delivered.
-  if(toDate(r.Delivery_Date) && dq>0 && !isDelivered && !/cancel|n\/a|return|on hold/.test(low)) return "6. Delivered";
-  if(toDate(r.Order_Date) && oq>0 && PRE_ORDER_STATES.indexOf(s)>=0) return "2.  Placed Order";
+  // Date-driven: entering a delivery date advances to Delivered, an order date to Placed Order.
+  // Never override a deliberate On hold / Cancelled / Return / N/A (substring test — statuses are
+  // prefixed like "5. On hold", so an exact-match list never caught them).
+  if(/cancel|n\/a|return|on hold/.test(low)) return null;
+  if(toDate(r.Delivery_Date) && !isDelivered) return "6. Delivered";
+  if(toDate(r.Order_Date) && PRE_ORDER_STATES.indexOf(s)>=0) return "2.  Placed Order";
   return null;
+}
+// Whole-day difference between a stored date and today (local midnight). +ve = in the past.
+function relDays(v){ const d=toDate(v); if(!d) return null;
+  const t=new Date(), a=new Date(t.getFullYear(),t.getMonth(),t.getDate()), b=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  return Math.round((a-b)/86400000); }
+// "Ordered 2 days ago" / "Delivered today" / "Delivered in 3 days" (future date).
+function agoText(verb,n){ if(n==null) return "";
+  if(n===0) return verb+" today";
+  if(n<0) return verb+" in "+(-n)+(-n===1?" day":" days");
+  return verb+" "+n+(n===1?" day":" days")+" ago"; }
+// An editable date cell for a stone line; setting it runs the auto-status rule.
+function stoneDateInput(r,col){
+  const wrap=$("div","ldate");
+  const di=document.createElement("input"); di.type="date"; di.className="ldateinp"; di.value=dateInput(r[col]);
+  di.title = col==="Order_Date" ? "Order date — sets the status to Placed Order" : "Delivery date — sets the status to Delivered";
+  di.onchange=()=>updateStoneAuto(r,{[col]:toEpochSec(di.value)});
+  wrap.appendChild(di); return wrap;
 }
 // Apply an edit to a stone line, then run the auto-status rule on the new data.
 function updateStoneAuto(r,fields){
@@ -1258,19 +1280,6 @@ function updateStoneAuto(r,fields){
   const auto=autoStatus(r);
   if(auto && auto!==r.Order_Status){ r.Order_Status=auto; fields.Order_Status=auto; }
   update("Stone_Order",r.id,fields);
-}
-// An editable "Ordered on / Delivered on" date line for a stone row.
-function stoneDateLine(r,col,verb){
-  const sd=$("div","statusdate");
-  const span=$("span","sdline", toDate(r[col]) ? (verb+" "+fmtDMY(r[col])) : (verb+" — set date"));
-  span.title="Click to set the "+verb.toLowerCase().replace(/ on$/,"")+" date";
-  span.onclick=()=>{
-    const di=document.createElement("input"); di.type="date"; di.value=dateInput(r[col]);
-    di.onchange=()=>updateStoneAuto(r,{[col]:toEpochSec(di.value)});
-    di.onblur=()=>renderDetail();
-    sd.replaceChild(di,span); di.focus(); if(di.showPicker){ try{di.showPicker();}catch(e){} }
-  };
-  sd.appendChild(span); return sd;
 }
 // A numeric qty input for a stone row. `auto` routes through the status rule.
 function stoneQtyInput(r,col,title,auto){
@@ -2591,7 +2600,7 @@ function renderDetail(){
   sh.appendChild(sadd); sc.appendChild(sh);
   const sb=$("div","card-body");
   if(!stone.length){ sb.appendChild($("div","empty","No stone lines for this job.")); }
-  else { const hd=$("div","stone-head"); ["Product","Status","Scope","Order","Deliv","Price","Note"].forEach(t=>hd.appendChild($("span",null,t)));
+  else { const hd=$("div","stone-head"); ["Product","Status","Scope","Order","Deliv","Order date","Delivery date","Price","Note"].forEach(t=>hd.appendChild($("span",null,t)));
     [...hd.children].forEach((cell,i)=>{ if(i===hd.children.length-1) return;
       const h=$("span","col-rz"); h.title="Drag to resize column";
       h.onmousedown=e=>{ e.preventDefault(); e.stopPropagation();
@@ -2623,12 +2632,18 @@ function renderDetail(){
     line.appendChild(prod);
     const scell=$("div","statuscell");
     scell.appendChild(pill(r.Order_Status,ORD_C,{options:ORDS,onchange:v=>update("Stone_Order",r.id,{Order_Status:v})}));
-    // One date line only: delivered → "Delivered on"; otherwise → "Ordered on".
-    scell.appendChild(isDeliveredStatus(r) ? stoneDateLine(r,"Delivery_Date","Delivered on") : stoneDateLine(r,"Order_Date","Ordered on"));
+    // Relative-time under the status: counts up from the delivery date once delivered, otherwise
+    // from the order date once ordered. Dates are edited in the dedicated columns to the right.
+    let ageTxt="";
+    if(isDeliveredStatus(r) && toDate(r.Delivery_Date)) ageTxt=agoText("Delivered",relDays(r.Delivery_Date));
+    else if(toDate(r.Order_Date)) ageTxt=agoText("Ordered",relDays(r.Order_Date));
+    if(ageTxt) scell.appendChild($("div","statusage",ageTxt));
     line.appendChild(scell);
     line.appendChild(stoneQtyInput(r,"Scope_Qty","Scope qty",false));
     line.appendChild(stoneQtyInput(r,"Ordered_Qty","Order qty",true));
     line.appendChild(stoneQtyInput(r,"Delivery_Qty","Delivered qty",true));
+    line.appendChild(stoneDateInput(r,"Order_Date"));
+    line.appendChild(stoneDateInput(r,"Delivery_Date"));
     // Price / slab is a Grist formula column (looked up from the chosen product) — read-only.
     // Writing it back raised "Can't save value to formula column Product_Price_slab", so show it
     // as text. To change a price, edit the product profile (pencil) / the Catalogue price.

@@ -396,6 +396,10 @@
   /* ---------- product cell + picker ---------- */
   .line .prod{cursor:pointer}
   .prod .nmrow{display:flex;align-items:center;gap:5px;min-width:0}
+  .prod .nmrow .stone-check{flex:0 0 auto;width:14px;height:14px;border:1.5px solid var(--line);border-radius:4px;cursor:pointer;opacity:.45}
+  .line:hover .prod .nmrow .stone-check{opacity:.85}
+  .prod .nmrow .stone-check.on{background:var(--accent);border-color:var(--accent);opacity:1}
+  .movesel{margin-left:10px;cursor:pointer}
   .prod .nmrow .nm{min-width:0;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
   .pencil{flex:0 0 auto;cursor:pointer;color:var(--muted);opacity:.4;font-size:12px;line-height:1;transition:opacity .1s}
   .line:hover .pencil{opacity:.8}
@@ -979,6 +983,7 @@ function filterCount(){ return activeKeys(state.filter.stage).length+activeKeys(
 
 const stoneFor=id=>state.stone.filter(r=>refId(r.Job)===id);
 const instFor =id=>state.inst.filter(r=>refId(r.Job)===id);
+let stoneSel=new Set(), stoneSelJob=null;   // stone lines ticked for a bulk "move to job"
 
 // ---- change history (tracks edits made through this widget) ----
 const HKEY="milano_inbox_history_v1";
@@ -1456,13 +1461,17 @@ function catalogueHaystack(c){
 }
 // ---- move a stone line to another job (split the Ghost Job back into real jobs) ----
 function jobPickLabel(j){ return (String(j.Client_Label||"").trim()) || (String(j.Job_Address||j.Address_Formatted||"").trim()) || j.Job_ID || ("#"+j.id); }
-function openJobPicker(r,anchor){
+// `recs` is one stone record or an array of them (bulk move).
+function openJobPicker(recs,anchor){
+  recs=[].concat(recs);
   const m=document.getElementById("jobPicker"); m.innerHTML="";
-  const sw=$("div","pp-search"); const si=document.createElement("input"); si.type="text"; si.placeholder="Move to job — search client / address…"; si.autocomplete="off";
+  const sw=$("div","pp-search"); const si=document.createElement("input"); si.type="text";
+  si.placeholder=(recs.length>1?("Move "+recs.length+" stones to job — search…"):"Move to job — search client / address…"); si.autocomplete="off";
   sw.appendChild(si); m.appendChild(sw);
   const list=$("div","pp-list"); m.appendChild(list);
-  const cur=refId(r.Job);
+  const cur=recs.length===1?refId(recs[0].Job):null;
   const hay=j=>((j.Client_Label||"")+" "+(j.Job_Address||"")+" "+(j.Address_Formatted||"")+" "+(j.Job_ID||"")).toLowerCase();
+  const moveTo=id=>{ stoneSel.clear(); recs.forEach(rec=>{ if(refId(rec.Job)!==id) update("Stone_Order",rec.id,{Job:id}); }); };
   function draw(q){
     list.innerHTML=""; const ql=(q||"").trim().toLowerCase();
     const rows=(state.jobs||[]).filter(j=>!ql||hay(j).includes(ql));
@@ -1471,25 +1480,27 @@ function openJobPicker(r,anchor){
       row.appendChild($("div","pplabel",jobPickLabel(j)));
       const sub=(String(j.Job_Address||j.Address_Formatted||"").trim());
       if(sub && sub!==jobPickLabel(j)) row.appendChild($("div","ppsub",sub));
-      row.onmousedown=e=>{ e.preventDefault(); closeMenus(); if(j.id!==cur) update("Stone_Order",r.id,{Job:j.id}); };
+      row.onmousedown=e=>{ e.preventDefault(); closeMenus(); moveTo(j.id); };
       list.appendChild(row);
     });
     if(!rows.length) list.appendChild($("div","pp-empty","No matching jobs."));
-    // No job for this stone yet? Create one and attach the stone to it.
+    // No job for these stones yet? Create one and attach them to it.
     const add=$("div","pp-row create","＋ New job"+(si.value.trim()?" “"+si.value.trim()+"”":"…"));
     add.style.color="var(--accent-ink)"; add.style.fontWeight="600";
-    add.onmousedown=e=>{ e.preventDefault(); closeMenus(); newJobForStone(r,si.value); };
+    add.onmousedown=e=>{ e.preventDefault(); closeMenus(); newJobForStone(recs,si.value); };
     list.appendChild(add);
   }
   draw(""); si.oninput=()=>draw(si.value);
   closeMenus(); m.hidden=false; positionPop(m,anchor,330); setTimeout(()=>si.focus(),0);
 }
-// Create a brand-new job, attach this stone line to it, and jump to it so details can be filled in.
-// If the picker search had text, use it as the client name; otherwise a funny placeholder client.
-function newJobForStone(r,name){
+// Create a brand-new job, attach these stone line(s) to it, and jump to it so details can be filled
+// in. If the picker search had text, use it as the client name; otherwise a funny placeholder.
+function newJobForStone(recs,name){
+  recs=[].concat(recs);
   const f={Stage:"Quote", Input_Date:toEpochSec(dateInput(new Date())), Assigned_To:["L",GHOST_ASSIGNEE]};
   addRecord("Jobs_Detail",f,id=>{
-    update("Stone_Order",r.id,{Job:id});                 // move the stone onto the new job
+    stoneSel.clear();
+    recs.forEach(rec=>update("Stone_Order",rec.id,{Job:id}));   // move the stone(s) onto the new job
     const j=state.jobs.find(x=>x.id===id);
     const nm=(name||"").trim(), R=state.ref.client;
     if(nm && R){ const ex=(state.clients||[]).find(c=>String(c[R.labelCol]||"").toLowerCase()===nm.toLowerCase());
@@ -2504,6 +2515,7 @@ function renderDetail(){
   const j=selectedJob();
   if(!j){ app.appendChild($("div","detail-empty","Select a job from the list to view its details.")); return; }
   const stone=stoneFor(j.id), inst=instFor(j.id);
+  if(j.id!==stoneSelJob){ stoneSel.clear(); stoneSelJob=j.id; }   // reset stone selection per job
 
   // ---------- summary card (3a: overview left · dates right) ----------
   const head=$("div","head sumcard"); applySummaryFont(head);
@@ -2647,7 +2659,16 @@ function renderDetail(){
   const sc=$("div","card stonecard");
   const sh=$("h3",null,"Stone Order");
   const sadd=$("span","add","+ Add line"); sadd.onclick=()=>addRecord("Stone_Order",{Job:j.id});
-  sh.appendChild(sadd); sc.appendChild(sh);
+  sh.appendChild(sadd);
+  // Bulk move: when lines are ticked, offer to move them all to one job at once.
+  const selRecs=stone.filter(x=>stoneSel.has(x.id));
+  if(selRecs.length){
+    const mvsel=$("span","add movesel","⇄ Move "+selRecs.length+" →");
+    mvsel.title="Move the selected stone line"+(selRecs.length>1?"s":"")+" to another job";
+    mvsel.onclick=e=>{ e.stopPropagation(); openJobPicker(selRecs,mvsel); };
+    sh.appendChild(mvsel);
+  }
+  sc.appendChild(sh);
   const sb=$("div","card-body");
   if(!stone.length){ sb.appendChild($("div","empty","No stone lines for this job.")); }
   else { const hd=$("div","stone-head");
@@ -2667,6 +2688,9 @@ function renderDetail(){
     line.appendChild(sdel);
     const prod=$("div","prod");
     const nmrow=$("div","nmrow");
+    const cb=$("span","stone-check"+(stoneSel.has(r.id)?" on":"")); cb.title="Select to move to another job";
+    cb.onclick=e=>{ e.stopPropagation(); if(stoneSel.has(r.id))stoneSel.delete(r.id); else stoneSel.add(r.id); renderDetail(); };
+    nmrow.appendChild(cb);
     const nm = stoneProductLabel(r);
     nmrow.appendChild($("div","nm",esc(nm)));
     if(state.ref.product){
@@ -2678,7 +2702,7 @@ function renderDetail(){
     }
     // Move this stone line to another job (e.g. split it out of the Ghost Job).
     const mvb=$("span","pencil movejob"); mvb.textContent="⇄"; mvb.title="Move this stone line to another job";
-    mvb.onclick=e=>{ e.stopPropagation(); openJobPicker(r,mvb); };
+    mvb.onclick=e=>{ e.stopPropagation(); openJobPicker([r],mvb); };
     nmrow.appendChild(mvb);
     prod.appendChild(nmrow);
     // ── Section 1: Product · Scope · Status · Price ──

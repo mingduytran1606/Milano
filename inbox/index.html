@@ -1086,6 +1086,11 @@ async function flushDraftToGrist(){
     bse.forEach(r=>{ if(!isTempId(r.id)&&!curById.has(r.id)) removes.push({table,id:r.id}); });
   });
   adds.sort((a,b)=>rank(a.table)-rank(b.table));
+  // Track whether any AddRecord has actually committed. If a later batch throws, the caller must
+  // resync from Grist rather than retry — otherwise the already-created rows (still holding temp ids
+  // in state) would be added a SECOND time, duplicating them. Updates/removes are keyed by id and
+  // idempotent, so only committed adds set this flag.
+  state._partialFlush=false;
   let i=0;
   while(i<adds.length){
     const r0=rank(adds[i].table), group=[];
@@ -1094,11 +1099,13 @@ async function flushDraftToGrist(){
     const res=await grist.docApi.applyUserActions(acts);
     const rv=(res&&res.retValues)||[];
     group.forEach((g,k)=>{ if(rv[k]!=null) idMap[g.rec.id]=rv[k]; });
+    if(rv.length) state._partialFlush=true;
   }
   const tail=[];
   updates.forEach(u=>tail.push(["UpdateRecord",u.table,resolve(u.id),resolveFields(u.fields)]));
   removes.forEach(u=>tail.push(["RemoveRecord",u.table,resolve(u.id)]));
   if(tail.length) await grist.docApi.applyUserActions(tail);
+  state._partialFlush=false;   // fully applied — nothing half-committed
   return idMap;
 }
 async function saveDraft(){
@@ -1106,13 +1113,27 @@ async function saveDraft(){
   if(state.grist){
     try{
       const idMap=await flushDraftToGrist();
+      state._lastIdMap=idMap;   // so callers (e.g. select) can remap a temp id they were holding
       if(idMap[state.selectedId]!=null) state.selectedId=idMap[state.selectedId];
       state.pinnedNew=(state.pinnedNew||[]).map(id=>idMap[id]!=null?idMap[id]:id);
       // remap the "NEW" badge timestamps from temp ids to the real ones, then share with the team
       const rj={}; for(const k in state.recentJobs){ const nk=(idMap[k]!=null)?idMap[k]:k; rj[nk]=state.recentJobs[k]; }
       state.recentJobs=rj; pruneRecent(); pushRecentJobs();
       await pullTables();
-    }catch(e){ console.error("save failed",e); alert("Couldn't save to Grist — your changes are kept here so you can try again.\n\n"+((e&&e.message)||e)); return; }
+    }catch(e){
+      console.error("save failed",e);
+      if(state._partialFlush){
+        // Some new rows were created before the error. Resync from Grist so a retry can't re-add
+        // them (which would duplicate). This clears the draft, so unsaved edits must be re-entered.
+        state._partialFlush=false;
+        try{ await pullTables(); }catch(_){}
+        renderAll(); updateSaveBar();
+        alert("Some changes were saved before an error occurred, so the view was refreshed from Grist.\n\nPlease re-check the job and re-enter anything that didn't save.\n\n"+((e&&e.message)||e));
+      }else{
+        alert("Couldn't save to Grist — your changes are kept here so you can try again.\n\n"+((e&&e.message)||e));
+      }
+      return;
+    }
   }
   snapshotClean();   // fresh clean baseline (grist: freshly-pulled data; demo: the edits are now committed locally)
   renderAll(); updateSaveBar();
@@ -1223,7 +1244,9 @@ function autoStatus(r){
   const s=String(r.Order_Status||""), low=s.toLowerCase();
   const isDelivered = isDeliveredStatus(r);
   const oq=Number(r.Ordered_Qty)||0, dq=Number(r.Delivery_Qty)||0;
-  if(toDate(r.Delivery_Date) && dq>0 && !isDelivered && !["cancelled","n/a","return"].includes(low)) return "6. Delivered";
+  // Substring test: real statuses are prefixed ("5. On hold", "8. Cancelled"), so an exact-match
+  // list never caught them and would revert a deliberate On hold / Cancelled / Return to Delivered.
+  if(toDate(r.Delivery_Date) && dq>0 && !isDelivered && !/cancel|n\/a|return|on hold/.test(low)) return "6. Delivered";
   if(toDate(r.Order_Date) && oq>0 && PRE_ORDER_STATES.indexOf(s)>=0) return "2.  Placed Order";
   return null;
 }
@@ -1327,7 +1350,7 @@ function openProductPicker(r,anchor){
   const list=$("div","pp-list"); m.appendChild(list);
   function draw(q){
     list.innerHTML=""; const ql=(q||"").trim().toLowerCase();
-    const rows=(state.catalogue||[]).filter(c=>!ql||productLabel(c).toLowerCase().includes(ql));
+    const rows=(state.catalogue||[]).filter(c=>!ql||catalogueHaystack(c).includes(ql));
     rows.slice(0,80).forEach(c=>{
       const row=$("div","pp-row"+(refId(r.Product)===c.id?" on":""),productLabel(c)||("#"+c.id));
       row.onmousedown=e=>{ e.preventDefault(); closeMenus(); setProduct(r,c); };
@@ -1338,7 +1361,21 @@ function openProductPicker(r,anchor){
       add.onmousedown=e=>{ e.preventDefault(); closeMenus(); newProductFor(r,si.value); }; list.appendChild(add); }
   }
   draw(""); si.oninput=()=>draw(si.value);
+  // Refresh the catalogue from Grist on open so products added elsewhere (Grist / the stone-order
+  // board) since this widget last pulled show up in the picker. Re-draw if the popup is still open.
+  if(state.grist && R && R.targetTableId){
+    grist.docApi.fetchTable(R.targetTableId)
+      .then(t=>{ state.catalogue=columnarToRows(t); if(!m.hidden) draw(si.value); })
+      .catch(()=>{});
+  }
   closeMenus(); m.hidden=false; positionPop(m,anchor,330); setTimeout(()=>si.focus(),0);
+}
+// Lower-cased search text for a catalogue row: its display label PLUS every string field value,
+// so a product is findable by name/code/supplier even when the Product_Full formula is blank.
+function catalogueHaystack(c){
+  let s=productLabel(c)||"";
+  for(const k in c){ if(k==="id") continue; const v=c[k]; if(typeof v==="string") s+=" "+v; }
+  return s.toLowerCase();
 }
 
 // ---- generic "create record" modal (used for new product) ----
@@ -2325,7 +2362,10 @@ function select(id){
   if(state.dirty){
     confirmUnsaved().then(choice=>{
       if(choice==="cancel") return;
-      if(choice==="save") saveDraft().then(go); else { discardDraft(); go(); }
+      // After a save, a temp id we're switching to is remapped to its real id — translate it so we
+      // don't land on a now-nonexistent row (blank detail pane).
+      if(choice==="save") saveDraft().then(()=>{ const m=state._lastIdMap; if(m&&m[id]!=null) id=m[id]; go(); });
+      else { discardDraft(); go(); }
     });
     return;
   }

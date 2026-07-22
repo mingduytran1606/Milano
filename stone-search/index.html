@@ -482,12 +482,21 @@ function renderDetail(){
 
   // resolve the active selection against what this product actually has
   let sel=state.selectedMonth;
-  if(sel==="undated"){ if(!hasUndated) sel=curKey; }
+  if(sel==="all"){ /* always valid */ }
+  else if(sel==="undated"){ if(!hasUndated) sel=curKey; }
   else if(!(typeof sel==="number" && keySet.has(sel))) sel=curKey;
   state.selectedMonth=sel;
 
   const countIn=k=>allOrders.filter(r=>monthKeyOf(r)===k).length;
   const mrow=$("div","mrow");
+  // "All time" pill first
+  {
+    const p=$("button","mpill"+(sel==="all"?" on":""));
+    p.appendChild($("span","mp-name","All time"));
+    if(allOrders.length) p.appendChild($("span","mp-n",String(allOrders.length)));
+    p.onclick=()=>{ state.selectedMonth="all"; renderDetail(); };
+    mrow.appendChild(p);
+  }
   monthKeys.forEach(k=>{
     const p=$("button","mpill"+(sel===k?" on":"")+(countIn(k)?"":" empty"));
     p.appendChild($("span","mp-name",monthPillLabel(k)));
@@ -504,11 +513,11 @@ function renderDetail(){
   }
   s3.appendChild(mrow);
 
-  // orders in the selected month, most-recent first
-  const orders=allOrders.filter(r=> sel==="undated" ? monthKeyOf(r)==null : monthKeyOf(r)===sel).slice().sort(byDateDesc);
+  // orders for the selected scope, most-recent first
+  const orders=allOrders.filter(r=> sel==="all" ? true : sel==="undated" ? monthKeyOf(r)==null : monthKeyOf(r)===sel).slice().sort(byDateDesc);
 
   // table first
-  const selLabel = sel==="undated" ? "orders with no order date" : monthLabelOf(sel);
+  const selLabel = sel==="all" ? "any month" : sel==="undated" ? "orders with no order date" : monthLabelOf(sel);
   if(!orders.length) s3.appendChild($("div","hist-none","No orders for this product in "+selLabel+"."));
   else s3.appendChild(orderTable(orders));
 
@@ -546,31 +555,48 @@ function supplierDaily(c,monthKey){
   });
   return days;
 }
+// Monthly aggregation across the whole supplier (used by the All-time view).
+function supplierMonthly(c){
+  const sup=c.Supplier||"", curId=c.id, byMonth={};
+  (state.stone||[]).forEach(r=>{
+    if(supplierFor(r)!==sup) return;
+    const k=monthKeyOf(r); if(k==null) return;
+    const q=num(r.Ordered_Qty); if(q<=0) return;
+    const m=byMonth[k]||(byMonth[k]={key:k,cur:0,other:0});
+    if(refId(r.Product)===curId) m.cur+=q; else m.other+=q;
+  });
+  return Object.keys(byMonth).map(k=>byMonth[k]).sort((a,b)=>a.key-b.key);
+}
 function histogram(c){
   const box=$("div","hist-chart");
   const sel=state.selectedMonth;
+  const allTime = sel==="all";
   const supTxt=(c.Supplier?("all "+c.Supplier+" orders · "):"")+"this stone highlighted";
   const head=$("div","chart-h");
-  head.appendChild($("span","st","Ordered by day"));
-  head.appendChild($("span","ssub",(typeof sel==="number"?monthLabelOf(sel)+" · ":"")+supTxt));
+  head.appendChild($("span","st", allTime?"Ordered by month":"Ordered by day"));
+  head.appendChild($("span","ssub",(typeof sel==="number"?monthLabelOf(sel)+" · ":allTime?"all time · ":"")+supTxt));
   box.appendChild(head);
 
-  if(typeof sel!=="number"){ box.appendChild($("div","hist-none","Pick a month above to see its daily breakdown.")); return box; }
-  const data=supplierDaily(c,sel);
-  if(!data.some(d=>d.cur+d.other>0)){ box.appendChild($("div","hist-none","No "+(c.Supplier?c.Supplier+" ":"")+"orders in "+monthLabelOf(sel)+".")); return box; }
+  if(!allTime && typeof sel!=="number"){ box.appendChild($("div","hist-none","Pick a month above to see its daily breakdown.")); return box; }
+  // All time → one bar per month; a specific month → one bar per day.
+  const data = allTime ? supplierMonthly(c) : supplierDaily(c,sel);
+  const empty = allTime ? !data.length : !data.some(d=>d.cur+d.other>0);
+  if(empty){ box.appendChild($("div","hist-none","No "+(c.Supplier?c.Supplier+" ":"")+"orders"+(allTime?" yet.":" in "+monthLabelOf(sel)+"."))); return box; }
   const max=Math.max(1,...data.map(d=>d.cur+d.other));
   const H=118;
-  const scroll=$("div","chart-scroll"); const chart=$("div","chart daily");
+  const scroll=$("div","chart-scroll"); const chart=$("div","chart"+(allTime?"":" daily"));
   data.forEach(d=>{
     const total=d.cur+d.other;
-    const col=$("div","bar-col"+(total?"":" zero"));
-    col.title=d.day+" "+monthLabelOf(sel)+(total?(" — "+total+" slab"+(total===1?"":"s")+" ("+d.cur+" this stone, "+d.other+" other)"):" — no orders");
+    const col=$("div","bar-col"+(total?"":" zero")+(allTime&&d.key===state.selectedMonth?" sel":""));
+    const label = allTime ? monthLabelOf(d.key) : (d.day+" "+monthLabelOf(sel));
+    col.title=label+(total?(" — "+total+" slab"+(total===1?"":"s")+" ("+d.cur+" this stone, "+d.other+" other)"):" — no orders");
     col.appendChild($("div","bar-v",total?String(total):""));
     const bar=$("div","bar");
     if(d.cur>0){ const s=$("div","seg cur"); s.style.height=Math.max(2,d.cur/max*H)+"px"; bar.appendChild(s); }
     if(d.other>0){ const s=$("div","seg other"); s.style.height=Math.max(2,d.other/max*H)+"px"; bar.appendChild(s); }
     col.appendChild(bar);
-    col.appendChild($("div","bar-x",String(d.day)));
+    col.appendChild($("div","bar-x", allTime?monthPillLabel(d.key):String(d.day)));
+    if(allTime){ col.style.cursor="pointer"; col.onclick=()=>{ state.selectedMonth=d.key; renderDetail(); }; }
     chart.appendChild(col);
   });
   scroll.appendChild(chart); box.appendChild(scroll);

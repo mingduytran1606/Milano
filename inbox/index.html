@@ -1336,6 +1336,7 @@ function createClientAndSet(j,name){
 const GHOST_ASSIGNEE = "Nè Hé";
 const GHOST_RED = "#e5484d";                        // Nè Hé's avatar/pill colour (red, not the grey default)
 const GHOST_JOB_CLIENT = "👻 Ghost Job (unclaimed stones)";
+const GHOST_ADDRESS = "Nhà cô Phương Hằng";         // placeholder address for the catch-all Ghost Job
 const FUN_CLIENT = "Cưng ơi cưng";
 function funnyClientName(){ return FUN_CLIENT; }
 // Give a freshly-created (draft) job a funny placeholder client, reusing one if it
@@ -1363,7 +1364,8 @@ async function ensureGhostJob(){
     const j=(state.jobs||[]).find(x=>String(x.Job_Address||"")===GHOST_JOB_CLIENT); if(j) return j.id;
   }
   const jf={Stage:"Quote", Assigned_To:["L",GHOST_ASSIGNEE]};
-  if(clientId!=null) jf.Client_Name=clientId; else jf.Job_Address=GHOST_JOB_CLIENT;
+  if(clientId!=null){ jf.Client_Name=clientId; jf.Job_Address=GHOST_ADDRESS; }
+  else jf.Job_Address=GHOST_JOB_CLIENT;   // no client ref — reuse the address field as the match sentinel
   const jr=await grist.docApi.applyUserActions([["AddRecord","Jobs_Detail",null,jf]]);
   return (jr&&jr.retValues&&jr.retValues[0])||null;
 }

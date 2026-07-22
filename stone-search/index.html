@@ -84,7 +84,18 @@
   .detail-empty{height:100%;display:flex;align-items:center;justify-content:center;color:var(--muted);
     text-align:center;font-size:13px;padding:30px}
 
-  .prod-head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--line2)}
+  /* three stacked sections: profile · active orders · monthly history */
+  .section{padding:16px 0}
+  .section:first-child{padding-top:0}
+  .section+.section{border-top:1px solid var(--line)}
+  .section-h{display:flex;align-items:baseline;gap:9px;margin-bottom:11px}
+  .section-h .st{font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink)}
+  .section-h .sc{font-size:11px;font-weight:700;color:var(--accent-ink);background:var(--accent-soft);border-radius:999px;padding:1px 8px}
+  .section-h .ssub{font-size:11.5px;color:var(--muted)}
+
+  .prod-head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+  .prof-life{margin-top:12px;display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+  .prof-life .lb b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
   .prod-title{flex:1 1 auto;min-width:0}
   .prod-name{font-size:21px;font-weight:700;line-height:1.25;word-break:break-word}
   .prod-sub{margin-top:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:12.5px}
@@ -93,7 +104,7 @@
   .prod-price small{font-size:11px;font-weight:600;color:var(--muted);display:block;text-align:right;letter-spacing:.03em;text-transform:uppercase}
 
   /* ---------- month picker pills ---------- */
-  .mrow{display:flex;gap:7px;flex-wrap:wrap;margin:16px 0 4px}
+  .mrow{display:flex;gap:7px;flex-wrap:wrap;margin:2px 0 6px}
   .mpill{font:inherit;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;
     border:1px solid var(--line);background:var(--panel);color:var(--ink);font-size:12.5px;font-weight:600;cursor:pointer;
     white-space:nowrap}
@@ -344,9 +355,12 @@ function catalogueCard(c){
 function renderDetail(){
   const app=document.getElementById("detail"); app.innerHTML="";
   const c=state.catById[state.selectedCatId];
-  if(!c){ app.appendChild($("div","detail-empty","Search the catalogue, then pick a product to see its full order history.")); return; }
+  if(!c){ app.appendChild($("div","detail-empty","Search the catalogue, then pick a product to see its profile and order history.")); return; }
+  const allOrders=ordersFor(c.id);
+  const byDateDesc=(a,b)=>{ const da=+toDate(a.Order_Date)||0, db=+toDate(b.Order_Date)||0; return db-da || (b.id||0)-(a.id||0); };
 
-  // ---- product header ----
+  // ═══ Section 1 — Stone profile ═══
+  const s1=$("div","section");
   const head=$("div","prod-head");
   const tw=$("div","prod-title");
   tw.appendChild($("div","prod-name",catLabel(c)));
@@ -357,10 +371,31 @@ function renderDetail(){
   head.appendChild(tw);
   const price=$("div","prod-price"); price.appendChild(document.createTextNode("$"+priceOf(c)));
   price.appendChild($("small",null,"per slab")); head.appendChild(price);
-  app.appendChild(head);
+  s1.appendChild(head);
+  // all-time context (the scoreboard below is month-scoped, so summarise lifetime here)
+  const lifeJobs=new Set(allOrders.map(r=>refId(r.Job)).filter(v=>v!=null));
+  const lifeOrd=allOrders.reduce((s,r)=>s+num(r.Ordered_Qty),0);
+  const lifeDel=allOrders.reduce((s,r)=>s+num(r.Delivery_Qty),0);
+  const life=$("div","prof-life");
+  life.appendChild(lifeBit(allOrders.length,"orders all-time"));
+  life.appendChild(lifeBit(lifeJobs.size,"jobs"));
+  life.appendChild(lifeBit(lifeOrd,"slabs ordered"));
+  life.appendChild(lifeBit(lifeDel,"slabs delivered"));
+  s1.appendChild(life);
+  app.appendChild(s1);
 
-  // ---- month picker (pills) — default to the current month ----
-  const allOrders=ordersFor(c.id);
+  // ═══ Section 2 — Active orders (placed & awaiting delivery, any month) ═══
+  const s2=$("div","section");
+  const active=allOrders.filter(isActiveOrder).slice().sort(byDateDesc);
+  s2.appendChild(sectionHead("Active orders","placed & awaiting delivery",active.length));
+  if(!active.length) s2.appendChild($("div","hist-none","No active orders — nothing placed and awaiting delivery."));
+  else s2.appendChild(orderTable(active));
+  app.appendChild(s2);
+
+  // ═══ Section 3 — Order history by month ═══
+  const s3=$("div","section");
+  s3.appendChild(sectionHead("Order history",null,null));
+
   const curKey=currentMonthKey();
   const keySet=new Set(allOrders.map(monthKeyOf).filter(k=>k!=null));
   keySet.add(curKey);                                  // this month is always offered
@@ -389,13 +424,12 @@ function renderDetail(){
     p.onclick=()=>{ state.selectedMonth="undated"; renderDetail(); };
     mrow.appendChild(p);
   }
-  app.appendChild(mrow);
+  s3.appendChild(mrow);
 
   // orders in the selected month, most-recent first
-  const orders=allOrders.filter(r=> sel==="undated" ? monthKeyOf(r)==null : monthKeyOf(r)===sel)
-    .slice().sort((a,b)=>{ const da=+toDate(a.Order_Date)||0, db=+toDate(b.Order_Date)||0; return db-da || (b.id||0)-(a.id||0); });
+  const orders=allOrders.filter(r=> sel==="undated" ? monthKeyOf(r)==null : monthKeyOf(r)===sel).slice().sort(byDateDesc);
 
-  // ---- scoreboard (for the selected month) ----
+  // scoreboard (for the selected month)
   const jobs=new Set(orders.map(r=>refId(r.Job)).filter(v=>v!=null));
   const ordered=orders.reduce((s,r)=>s+num(r.Ordered_Qty),0);
   const delivered=orders.reduce((s,r)=>s+num(r.Delivery_Qty),0);
@@ -404,19 +438,36 @@ function renderDetail(){
   stats.appendChild(stat(jobs.size,"jobs"));
   stats.appendChild(stat(ordered,"slabs ordered"));
   stats.appendChild(stat(delivered,"slabs delivered"));
-  app.appendChild(stats);
+  s3.appendChild(stats);
 
-  // ---- history (selected month) ----
   const selLabel = sel==="undated" ? "orders with no order date" : monthLabelOf(sel);
-  if(!orders.length){ app.appendChild($("div","hist-none","No orders for this product in "+selLabel+".")); return; }
+  if(!orders.length) s3.appendChild($("div","hist-none","No orders for this product in "+selLabel+"."));
+  else s3.appendChild(orderTable(orders));
+  app.appendChild(s3);
+}
+
+// Shared one-line order table (used by Active orders + monthly history).
+function orderTable(rows){
   const wrap=$("div","htbl-wrap"); const tbl=$("div","htbl");
   const thead=$("div","hgridrow htbl-head");
   [["Job / client",""],["Status",""],["Ord","n"],["Order date",""],["Deliv","n"],["Delivery date",""],["INV",""],["Note",""]]
     .forEach(([t,cls])=>thead.appendChild($("span","hh"+(cls?" "+cls:""),t)));
   tbl.appendChild(thead);
-  orders.forEach(r=>tbl.appendChild(historyRow(r)));
-  wrap.appendChild(tbl); app.appendChild(wrap);
+  rows.forEach(r=>tbl.appendChild(historyRow(r)));
+  wrap.appendChild(tbl); return wrap;
 }
+function sectionHead(title,sub,count){
+  const h=$("div","section-h");
+  h.appendChild($("span","st",title));
+  if(count!=null) h.appendChild($("span","sc",String(count)));
+  if(sub) h.appendChild($("span","ssub",sub));
+  return h;
+}
+function lifeBit(v,label){ const s=$("span","lb"); s.appendChild($("b",null,String(v))); s.appendChild(document.createTextNode(" "+label)); return s; }
+
+// An order is "active" when it's been placed but not yet delivered/closed.
+const ACTIVE_STATES=["2.  Placed Order","7. Not Delivered Yet","4. Awaiting Pickup"];
+function isActiveOrder(r){ return ACTIVE_STATES.indexOf(String(r.Order_Status||""))>=0; }
 
 const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
 const MONTHS_SHORT=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];

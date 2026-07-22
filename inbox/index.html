@@ -1354,6 +1354,9 @@ function createClientAndSet(j,name){
 const GHOST_ASSIGNEE = "Nè Hé";
 const GHOST_RED = "#e5484d";                        // Nè Hé's avatar/pill colour (red, not the grey default)
 const GHOST_JOB_CLIENT = "👻 Ghost Job (unclaimed stones)";
+// The catch-all job — matched by its client label (or the address sentinel in the no-client fallback).
+// The stone select/relocate controls are shown only here.
+function isGhostJob(j){ return !!j && (String(j.Client_Label||"")===GHOST_JOB_CLIENT || String(j.Job_Address||"")===GHOST_JOB_CLIENT); }
 const GHOST_ADDRESS = "ê nha";                      // placeholder address for the catch-all Ghost Job
 const FUN_CLIENT = "Cưng ơi cưng";
 function funnyClientName(){ return FUN_CLIENT; }
@@ -2661,8 +2664,10 @@ function renderDetail(){
   const sadd=$("span","add","+ Add line"); sadd.onclick=()=>addRecord("Stone_Order",{Job:j.id});
   sh.appendChild(sadd);
   // Bulk move: when lines are ticked, offer to move them all to one job at once.
-  const selRecs=stone.filter(x=>stoneSel.has(x.id));
-  if(selRecs.length){
+  // Relocation controls live under the Ghost Job only.
+  const ghost=isGhostJob(j);
+  const selRecs=ghost?stone.filter(x=>stoneSel.has(x.id)):[];
+  if(ghost && selRecs.length){
     const mvsel=$("span","add movesel","⇄ Move "+selRecs.length+" →");
     mvsel.title="Move the selected stone line"+(selRecs.length>1?"s":"")+" to another job";
     mvsel.onclick=e=>{ e.stopPropagation(); openJobPicker(selRecs,mvsel); };
@@ -2688,9 +2693,11 @@ function renderDetail(){
     line.appendChild(sdel);
     const prod=$("div","prod");
     const nmrow=$("div","nmrow");
-    const cb=$("span","stone-check"+(stoneSel.has(r.id)?" on":"")); cb.title="Select to move to another job";
-    cb.onclick=e=>{ e.stopPropagation(); if(stoneSel.has(r.id))stoneSel.delete(r.id); else stoneSel.add(r.id); renderDetail(); };
-    nmrow.appendChild(cb);
+    if(ghost){   // relocation controls only under the Ghost Job
+      const cb=$("span","stone-check"+(stoneSel.has(r.id)?" on":"")); cb.title="Select to move to another job";
+      cb.onclick=e=>{ e.stopPropagation(); if(stoneSel.has(r.id))stoneSel.delete(r.id); else stoneSel.add(r.id); renderDetail(); };
+      nmrow.appendChild(cb);
+    }
     const nm = stoneProductLabel(r);
     nmrow.appendChild($("div","nm",esc(nm)));
     if(state.ref.product){
@@ -2700,10 +2707,12 @@ function renderDetail(){
       prod.title="Double-click to pick a different product";
       prod.ondblclick=e=>{ e.stopPropagation(); openProductPicker(r,prod); };
     }
-    // Move this stone line to another job (e.g. split it out of the Ghost Job).
-    const mvb=$("span","pencil movejob"); mvb.textContent="⇄"; mvb.title="Move this stone line to another job";
-    mvb.onclick=e=>{ e.stopPropagation(); openJobPicker([r],mvb); };
-    nmrow.appendChild(mvb);
+    // Move this stone line to another job (split it out of the Ghost Job) — Ghost Job only.
+    if(ghost){
+      const mvb=$("span","pencil movejob"); mvb.textContent="⇄"; mvb.title="Move this stone line to another job";
+      mvb.onclick=e=>{ e.stopPropagation(); openJobPicker([r],mvb); };
+      nmrow.appendChild(mvb);
+    }
     prod.appendChild(nmrow);
     // ── Section 1: Product · Scope · Status · Price ──
     line.appendChild(prod);

@@ -99,11 +99,20 @@
   .cell.today .dn{background:var(--accent);color:#fff;border-radius:50%}
   .dsum{margin-left:auto;font-size:9.5px;color:var(--muted);font-variant-numeric:tabular-nums}
 
-  .ev{font-size:10.5px;line-height:1.3;border-radius:6px;padding:2px 6px;cursor:pointer;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:5px}
-  .ev .dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
-  .ev b{font-weight:700}
-  .ev .who{color:var(--muted)}
+  .ev{font-size:var(--ev-card-font,10.5px);line-height:1.32;border-radius:6px;padding:2px 6px;cursor:pointer;overflow:hidden}
+  .ev strong{font-weight:700}
+  .ev em{font-style:italic;color:var(--muted)}
+  /* templated card lines (shared by event chips + job cards) */
+  .cline{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cdivider{height:1px;background:var(--line2);margin:3px 0}
+  .cbar{border-radius:5px;padding:0 5px;display:inline-block}
+  .cpill{display:inline-flex;align-items:center;gap:4px;border-radius:20px;padding:0 7px;font-size:.92em;font-weight:700;color:var(--ink)}
+  .cpill .cpd{width:6px;height:6px;border-radius:50%;flex:0 0 auto}
+  .avwrap{display:inline-flex;vertical-align:-4px}
+  .avwrap .av{width:16px;height:16px;font-size:8.5px;margin-left:-4px;border:1.5px solid var(--panel)}
+  .avwrap .av:first-child{margin-left:0}
+  .jk{display:inline-flex;align-items:center;gap:4px}
+  .jk .kd{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
   .ev.ordered{background:#fdf6c8}
   .ev.delivered{background:#dcf7d6}
   @media (prefers-color-scheme:dark){ .ev.ordered{background:#3a380f} .ev.delivered{background:#173a24} }
@@ -148,6 +157,47 @@
   .pev .pname{font-weight:700;font-size:12.5px}
   .pev .pmeta{font-size:11.5px;color:var(--muted);margin-top:2px}
 
+  .job{font-size:var(--job-card-font,12.5px)}
+
+  /* ---- card customisation modal ---- */
+  .modal{position:fixed;inset:0;background:rgba(16,24,40,.42);z-index:80;display:none;align-items:center;justify-content:center;padding:20px}
+  .modal.open{display:flex}
+  .modal-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);
+    width:min(560px,96vw);max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+  .modal-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line2)}
+  .modal-close{margin-left:auto;cursor:pointer;font-size:20px;color:var(--muted);line-height:1;padding:2px 6px;border-radius:6px}
+  .modal-close:hover{background:var(--line2);color:var(--ink)}
+  .ce-tabs{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .ce-tab{border:0;background:var(--panel);color:var(--muted);padding:6px 12px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+  .ce-tab+.ce-tab{border-left:1px solid var(--line)}
+  .ce-tab.on{background:var(--accent-soft);color:var(--accent-ink);font-weight:700}
+  .ce-body{padding:14px;overflow:auto}
+  .ce-note{font-size:11.5px;color:var(--muted);margin-bottom:9px;line-height:1.5}
+  .ce-ta{width:100%;min-height:92px;font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink);
+    background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;resize:vertical;outline:none}
+  .ce-ta:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+  .ce-tokens{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .ce-tok{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);border-radius:8px;
+    padding:4px 8px;cursor:pointer;font:inherit;font-size:11px;color:var(--ink)}
+  .ce-tok:hover{border-color:var(--accent);background:var(--accent-soft)}
+  .ce-tok code{font-family:ui-monospace,Menlo,monospace;font-weight:700;color:var(--accent-ink)}
+  .ce-tok span{color:var(--muted)}
+  .ce-reset{margin-top:12px;font-size:12px;color:var(--accent-ink);cursor:pointer;display:inline-block}
+  .ce-reset:hover{text-decoration:underline}
+  .ce-fontrow{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12.5px}
+  .ce-flabel{color:var(--muted);font-weight:600;margin-right:auto}
+  .ce-fbtn{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;font-size:15px}
+  .ce-fbtn:hover{border-color:var(--accent)}
+  .ce-fval{font-variant-numeric:tabular-nums;min-width:44px;text-align:center}
+  .ce-foot{margin-top:14px;border-top:1px solid var(--line2);padding-top:12px}
+  .ce-scope{font-size:11.5px;color:var(--muted);margin-bottom:8px}
+  .ce-btnrow{display:flex;gap:8px;justify-content:flex-end}
+  .ce-save{font:inherit;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:9px;cursor:pointer;border:1px solid var(--line)}
+  .ce-save.ghost{background:var(--panel);color:var(--ink)}
+  .ce-save.ghost:hover{background:var(--line2)}
+  .ce-save.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .ce-save.primary:hover{filter:brightness(1.06)}
+
   .demo-tag{position:fixed;bottom:9px;left:11px;font-size:10px;color:var(--muted);background:var(--panel);
     border:1px solid var(--line);border-radius:20px;padding:2px 9px;opacity:.75;z-index:40}
 </style>
@@ -172,6 +222,7 @@
       <span class="lg on" id="lgOrdered"><span class="sw" style="background:#f2df3a"></span>Ordered <span class="n" id="nOrdered">0</span></span>
       <span class="lg on" id="lgDelivered"><span class="sw" style="background:#7ad66f"></span>Delivered <span class="n" id="nDelivered">0</span></span>
     </div>
+    <button class="assign" id="cardsBtn" title="Customise how cards appear">⚙ Cards</button>
     <button class="assign" id="btnJobs" title="Show / hide the jobs panel">▦ Jobs</button>
   </div>
   <div class="body" id="body">
@@ -194,6 +245,18 @@
 
 <div class="pop" id="dayPop" hidden></div>
 <div class="pop" id="assignPop" hidden></div>
+<div class="modal" id="cardModal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div class="ce-tabs">
+        <button class="ce-tab on" data-tab="event">Event card</button>
+        <button class="ce-tab" data-tab="job">Job card</button>
+      </div>
+      <span class="modal-close" id="cardClose">&times;</span>
+    </div>
+    <div class="ce-body" id="ceBody"></div>
+  </div>
+</div>
 <div class="demo-tag" id="demoTag" hidden>demo data</div>
 
 <script>
@@ -231,6 +294,12 @@ function fmtDMY(v){ const d=toDate(v); if(!d)return "—";
 const num=v=>{ const n=Number(v); return isFinite(n)?n:0; };
 function ymd(d){ return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate(); }
 function columnarToRows(t){ if(!t||!t.id)return []; return t.id.map((id,i)=>{const o={id}; for(const k in t)if(k!=="id")o[k]=t[k][i]; return o;}); }
+function hexRgb(h){ h=String(h||"").replace("#",""); if(h.length===3)h=h.split("").map(c=>c+c).join("");
+  return {r:parseInt(h.slice(0,2),16)||0,g:parseInt(h.slice(2,4),16)||0,b:parseInt(h.slice(4,6),16)||0}; }
+function softTint(hex){ const {r,g,b}=hexRgb(hex||"#cfd4d1");
+  return { bg:"rgb("+Math.round(r+(255-r)*.72)+","+Math.round(g+(255-g)*.72)+","+Math.round(b+(255-b)*.72)+")",
+           dot:"rgb("+Math.round(r*.66)+","+Math.round(g*.66)+","+Math.round(b*.66)+")" }; }
+function txtNode(s){ return (s==null||s==="")?null:document.createTextNode(String(s)); }
 
 const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DOW=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
@@ -248,6 +317,34 @@ const state={
   jobById:{}, catById:{}
 };
 window._stonecal=state;
+
+// ---- customisable card templates (mirrors the installations calendar) ----
+// Markdown-ish: **bold**, *italic*, {token}, ==coloured bar==, --- divider, \n = new line.
+const DEFAULT_EVENT_CARD='**{client}** · {product}';
+const DEFAULT_JOB_CARD='**{client}**\n{address}\n{ordered} {delivered} {assigned}';
+let eventCardTpl=DEFAULT_EVENT_CARD, jobCardTpl=DEFAULT_JOB_CARD;
+let cardScope='everyone', eventCardFont=10.5, jobCardFont=12.5;
+const CARD_LS='milano_stonecal_cards';
+const EVENT_TOKENS={ client:'Client', job:'Job ID', address:'Address', product:'Product', supplier:'Supplier',
+  code:'Product code', status:'Status pill', kind:'Ordered / Delivered', ordered:'Ordered qty', delivered:'Delivered qty',
+  orderdate:'Order date', deliverydate:'Delivery date', inv:'Invoice #', note:'Note', price:'$ / slab', assigned:'Assignee avatars' };
+const JOB_TOKENS={ client:'Client', address:'Address', job:'Job ID', orders:'Order count', ordered:'# ordered', delivered:'# delivered', assigned:'Assignee avatars' };
+function applyCardFonts(){ document.documentElement.style.setProperty("--ev-card-font",eventCardFont+"px");
+  document.documentElement.style.setProperty("--job-card-font",jobCardFont+"px"); }
+function loadLocalCards(){ try{ return JSON.parse(localStorage.getItem(CARD_LS)||"{}")||{}; }catch(e){ return {}; } }
+function saveLocalCards(){ try{ localStorage.setItem(CARD_LS,JSON.stringify({event:eventCardTpl,job:jobCardTpl,scope:cardScope,ef:eventCardFont,jf:jobCardFont})); }catch(e){} }
+function publishCards(){ try{ grist.setOption("eventCardTpl",eventCardTpl); grist.setOption("jobCardTpl",jobCardTpl);
+  grist.setOption("eventCardFont",eventCardFont); grist.setOption("jobCardFont",jobCardFont); }catch(e){} }
+function applyGristOptions(opts){ if(!opts)return;
+  const mod=document.getElementById("cardModal"); const editing=mod&&mod.classList.contains("open");
+  if(cardScope!=="me" && !editing){
+    if(typeof opts.eventCardTpl==="string") eventCardTpl=opts.eventCardTpl;
+    if(typeof opts.jobCardTpl==="string") jobCardTpl=opts.jobCardTpl;
+    if(typeof opts.eventCardFont==="number") eventCardFont=opts.eventCardFont;
+    if(typeof opts.jobCardFont==="number") jobCardFont=opts.jobCardFont;
+    applyCardFonts(); render();
+  }
+}
 
 // ---- lookups ----
 function reindex(){ state.jobById={}; state.jobs.forEach(j=>state.jobById[j.id]=j);
@@ -348,17 +445,9 @@ function renderSidebar(){
   document.getElementById("jobCount").textContent=shown.length;
   if(!shown.length){ list.appendChild($("div","side-empty",q?"No jobs match “"+state.jobQ+"”.":"No jobs with stone orders.")); return; }
   shown.forEach(j=>{
-    const st=jobStoneStats(j.id);
     const card=$("div","job"+(state.jobFilter===j.id?" on":""));
-    card.appendChild($("div","jc",jobClient(j)));
-    const addr=(String(j.Address_Formatted||j.Job_Address||"")).trim();
-    if(addr){ const a=$("div","ja",addr); a.title=addr; card.appendChild(a); }
-    const jm=$("div","jm");
-    if(st.ord){ const k=$("span","k"); const d=$("span","kd"); d.style.background="#f2df3a"; k.appendChild(d); k.appendChild(document.createTextNode(st.ord+" ordered")); jm.appendChild(k); }
-    if(st.del){ const k=$("span","k"); const d=$("span","kd"); d.style.background="#7ad66f"; k.appendChild(d); k.appendChild(document.createTextNode(st.del+" delivered")); jm.appendChild(k); }
-    const as=choiceList(j.Assigned_To);
-    if(as.length){ const avs=$("span","avs"); as.slice(0,3).forEach(n=>{ const a=$("span","av"); a.style.background=avatarColor(n); a.textContent=initials(n); a.title=n; avs.appendChild(a); }); jm.appendChild(avs); }
-    card.appendChild(jm);
+    renderCardTemplate(jobCardTpl, jobCardTokens(j), card, {});
+    card.title=jobClient(j);
     card.onclick=()=>{ state.jobFilter=(state.jobFilter===j.id?null:j.id); render(); };
     list.appendChild(card);
   });
@@ -414,16 +503,139 @@ function renderAgenda(byYmd){
   }
   if(!any) grid.appendChild($("div","ag-empty","No stone orders "+(state.assignee?("for "+state.assignee+" "):"")+"in "+MONTHS[state.cursor.getMonth()]+" "+state.cursor.getFullYear()+"."));
 }
+// ---- template engine (markdown-ish → DOM), ported from the installations calendar ----
+function renderCardTemplate(str,tokens,host,ctx){
+  const added=[];
+  String(str==null?"":str).split("\n").forEach(lineStr=>{
+    if(/^\s*(-{3,}|—+|\*{3,})\s*$/.test(lineStr)){ const hr=$("div","cdivider"); host.appendChild(hr); added.push(hr); return; }
+    const line=$("div","cline"); const stats={tokens:0,filled:0};
+    renderCardInline(lineStr,tokens,line,ctx,stats);
+    if(stats.tokens>0 && stats.filled===0) return;             // whole line was empty tokens → drop
+    while(line.firstChild&&line.firstChild.nodeType===3&&!line.firstChild.textContent.trim()) line.removeChild(line.firstChild);
+    while(line.lastChild&&line.lastChild.nodeType===3&&!line.lastChild.textContent.trim()) line.removeChild(line.lastChild);
+    host.appendChild(line); added.push(line);
+  });
+  added.forEach((el,i)=>{ if(!el.classList.contains("cdivider"))return; let after=false;
+    for(let k=i+1;k<added.length;k++){ const n=added[k]; if(n.classList.contains("cdivider"))break; if(n.textContent.trim()||n.children.length){after=true;break;} }
+    if(!after&&el.parentNode) el.parentNode.removeChild(el); });
+}
+function renderCardInline(str,tokens,host,ctx,stats){
+  const re=/\*\*([^*]+)\*\*|\*([^*]+)\*|==([^=]+)==|\{([a-z_]+)\}|([^{*=]+)|([\s\S])/g; let m;
+  const has=el=>el.textContent.trim()||el.children.length;
+  while((m=re.exec(str))){
+    if(m[1]!=null){ const b=document.createElement("strong"); renderCardInline(m[1],tokens,b,ctx,stats); if(has(b))host.appendChild(b); }
+    else if(m[2]!=null){ const it=document.createElement("em"); renderCardInline(m[2],tokens,it,ctx,stats); if(has(it))host.appendChild(it); }
+    else if(m[3]!=null){ const bar=$("span","cbar"); if(ctx&&ctx.bar){ bar.style.background=ctx.bar.fill||"var(--line)"; bar.style.color=ctx.bar.text||"var(--ink)"; }
+      renderCardInline(m[3],tokens,bar,ctx,stats); if(has(bar))host.appendChild(bar); }
+    else if(m[4]!=null){ const fn=tokens[m[4]];
+      if(fn){ if(stats)stats.tokens++; const el=fn(); if(el!=null){ if(stats)stats.filled++; host.appendChild(typeof el==="string"?document.createTextNode(el):el); } }
+      else host.appendChild(document.createTextNode("{"+m[4]+"}")); }
+    else host.appendChild(document.createTextNode(m[5]!=null?m[5]:m[6]));
+  }
+}
+function pillEl(s){ const t=softTint(statusColor(s)); const p=$("span","cpill"); p.style.background=t.bg;
+  const d=$("span","cpd"); d.style.background=t.dot; p.appendChild(d); p.appendChild(document.createTextNode(statusLabel(s))); return p; }
+function avatarsEl(list){ if(!list||!list.length)return null; const w=$("span","avwrap");
+  list.slice(0,4).forEach(n=>{ if(!n)return; const a=$("span","av"); a.style.background=avatarColor(n); a.textContent=initials(n); a.title=n; w.appendChild(a); }); return w; }
+function countEl(text,color){ const s=$("span","jk"); const d=$("span","kd"); d.style.background=color; s.appendChild(d); s.appendChild(document.createTextNode(text)); return s; }
+function priceOf(r){ const c=catFor(r); const v=(r.Product_Price_slab!=null&&r.Product_Price_slab!=="")?r.Product_Price_slab:(c?c.Price_Slab:null);
+  return (v!=null&&v!=="")?("$"+v):null; }
+function eventCardTokens(e){
+  const r=e.r, j=jobFor(r);
+  return {
+    client:()=>txtNode(jobClient(j)),
+    job:()=>txtNode(jobCode(j)),
+    address:()=>txtNode((String((j&&(j.Address_Formatted||j.Job_Address))||"")).trim()||null),
+    product:()=>txtNode(stoneLabel(r)),
+    supplier:()=>txtNode(r.Product_Supplier||(catFor(r)&&catFor(r).Supplier)||null),
+    code:()=>txtNode(r.Product_Code||null),
+    status:()=>pillEl(r.Order_Status),
+    kind:()=>txtNode(e.kind==="delivered"?"Delivered":"Ordered"),
+    ordered:()=>txtNode(num(r.Ordered_Qty)?("Ord "+num(r.Ordered_Qty)):null),
+    delivered:()=>txtNode(num(r.Delivery_Qty)?("Deliv "+num(r.Delivery_Qty)):null),
+    orderdate:()=>txtNode(toDate(r.Order_Date)?fmtDMY(r.Order_Date):null),
+    deliverydate:()=>txtNode(toDate(r.Delivery_Date)?fmtDMY(r.Delivery_Date):null),
+    inv:()=>txtNode(r.INV||null),
+    note:()=>txtNode(r.Note||null),
+    price:()=>txtNode(priceOf(r)),
+    assigned:()=>avatarsEl(assigneesOf(r))
+  };
+}
+function jobCardTokens(j){
+  const st=jobStoneStats(j.id);
+  return {
+    client:()=>txtNode(jobClient(j)),
+    address:()=>txtNode((String(j.Address_Formatted||j.Job_Address||"")).trim()||null),
+    job:()=>txtNode(jobCode(j)),
+    orders:()=>txtNode(st.n?(st.n+" order"+(st.n===1?"":"s")):null),
+    ordered:()=>st.ord?countEl(st.ord+" ordered","#f2df3a"):null,
+    delivered:()=>st.del?countEl(st.del+" delivered","#7ad66f"):null,
+    assigned:()=>avatarsEl(choiceList(j.Assigned_To))
+  };
+}
+function kindBar(kind){ return kind==="delivered"?{fill:"#7ad66f",text:"#0f2e18"}:{fill:"#f2df3a",text:"#4a3f00"}; }
+
 function eventChip(e){
   const r=e.r, j=jobFor(r);
   const chip=$("div","ev "+e.kind);
-  const dot=$("span","dot"); dot.style.background=statusColor(r.Order_Status); chip.appendChild(dot);
-  chip.appendChild($("b",null,jobClient(j)));
-  chip.appendChild($("span","who"," · "+stoneLabel(r)));
+  renderCardTemplate(eventCardTpl, eventCardTokens(e), chip, { bar:kindBar(e.kind) });
   chip.title=(e.kind==="delivered"?"Delivered ":"Ordered ")+fmtDMY(e.date)+"\n"+jobClient(j)+" ("+jobCode(j)+")\n"+stoneLabel(r)
     +"\nStatus: "+statusLabel(r.Order_Status)+" · Ord "+num(r.Ordered_Qty)+" / Deliv "+num(r.Delivery_Qty);
   chip.onclick=ev=>{ ev.stopPropagation(); openDay(e.date,[e],chip); };
   return chip;
+}
+
+// ---- card editor modal ----
+let cardTab="event";
+function openCardEditor(tab){ if(tab)cardTab=tab; document.getElementById("cardModal").classList.add("open"); renderCardEditor(); }
+function closeCardEditor(){ document.getElementById("cardModal").classList.remove("open"); }
+function renderCardEditor(){
+  const isEvent=cardTab==="event";
+  [].forEach.call(document.querySelectorAll("#cardModal .ce-tab"),b=>b.classList.toggle("on",b.dataset.tab===cardTab));
+  const body=document.getElementById("ceBody"); body.innerHTML="";
+  const tokens=isEvent?EVENT_TOKENS:JOB_TOKENS;
+  const note=$("div","ce-note");
+  note.textContent=(isEvent?"The chips on the calendar grid. ":"The cards in the right-hand jobs list. ")
+    +"Use **bold**, *italic*, {tokens}, line breaks, --- for a divider, and ==wrap== for a coloured bar. Applies to every "+(isEvent?"event.":"job.");
+  body.appendChild(note);
+  const ta=document.createElement("textarea"); ta.className="ce-ta"; ta.spellcheck=false;
+  ta.value=isEvent?eventCardTpl:jobCardTpl;
+  function commit(){ if(isEvent)eventCardTpl=ta.value; else jobCardTpl=ta.value; saveLocalCards(); render(); }
+  ta.addEventListener("input",commit); body.appendChild(ta);
+  const toks=$("div","ce-tokens");
+  const insert=(text,caretBack)=>{ const s=ta.selectionStart||0,en=ta.selectionEnd||0;
+    ta.value=ta.value.slice(0,s)+text+ta.value.slice(en); ta.focus();
+    ta.selectionStart=ta.selectionEnd=s+text.length-(caretBack||0); commit(); };
+  Object.keys(tokens).forEach(k=>{ const chip=document.createElement("button"); chip.type="button"; chip.className="ce-tok";
+    chip.innerHTML="<code>{"+k+"}</code><span>"+tokens[k]+"</span>"; chip.title="Insert {"+k+"}";
+    chip.addEventListener("click",()=>insert("{"+k+"}")); toks.appendChild(chip); });
+  const divChip=document.createElement("button"); divChip.type="button"; divChip.className="ce-tok";
+  divChip.innerHTML="<code>---</code><span>Divider</span>"; divChip.addEventListener("click",()=>{
+    const s=ta.selectionStart||0; const pre=(s>0&&ta.value[s-1]!=="\n")?"\n":""; insert(pre+"---\n"); }); toks.appendChild(divChip);
+  const barChip=document.createElement("button"); barChip.type="button"; barChip.className="ce-tok";
+  barChip.innerHTML="<code>== ==</code><span>Coloured bar</span>"; barChip.addEventListener("click",()=>{
+    const s=ta.selectionStart||0,en=ta.selectionEnd||0; const inner=ta.value.slice(s,en)||"{client}";
+    ta.value=ta.value.slice(0,s)+"=="+inner+"=="+ta.value.slice(en); ta.focus(); ta.selectionStart=s+2; ta.selectionEnd=s+2+inner.length; commit(); }); toks.appendChild(barChip);
+  body.appendChild(toks);
+  const reset=$("div","ce-reset","↩ Reset this card to default");
+  reset.addEventListener("click",()=>{ if(isEvent)eventCardTpl=DEFAULT_EVENT_CARD; else jobCardTpl=DEFAULT_JOB_CARD; saveLocalCards(); render(); renderCardEditor(); });
+  body.appendChild(reset);
+  const fRow=$("div","ce-fontrow"); fRow.appendChild($("span","ce-flabel","Text size"));
+  const fVal=$("span","ce-fval"); const showF=()=>fVal.textContent=(isEvent?eventCardFont:jobCardFont)+"px";
+  const stepF=d=>{ let cur=isEvent?eventCardFont:jobCardFont; cur=Math.max(9,Math.min(20,Math.round((cur+d)*10)/10));
+    if(isEvent)eventCardFont=cur; else jobCardFont=cur; applyCardFonts(); saveLocalCards(); showF(); render(); };
+  const fMinus=document.createElement("button"); fMinus.type="button"; fMinus.className="ce-fbtn"; fMinus.textContent="−"; fMinus.onclick=()=>stepF(-0.5);
+  const fPlus=document.createElement("button"); fPlus.type="button"; fPlus.className="ce-fbtn"; fPlus.textContent="+"; fPlus.onclick=()=>stepF(0.5);
+  showF(); fRow.appendChild(fMinus); fRow.appendChild(fVal); fRow.appendChild(fPlus); body.appendChild(fRow);
+  const foot=$("div","ce-foot"); const scopeNote=$("div","ce-scope");
+  const setNote=msg=>scopeNote.textContent=msg||(cardScope==="me"?"Using your own design (just for you).":"Following the shared design (everyone sees it).");
+  setNote(); foot.appendChild(scopeNote);
+  const row=$("div","ce-btnrow");
+  const bMe=document.createElement("button"); bMe.type="button"; bMe.className="ce-save ghost"; bMe.textContent="Save just for me";
+  bMe.onclick=()=>{ cardScope="me"; saveLocalCards(); setNote("Saved — just for you."); };
+  const bAll=document.createElement("button"); bAll.type="button"; bAll.className="ce-save primary"; bAll.textContent="Save for everyone";
+  bAll.onclick=()=>{ cardScope="everyone"; publishCards(); saveLocalCards(); setNote("Saved — shared with everyone."); };
+  row.appendChild(bMe); row.appendChild(bAll); foot.appendChild(row); body.appendChild(foot);
 }
 function openDay(d,evs,anchor){
   const m=document.getElementById("dayPop"); m.innerHTML="";
@@ -497,6 +709,7 @@ async function refetch(){ if(!state.grist)return; try{ await pullTables(); }catc
 if(typeof grist!=="undefined"){
   try{ grist.ready({ requiredAccess:"full" }); }catch(e){}
   try{ grist.onRecord(()=>{}); }catch(e){}
+  try{ grist.onOptions(applyGristOptions); }catch(e){}   // adopt the shared card design
   grist.docApi.fetchTable("Stone_Order").then(async ()=>{
     try{ const sc=await loadGristSchema(); state.ref.product=sc.refInfo("Stone_Order","Product"); }catch(e){ console.warn("schema failed",e); }
     try{ await pullTables(); }catch(e){ console.warn("initial fetch failed",e); }
@@ -556,10 +769,22 @@ document.getElementById("lgOrdered").onclick=()=>{ state.show.ordered=!state.sho
 document.getElementById("lgDelivered").onclick=()=>{ state.show.delivered=!state.show.delivered; render(); };
 document.getElementById("btnJobs").onclick=()=>{ state.sideOpen=!state.sideOpen; render(); };
 document.getElementById("jobSearch").oninput=e=>{ state.jobQ=e.target.value; renderSidebar(); };
+document.getElementById("cardsBtn").onclick=e=>{ e.stopPropagation(); openCardEditor(); };
+document.getElementById("cardClose").onclick=closeCardEditor;
+document.getElementById("cardModal").onclick=e=>{ if(e.target.id==="cardModal") closeCardEditor(); };
+[].forEach.call(document.querySelectorAll("#cardModal .ce-tab"),b=>b.onclick=()=>{ cardTab=b.dataset.tab; renderCardEditor(); });
 document.getElementById("dayPop").onclick=e=>e.stopPropagation();
 document.addEventListener("click",closePops);
 document.addEventListener("keydown",e=>{ if(e.key==="Escape") closePops(); });
 
+// restore any personal card design
+{ const lc=loadLocalCards();
+  if(typeof lc.event==="string") eventCardTpl=lc.event;
+  if(typeof lc.job==="string") jobCardTpl=lc.job;
+  if(lc.scope==="me"||lc.scope==="everyone") cardScope=lc.scope;
+  if(typeof lc.ef==="number") eventCardFont=lc.ef;
+  if(typeof lc.jf==="number") jobCardFont=lc.jf;
+  applyCardFonts(); }
 if(!state.ref.product) state.ref.product=DEMO_REF.product;
 // sample-first so the grid is never blank; live wiring above flips + replaces it.
 window._test(SAMPLE_STONE,SAMPLE_JOBS,SAMPLE_CAT);

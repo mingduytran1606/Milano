@@ -119,6 +119,33 @@
   .stat .sv{font-size:20px;font-weight:800;line-height:1.15;font-variant-numeric:tabular-nums}
   .stat .sl{font-size:10.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
 
+  /* ---------- histogram (stacked bars: ordered slabs per month) ---------- */
+  .hist-chart{margin-top:18px}
+  .chart-h{display:flex;align-items:baseline;gap:9px;margin-bottom:12px}
+  .chart-h .st{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink)}
+  .chart-h .ssub{font-size:11.5px;color:var(--muted)}
+  .chart-scroll{overflow-x:auto;padding-bottom:2px}
+  .chart{display:flex;align-items:flex-end;gap:12px;min-height:152px;padding:2px}
+  .bar-col{display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;flex:0 0 auto}
+  .bar-col .bar-v{font-size:11px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+  .bar{width:30px;min-height:2px;display:flex;flex-direction:column;justify-content:flex-end;
+    border-radius:6px 6px 0 0;overflow:hidden;background:var(--line2)}
+  .bar .seg{width:100%}
+  .bar .seg.cur{background:var(--accent)}
+  .bar .seg.other{background:#c3ccd6}
+  .bar-col:hover .bar{filter:brightness(1.05)}
+  .bar-col .bar-x{font-size:10.5px;color:var(--muted);white-space:nowrap}
+  .bar-col.sel .bar-x{color:var(--accent-ink);font-weight:700}
+  .bar-col.sel .bar{outline:2px solid var(--accent-ink);outline-offset:1px}
+  .chart-legend{display:flex;gap:16px;margin-top:11px}
+  .chart-legend .lg{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted)}
+  .chart-legend .sw{width:11px;height:11px;border-radius:3px;display:inline-block;flex:0 0 auto}
+  .chart-legend .sw.cur{background:var(--accent)}
+  .chart-legend .sw.other{background:#c3ccd6}
+  @media (prefers-color-scheme:dark){ .bar .seg.other,.chart-legend .sw.other{background:#3a434d} }
+  :root[data-theme="dark"] .bar .seg.other,:root[data-theme="dark"] .chart-legend .sw.other{background:#3a434d}
+  :root[data-theme="light"] .bar .seg.other,:root[data-theme="light"] .chart-legend .sw.other{background:#c3ccd6}
+
   .hist-h{margin:18px 0 8px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
   .htbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
   .htbl{min-width:900px}
@@ -301,11 +328,13 @@ function reindex(){
     (state.ordersByCat[pid]=state.ordersByCat[pid]||[]).push(r); });
 }
 function jobFor(r){ return state.jobById[refId(r.Job)]||null; }
+function catFor(r){ return state.catById[refId(r.Product)]||null; }
 function catLabel(c){ return (c.Product_Full && String(c.Product_Full).trim())
   || [c.Supplier,c.Code].filter(Boolean).join(" · ") || ("#"+c.id); }
 function catalogueHaystack(c){ let s=catLabel(c)||"";
   for(const k in c){ if(k==="id")continue; const v=c[k]; if(typeof v==="string") s+=" "+v; } return s.toLowerCase(); }
 function priceOf(c){ const v=c&&c.Price_Slab; return (v!=null&&v!=="")?v:0; }
+function supplierFor(r){ const c=catFor(r); return r.Product_Supplier || (c&&c.Supplier) || ""; }
 function ordersFor(catId){ return state.ordersByCat[catId]||[]; }
 function jobClient(j){ return j ? ((String(j.Client_Label||"")).trim() || (String(j.Job_Address||"")).trim() || j.Job_ID || ("#"+j.id)) : "—"; }
 function jobAddr(j){ return j ? ((String(j.Address_Formatted||j.Job_Address||"")).trim()) : ""; }
@@ -472,7 +501,12 @@ function renderDetail(){
   // orders in the selected month, most-recent first
   const orders=allOrders.filter(r=> sel==="undated" ? monthKeyOf(r)==null : monthKeyOf(r)===sel).slice().sort(byDateDesc);
 
-  // scoreboard (for the selected month)
+  // table first
+  const selLabel = sel==="undated" ? "orders with no order date" : monthLabelOf(sel);
+  if(!orders.length) s3.appendChild($("div","hist-none","No orders for this product in "+selLabel+"."));
+  else s3.appendChild(orderTable(orders));
+
+  // scoreboard — now below the table (for the selected month)
   const jobs=new Set(orders.map(r=>refId(r.Job)).filter(v=>v!=null));
   const ordered=orders.reduce((s,r)=>s+num(r.Ordered_Qty),0);
   const delivered=orders.reduce((s,r)=>s+num(r.Delivery_Qty),0);
@@ -483,10 +517,59 @@ function renderDetail(){
   stats.appendChild(stat(delivered,"slabs delivered"));
   s3.appendChild(stats);
 
-  const selLabel = sel==="undated" ? "orders with no order date" : monthLabelOf(sel);
-  if(!orders.length) s3.appendChild($("div","hist-none","No orders for this product in "+selLabel+"."));
-  else s3.appendChild(orderTable(orders));
+  // histogram — ordered slabs per month across the whole supplier, this stone highlighted
+  s3.appendChild(histogram(c));
   app.appendChild(s3);
+}
+
+// Stacked column chart: for each month, total slabs ordered across ALL of this
+// product's supplier, split into "this stone" (highlighted) + "other <supplier>".
+// Clicking a bar selects that month above.
+function supplierMonthly(c){
+  const sup=c.Supplier||"";
+  const curId=c.id;
+  const byMonth={};
+  (state.stone||[]).forEach(r=>{
+    if(supplierFor(r)!==sup) return;
+    const k=monthKeyOf(r); if(k==null) return;        // dated orders only
+    const q=num(r.Ordered_Qty); if(q<=0) return;
+    const m=byMonth[k]||(byMonth[k]={key:k,cur:0,other:0});
+    if(refId(r.Product)===curId) m.cur+=q; else m.other+=q;
+  });
+  return Object.keys(byMonth).map(k=>byMonth[k]).sort((a,b)=>a.key-b.key);   // oldest → newest
+}
+function histogram(c){
+  const box=$("div","hist-chart");
+  const head=$("div","chart-h");
+  head.appendChild($("span","st","Ordered by month"));
+  if(c.Supplier) head.appendChild($("span","ssub","all "+c.Supplier+" orders · this stone highlighted"));
+  box.appendChild(head);
+
+  const data=supplierMonthly(c);
+  if(!data.length){ box.appendChild($("div","hist-none","No dated orders to chart yet.")); return box; }
+  const max=Math.max(1,...data.map(d=>d.cur+d.other));
+  const H=118;
+  const scroll=$("div","chart-scroll"); const chart=$("div","chart");
+  data.forEach(d=>{
+    const total=d.cur+d.other;
+    const col=$("div","bar-col"+(d.key===state.selectedMonth?" sel":""));
+    col.title=monthLabelOf(d.key)+" — "+total+" slab"+(total===1?"":"s")+" ordered ("+d.cur+" this stone, "+d.other+" other)";
+    col.appendChild($("div","bar-v",String(total)));
+    const bar=$("div","bar");
+    if(d.cur>0){ const s=$("div","seg cur"); s.style.height=Math.max(2,d.cur/max*H)+"px"; bar.appendChild(s); }
+    if(d.other>0){ const s=$("div","seg other"); s.style.height=Math.max(2,d.other/max*H)+"px"; bar.appendChild(s); }
+    col.appendChild(bar);
+    col.appendChild($("div","bar-x",monthPillLabel(d.key)));
+    col.onclick=()=>{ state.selectedMonth=d.key; renderDetail(); };
+    chart.appendChild(col);
+  });
+  scroll.appendChild(chart); box.appendChild(scroll);
+
+  const legend=$("div","chart-legend");
+  const l1=$("span","lg"); l1.appendChild($("i","sw cur")); l1.appendChild(document.createTextNode("This stone")); legend.appendChild(l1);
+  const l2=$("span","lg"); l2.appendChild($("i","sw other")); l2.appendChild(document.createTextNode(c.Supplier?("Other "+c.Supplier):"Other")); legend.appendChild(l2);
+  box.appendChild(legend);
+  return box;
 }
 
 // ---- column-config-driven one-line order table ----

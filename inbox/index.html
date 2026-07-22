@@ -773,7 +773,13 @@ function observeStoneNote(el){
   const ro=new ResizeObserver(()=>{
     if(_noteSync) return;
     const h=el.offsetHeight;
-    if(h && h!==state.stoneNoteH){ state.stoneNoteH=h; savePrefs(); applyStoneNoteHeight(h); }
+    if(!h) return;
+    // Ignore ±1px jitter: at some browser-zoom / DPR levels offsetHeight rounds to a
+    // different integer than the px we set, so "apply height → observer reports a
+    // 1px-different height → apply again" oscillates forever and freezes the widget.
+    // A real drag of the resize handle moves more than 1px, so it's still captured.
+    if(state.stoneNoteH!=null && Math.abs(h-state.stoneNoteH)<=1) return;
+    state.stoneNoteH=h; savePrefs(); applyStoneNoteHeight(h);
   });
   ro.observe(el);
 }

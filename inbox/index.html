@@ -907,6 +907,8 @@ function avatarStack(names,sm){
 const LSKEY="milano_inbox_prefs_v2";
 const state = { jobs:[], stone:[], inst:[], clients:[], catalogue:[], selectedId:null, grist:false,
   ref:{ client:null, product:null },   // resolved from the Grist schema (or DEMO_REF standalone)
+  formulaCols:{},                       // {tableId:{colId:true}} — Grist formula/rollup cols, detected from
+                                        // the schema; the write path never sends these (brief §5)
   stoneNoteH:null,                      // shared height for stone-order note boxes
   stoneColW:null,                       // persisted stone-order column widths (px)
   sumLeftPct:null,                      // summary card: left column width %
@@ -1002,8 +1004,14 @@ function isTempId(id){ return typeof id==="number" && id>=TMP_BASE; }
 // Columns that are Grist formulas/rollups (or locally-mirrored ref labels) — never write these
 // back. This is TABLE-AWARE: Scope_Qty / Ordered_Qty are read-only rollups on Jobs_Detail but
 // EDITABLE columns on Stone_Order, so they must only be blocked for the job, not the stone line.
+const ROLE_TABLE={job:"Jobs_Detail",stone:"Stone_Order",visit:"Inst_"};
 function isReadonlyCol(role,col){
   if(col==="id"||col==="manualSort"||col==="Job_ID"||col==="Client_Label"||col==="Stones"||col==="Inst_Dates") return true;
+  // Any Grist formula/rollup column, detected from the schema — writing one raises
+  // "Can't save value to formula column …" and fails the whole save (brief §5).
+  const t=ROLE_TABLE[role], fc=t&&state.formulaCols&&state.formulaCols[t];
+  if(fc && fc[col]) return true;
+  // Hardcoded fallback (demo mode / schema not yet loaded): known rollups + mirrored ref labels.
   if(role==="job"   && (col==="Scope_Qty"||col==="Ordered_Qty"||col==="In_WH_Qty")) return true;
   if(role==="stone" && (col==="Product_Code"||col==="Product_Supplier"||col==="Stone"||col==="Product_Price_slab")) return true;
   return false;
@@ -1267,7 +1275,11 @@ async function loadGristSchema(){
   }
   function colChoices(tableId,colId){ const c=colsOf(tableId).find(x=>x.colId===colId); return c?choicesOf(c):null; }
   function colChoiceColors(tableId,colId){ const c=colsOf(tableId).find(x=>x.colId===colId); return c?choiceColorsOf(c):{}; }
-  return { refInfo, colChoices, colChoiceColors };
+  // Map every table -> its Grist formula/rollup columns. A pure formula col has isFormula set and a
+  // non-empty formula; trigger-formula (data) cols have isFormula=false and stay writable.
+  const formulaColsByTable={};
+  tables.forEach(t=>{ const s={}; colsOf(t.tableId).forEach(c=>{ if(c.isFormula && c.formula && String(c.formula).trim()!=="") s[c.colId]=true; }); formulaColsByTable[t.tableId]=s; });
+  return { refInfo, colChoices, colChoiceColors, formulaCols:formulaColsByTable };
 }
 
 // ---- assigning / creating referenced records ----
@@ -2647,6 +2659,7 @@ if(typeof grist!=="undefined"){
       state.ref.client =sc.refInfo("Jobs_Detail","Client_Name");
       state.ref.product=sc.refInfo("Stone_Order","Product");
       state.assignChoices=sc.colChoices("Jobs_Detail","Assigned_To")||null;
+      state.formulaCols=sc.formulaCols||{};   // never write Grist formula/rollup cols
       applyGristChoices(sc);
       finishRefSetup();
     }catch(e){ state.ref.client=null; state.ref.product=null; console.warn("schema introspection failed — lookups disabled",e); }

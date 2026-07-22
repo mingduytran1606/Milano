@@ -607,10 +607,17 @@
   // Scope_Qty / Ordered_Qty are read-only rollups on Jobs_Detail but EDITABLE on Stone_Order.
   function isReadonlyCol(role, col){
     if (col === 'id' || col === 'manualSort' || col === 'Job_ID' || col === 'Client_Label' || col === 'Stones' || col === 'Inst_Dates') return true;
+    // Any Grist formula/rollup column, detected from the schema — writing one raises
+    // "Can't save value to formula column …" and fails the whole save.
+    if (isFormulaColRole(role, col)) return true;
+    // Hardcoded fallback (metadata not yet loaded): known rollups + mirrored ref labels.
     if (role === 'job'   && (col === 'Scope_Qty' || col === 'Ordered_Qty' || col === 'In_WH_Qty')) return true;
     if (role === 'stone' && (col === 'Product_Code' || col === 'Product_Supplier' || col === 'Stone' || col === 'Product_Price_slab')) return true;
     return false;
   }
+  // Pick the per-table column-metadata map for a write role, then test formula-ness.
+  function metaMapForRole(role){ return role === 'job' ? jobMetaByColId : role === 'stone' ? stoneMetaByColId : role === 'visit' ? metaByColId : null; }
+  function isFormulaColRole(role, col){ var mm = metaMapForRole(role); var m = mm && mm[col]; return !!(m && m.isFormula && m.formula && String(m.formula).trim() !== ''); }
   var TMP_BASE = 1e9, _tmpSeq = 1e9;
   function nextTmp(){ return ++_tmpSeq; }
   function isTemp(id){ return typeof id === 'number' && id >= TMP_BASE; }
@@ -1876,7 +1883,8 @@
         if (cols.parentId[i] !== tref) continue;
         var wo = {}; try { wo = JSON.parse(cols.widgetOptions[i] || '{}'); } catch (e) {}
         sm[cols.colId[i]] = { label: cols.label[i] || cols.colId[i], type: cols.type[i] || '',
-          choices: wo.choices || null, choiceOptions: wo.choiceOptions || {} };
+          choices: wo.choices || null, choiceOptions: wo.choiceOptions || {},
+          isFormula: !!(cols.isFormula && cols.isFormula[i]), formula: (cols.formula && cols.formula[i]) || '' };
         if (cols.colId[i] === STONE.product) {
           var mm = /^Ref:(.+)$/.exec(cols.type[i] || ''); if (mm) catTable = mm[1];
           catVisRef = cols.visibleCol && cols.visibleCol[i];
@@ -2435,7 +2443,8 @@
         if (cols.parentId[c] !== tref) continue;
         var co = {};
         try { co = (JSON.parse(cols.widgetOptions[c] || '{}')).choiceOptions || {}; } catch (e) {}
-        jm[cols.colId[c]] = { label: cols.label[c] || cols.colId[c], type: cols.type[c] || '', choiceOptions: co };
+        jm[cols.colId[c]] = { label: cols.label[c] || cols.colId[c], type: cols.type[c] || '', choiceOptions: co,
+          isFormula: !!(cols.isFormula && cols.isFormula[c]), formula: (cols.formula && cols.formula[c]) || '' };
       }
       jobMetaByColId = jm;
       applyChoiceColorOverrides(jobMetaByColId);

@@ -598,6 +598,7 @@
   var catalogueCache = null;   // Catalogue rows (product labels + picker)
   var stoneMetaByColId = {};   // Stone_Order col meta (Order_Status choices + colours)
   var catLabelCol = 'Product_Full';
+  var catTableId = null;       // resolved Catalogue table id (from the Product ref) — for picker refresh
   var stoneLoad = null;        // in-flight/So-far ensureStoneLoaded() promise
   // Stone_Order / Catalogue col ids (match the brief + Inbox widget)
   var STONE = { table:'Stone_Order', catalogue:'Catalogue', job:'Job', product:'Product', status:'Order_Status',
@@ -1892,6 +1893,7 @@
       }
       stoneMetaByColId = sm; applyChoiceColorOverrides(stoneMetaByColId);
       if (catVisRef) { var vi = cols.id.indexOf(catVisRef); if (vi !== -1 && cols.colId[vi]) catLabelCol = cols.colId[vi]; }
+      catTableId = catTable;   // remember for the picker's on-open refresh
       return grist.docApi.fetchTable(catTable).then(function (ct) { catalogueCache = columnarRows(ct); })
         .catch(function () { catalogueCache = []; });
     }).catch(function (e) { console.warn('stone/catalogue load failed', e); stoneCache = []; catalogueCache = []; });
@@ -1910,7 +1912,7 @@
   // ---- draft buffer: every edit is held here until Save (Discard restores) ----
   function cloneVal(v){ if (v instanceof Date) return new Date(v.getTime()); if (Array.isArray(v)) return v.map(cloneVal); if (v && typeof v === 'object') { var o = {}; for (var k in v) o[k] = cloneVal(v[k]); return o; } return v; }
   function cloneRows(a){ return (a || []).map(function (r) { return cloneVal(r); }); }
-  function ensureEdit(){ if (!edit.dirty) { edit.base = { jobs: cloneRows(jobsCache), stone: cloneRows(stoneCache), visits: cloneRows(recordsCache) }; edit.dirty = true; } }
+  function ensureEdit(){ if (!edit.dirty) { edit.base = { jobs: cloneRows(jobsCache), stone: cloneRows(stoneCache), visits: cloneRows(recordsCache) }; edit.baseStoneLoaded = (stoneCache !== null); edit.dirty = true; } }
   function updateEditBar(){ var m = document.getElementById('jobModal'); if (m) m.classList.toggle('has-edit', !!edit.dirty); renderFooter(currentDetailJob); }
   function refreshDetail(job){ if (job && document.getElementById('jobModal').classList.contains('open')) renderJobEditor(job); updateEditBar(); }
   function syncJobDerived(job){
@@ -1987,7 +1989,13 @@
   }
   function discardEdit(){
     if (!edit.dirty) return;
-    if (edit.base) { jobsCache = edit.base.jobs; stoneCache = edit.base.stone; recordsCache = edit.base.visits; }
+    if (edit.base) {
+      jobsCache = edit.base.jobs; recordsCache = edit.base.visits;
+      // Only restore stone if it was actually loaded when the edit began. If the first edit happened
+      // before ensureStoneLoaded() resolved, base.stone is [] — restoring it would blank the cache
+      // permanently (the !==null guard stops a reload). Force a fresh load instead.
+      if (edit.baseStoneLoaded) stoneCache = edit.base.stone; else reloadStone();
+    }
     edit.dirty = false; edit.base = null;
     if (currentDetailJob) { var j = (jobsCache || []).find(function (x) { return x.id === currentDetailJob.id; }); if (j) currentDetailJob = j; }
     render(); refreshDetail(currentDetailJob); updateEditBar();
@@ -2046,13 +2054,24 @@
     var inp = elx('input', 'je-search'); inp.placeholder = 'Search product…'; inp.addEventListener('click', function (e) { e.stopPropagation(); }); m.appendChild(inp);
     var listWrap = elx('div', 'je-prodlist'); m.appendChild(listWrap);
     var draw = function (q) { listWrap.innerHTML = '';
-      var rows = (catalogueCache || []).filter(function (c) { var lbl = String(c[catLabelCol] || '').toLowerCase(); return !q || lbl.indexOf(q) !== -1; }).slice(0, 40);
+      var rows = (catalogueCache || []).filter(function (c) { return !q || catalogueHaystack(c).indexOf(q) !== -1; }).slice(0, 40);
       if (!rows.length) { listWrap.appendChild(elx('div', 'je-menu-empty', 'No match')); }
-      rows.forEach(function (c) { var it = elx('div', 'je-menu-item', String(c[catLabelCol] || ('#' + c.id)));
+      rows.forEach(function (c) { var it = elx('div', 'je-menu-item', catLabel(c));
         it.addEventListener('click', function (e) { e.stopPropagation(); closeFloatMenu(); setStoneField(r, STONE.product, c.id); }); listWrap.appendChild(it); }); };
     draw(''); inp.addEventListener('input', function () { draw(inp.value.trim().toLowerCase()); });
+    // Refresh the catalogue from Grist on open so products added elsewhere (Grist / the stone-order
+    // board) after this widget first cached it are pickable. Re-draw if the menu is still open.
+    var catTable = catTableId || STONE.catalogue;
+    if (catTable) grist.docApi.fetchTable(catTable)
+      .then(function (ct) { catalogueCache = columnarRows(ct); if (_floatMenu === m) draw(inp.value.trim().toLowerCase()); })
+      .catch(function () {});
     _floatMenu = m; placeMenu(m, anchor); inp.focus();
   }
+  // Display label for a catalogue row: the ref's visible column, else Supplier | Code, else #id.
+  function catLabel(c){ if (c[catLabelCol]) return String(c[catLabelCol]); var p = [c.Supplier, c.Code].filter(Boolean).join(' | '); return p || ('#' + c.id); }
+  // Lower-cased search text: label PLUS every string field, so a product is findable by
+  // name/code/supplier even when the Product_Full formula (catLabelCol) is blank.
+  function catalogueHaystack(c){ var s = catLabel(c); for (var k in c) { if (k === 'id') continue; if (typeof c[k] === 'string') s += ' ' + c[k]; } return s.toLowerCase(); }
 
   // ---- date <-> input helpers ----
   function toDateInputVal(v){ var d = gristToLocalDate(v); if (!d) return ''; var mo = ('0' + (d.getMonth() + 1)).slice(-2), da = ('0' + d.getDate()).slice(-2); return d.getFullYear() + '-' + mo + '-' + da; }
@@ -2412,9 +2431,9 @@
         var m = {};
         for (var i = 0; i < cols.id.length; i++) {
           if (cols.parentId[i] !== tref) continue;
-          var co = {};
-          try { co = (JSON.parse(cols.widgetOptions[i] || '{}')).choiceOptions || {}; } catch (e) {}
-          m[cols.colId[i]] = { label: cols.label[i] || cols.colId[i], type: cols.type[i] || '', choiceOptions: co,
+          var wo = {};
+          try { wo = JSON.parse(cols.widgetOptions[i] || '{}'); } catch (e) {}
+          m[cols.colId[i]] = { label: cols.label[i] || cols.colId[i], type: cols.type[i] || '', choiceOptions: wo.choiceOptions || {}, choices: wo.choices || null,
             isFormula: !!(cols.isFormula && cols.isFormula[i]), formula: (cols.formula && cols.formula[i]) || '' };
         }
         metaByColId = m;
@@ -2441,9 +2460,9 @@
       var jm = {};
       for (var c = 0; c < cols.id.length; c++) {
         if (cols.parentId[c] !== tref) continue;
-        var co = {};
-        try { co = (JSON.parse(cols.widgetOptions[c] || '{}')).choiceOptions || {}; } catch (e) {}
-        jm[cols.colId[c]] = { label: cols.label[c] || cols.colId[c], type: cols.type[c] || '', choiceOptions: co,
+        var wo = {};
+        try { wo = JSON.parse(cols.widgetOptions[c] || '{}'); } catch (e) {}
+        jm[cols.colId[c]] = { label: cols.label[c] || cols.colId[c], type: cols.type[c] || '', choiceOptions: wo.choiceOptions || {}, choices: wo.choices || null,
           isFormula: !!(cols.isFormula && cols.isFormula[c]), formula: (cols.formula && cols.formula[c]) || '' };
       }
       jobMetaByColId = jm;
@@ -2617,6 +2636,11 @@
       return;
     }
     msg.style.display = 'none';
+    // While the job popup has unsaved edits, the draft lives in the live caches
+    // (recordsCache / jobsCache / stoneCache) and currentDetailJob points into jobsCache.
+    // Replacing them here (and rebuilding jobsCache via loadJobs) would orphan the edit and
+    // make Save silently write nothing. Defer the refresh until the edit is saved or discarded.
+    if (edit.dirty) { mappingsCache = mappings; return; }
     var mapChanged = !mappingsCache || JSON.stringify(mappingsCache) !== JSON.stringify(mappings);
     mappingsCache = mappings;
     recordsCache = records || [];

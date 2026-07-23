@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Milano — Catalogue Search</title>
+<title>Milano - Catalogue Search</title>
 <script src="https://milano.getgrist.com/grist-plugin-api.js"></script>
 <style>
   :root{
@@ -296,7 +296,7 @@
       <div class="search-title">Catalogue <span class="count" id="resCount">0</span></div>
       <div class="search">
         <svg class="sic" viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input id="q" type="text" placeholder="Search catalogue — product, code, supplier…" autocomplete="off">
+        <input id="q" type="text" placeholder="Search catalogue - product, code, supplier…" autocomplete="off">
         <span class="clr" id="qClr" title="Clear" hidden>&times;</span>
       </div>
       <button class="btn primary add-order" id="addBtn" title="Add a new stone order (tied to a job)">＋ New stone order</button>
@@ -319,9 +319,9 @@
 <script>
 "use strict";
 /* ============================================================
-   Milano — Catalogue Search widget
+   Milano - Catalogue Search widget
    Left: search the Catalogue (product · code · supplier).
-   Right: click a product → its full ORDER HISTORY — every
+   Right: click a product → its full ORDER HISTORY - every
    Stone_Order line that used it, across all jobs, with the
    order/delivery dates + qtys, status, INV and note. Each
    history row is editable in place and writes back to
@@ -434,7 +434,7 @@ function reindex(){
     if(pid!=null && state.catById[pid]){ key=pid; }
     else {
       const nm=(r.Stone||r.Product_Code||"").trim(), sup=(r.Product_Supplier||"").trim();
-      if(!nm && !sup) return;                      // nothing identifiable — skip
+      if(!nm && !sup) return;                      // nothing identifiable - skip
       key="v:"+(sup+"|"+nm).toLowerCase();
       if(!state.virtualById[key]) state.virtualById[key]={ id:key, _virtual:true,
         Supplier:sup, Code:(r.Product_Code||""), Name:(r.Stone||"").trim()||nm };
@@ -456,12 +456,12 @@ function catalogueHaystack(c){ let s=catLabel(c)||"";
 function priceOf(c){ const v=c&&c.Price_Slab; return (v!=null&&v!=="")?v:0; }
 function supplierFor(r){ const c=catFor(r); return r.Product_Supplier || (c&&c.Supplier) || ""; }
 function ordersFor(catId){ return state.ordersByCat[catId]||[]; }
-function jobClient(j){ return j ? ((String(j.Client_Label||"")).trim() || (String(j.Job_Address||"")).trim() || j.Job_ID || ("#"+j.id)) : "—"; }
+function jobClient(j){ return j ? ((String(j.Client_Label||"")).trim() || (String(j.Job_Address||"")).trim() || j.Job_ID || ("#"+j.id)) : "-"; }
 function jobAddr(j){ return j ? ((String(j.Address_Formatted||j.Job_Address||"")).trim()) : ""; }
 function jobCode(j){ return j ? (j.Job_ID || ("#"+j.id)) : ""; }
 
 // ============================================================
-//  SEARCH — rank catalogue products by closeness to the query
+//  SEARCH - rank catalogue products by closeness to the query
 // ============================================================
 function scoreText(hay,q){
   if(!hay) return 0; hay=String(hay).toLowerCase();
@@ -541,7 +541,7 @@ function renderDetail(){
   const allOrders=ordersFor(c.id);
   const byDateDesc=(a,b)=>{ const da=+toDate(a.Order_Date)||0, db=+toDate(b.Order_Date)||0; return db-da || (b.id||0)-(a.id||0); };
 
-  // ═══ Section 1 — Stone profile ═══
+  // ═══ Section 1 - Stone profile ═══
   const s1=$("div","section");
   const head=$("div","prod-head");
   const tw=$("div","prod-title");
@@ -575,11 +575,11 @@ function renderDetail(){
   s1.appendChild(life);
   app.appendChild(s1);
 
-  // ═══ Section 2 — Status Summary (pills switch the status view; grouped by date) ═══
+  // ═══ Section 2 - Status Summary (pills switch the status view; grouped by date) ═══
   const s2=$("div","section");
   s2.appendChild(sectionHead("Status summary",null,null));
   const VIEWS=[
-    { key:"active",    label:"Active order", sub:"placed & awaiting delivery", filter:isActiveOrder,       dateField:"Order_Date",    empty:"No active orders — nothing placed and awaiting delivery." },
+    { key:"active",    label:"Active order", sub:"placed & awaiting delivery", filter:isActiveOrder,       dateField:"Order_Date",    empty:"No active orders - nothing placed and awaiting delivery." },
     { key:"delivered", label:"Delivered",    sub:"grouped by delivery date",   filter:isDeliveredStatus,   dateField:"Delivery_Date", empty:"Nothing delivered for this product yet." }
   ];
   let sv=state.statusView; if(!VIEWS.some(v=>v.key===sv)) sv="active"; state.statusView=sv;
@@ -600,7 +600,7 @@ function renderDetail(){
   else s2.appendChild(groupedOrderTable(svRows, view.dateField));
   app.appendChild(s2);
 
-  // ═══ Section 3 — Order history by month ═══
+  // ═══ Section 3 - Order history by month ═══
   const s3=$("div","section");
   s3.appendChild(sectionHead("Order history",null,null));
 
@@ -651,7 +651,7 @@ function renderDetail(){
   if(!orders.length) s3.appendChild($("div","hist-none","No orders for this product in "+selLabel+"."));
   else s3.appendChild(orderTable(orders));
 
-  // scoreboard — now below the table (for the selected month)
+  // scoreboard - now below the table (for the selected month)
   const jobs=new Set(orders.map(r=>refId(r.Job)).filter(v=>v!=null));
   const ordered=orders.reduce((s,r)=>s+num(r.Ordered_Qty),0);
   const delivered=orders.reduce((s,r)=>s+num(r.Delivery_Qty),0);
@@ -662,7 +662,7 @@ function renderDetail(){
   stats.appendChild(stat(delivered,"slabs delivered"));
   s3.appendChild(stats);
 
-  // histogram — daily ordered slabs for the selected month across the whole supplier
+  // histogram - daily ordered slabs for the selected month across the whole supplier
   s3.appendChild(histogram(c));
   app.appendChild(s3);
 }
@@ -719,7 +719,7 @@ function histogram(c){
     const total=d.cur+d.other;
     const col=$("div","bar-col"+(total?"":" zero")+(allTime&&d.key===state.selectedMonth?" sel":""));
     const label = allTime ? monthLabelOf(d.key) : (d.day+" "+monthLabelOf(sel));
-    col.title=label+(total?(" — "+total+" slab"+(total===1?"":"s")+" ("+d.cur+" this stone, "+d.other+" other)"):" — no orders");
+    col.title=label+(total?(" - "+total+" slab"+(total===1?"":"s")+" ("+d.cur+" this stone, "+d.other+" other)"):" - no orders");
     col.appendChild($("div","bar-v",total?String(total):""));
     const bar=$("div","bar");
     if(d.cur>0){ const s=$("div","seg cur"); s.style.height=Math.max(2,d.cur/max*H)+"px"; bar.appendChild(s); }
@@ -747,7 +747,7 @@ const COL_DEFS={
   orderdate:{label:"Order date",     w:"124px", min:124, build:r=>dateCell(r,"Order_Date")},
   deliv:    {label:"Deliv", num:true, w:"52px",  min:52, build:r=>numCell(r,"Delivery_Qty",true,x=>num(x.Delivery_Qty)<num(x.Ordered_Qty))},
   delivdate:{label:"Delivery date",  w:"124px", min:124, build:r=>dateCell(r,"Delivery_Date")},
-  inv:      {label:"INV",            w:"84px",  min:84,  build:r=>textCell(r,"INV","—")},
+  inv:      {label:"INV",            w:"84px",  min:84,  build:r=>textCell(r,"INV","-")},
   note:     {label:"Note",           w:"minmax(120px,1.3fr)", min:120, build:r=>textCell(r,"Note","Note…")},
   scope:    {label:"Scope", num:true, w:"54px", min:54,  build:r=>numCell(r,"Scope_Qty",false)},
   price:    {label:"$/slab",num:true, w:"74px", min:74,  build:priceCell}
@@ -777,7 +777,7 @@ function priceCell(r){ const c=catFor(r);
   const v=(r.Product_Price_slab!=null&&r.Product_Price_slab!=="")?r.Product_Price_slab:(c?c.Price_Slab:0);
   return $("div","hro","$"+(v!=null&&v!==""?v:0)); }
 
-// Flat table (one month already chosen) — used by the monthly history section.
+// Flat table (one month already chosen) - used by the monthly history section.
 function orderTable(rows){
   const vis=visibleCols(), tpl=gridTemplate(vis);
   const wrap=$("div","htbl-wrap"); const tbl=$("div","htbl"); tbl.style.minWidth=minWidthOf(vis)+"px";
@@ -812,7 +812,7 @@ function groupedOrderTable(rows,dateField){
 // ---- floating column configuration ----
 function openConfig(){
   const m=document.getElementById("cfgPop"); m.className="pop cfgpop"; m.innerHTML="";
-  m.appendChild($("div","cfg-h","Table columns — show & order"));
+  m.appendChild($("div","cfg-h","Table columns - show & order"));
   const cfg=ensureColCfg();
   cfg.forEach((cc,i)=>{
     const row=$("div","cfgrow");
@@ -1049,7 +1049,7 @@ function wizStep1(body){
   const w=state.wiz;
   const fld=$("div","fld");
   const lab=$("label"); lab.appendChild(document.createTextNode("Customer "));
-  lab.appendChild($("span","hint","— name of the client this order is for")); fld.appendChild(lab);
+  lab.appendChild($("span","hint","- name of the client this order is for")); fld.appendChild(lab);
   const ac=$("div","ac");
   const inp=document.createElement("input"); inp.type="text"; inp.placeholder="Start typing a customer name…"; inp.value=w.clientName; inp.autocomplete="off";
   ac.appendChild(inp);
@@ -1073,7 +1073,7 @@ function wizStep1(body){
   if(w.clientName.trim() && jobs.length){
     const jf=$("div","fld");
     const jl=$("label"); jl.appendChild(document.createTextNode("Attach to job "));
-    jl.appendChild($("span","hint","— reuse an existing job, or create a new one below")); jf.appendChild(jl);
+    jl.appendChild($("span","hint","- reuse an existing job, or create a new one below")); jf.appendChild(jl);
     const pick=$("div","jobpick");
     jobs.forEach(j=>{
       const opt=$("div","jobopt"+(w.jobMode==="existing"&&w.jobId===j.id?" on":""));
@@ -1094,13 +1094,13 @@ function wizStep1(body){
   if(w.jobMode!=="existing"){
     const af=$("div","fld");
     const al=$("label"); al.appendChild(document.createTextNode("Job address "));
-    al.appendChild($("span","hint","— site address for this job")); af.appendChild(al);
+    al.appendChild($("span","hint","- site address for this job")); af.appendChild(al);
     const ai=document.createElement("input"); ai.type="text"; ai.placeholder="e.g. 19 Stephens St, Balwyn North VIC 3104"; ai.value=w.address;
     ai.oninput=()=>{ w.address=ai.value; syncWizPrimary(); }; af.appendChild(ai); body.appendChild(af);
 
     const asf=$("div","fld");
     const asl=$("label"); asl.appendChild(document.createTextNode("Assigned to "));
-    asl.appendChild($("span","hint","— optional; tap to assign")); asf.appendChild(asl);
+    asl.appendChild($("span","hint","- optional; tap to assign")); asf.appendChild(asl);
     const chips=$("div","chips"); const opts=assigneeOptions();
     if(!opts.length) chips.appendChild($("span","hint","No assignee options yet."));
     opts.forEach(name=>{
@@ -1128,7 +1128,7 @@ function wizStep2(body){
 
   const pf=$("div","fld");
   const pl=$("label"); pl.appendChild(document.createTextNode("Stone / profile "));
-  pl.appendChild($("span","hint","— pick from the catalogue, or add a new one")); pf.appendChild(pl);
+  pl.appendChild($("span","hint","- pick from the catalogue, or add a new one")); pf.appendChild(pl);
   if(w.product && w.product.id!=null){
     const sel=$("div","selbox");
     const s=$("div"); s.appendChild($("div","sb-main",catLabel(w.product))); sel.appendChild(s);
@@ -1224,7 +1224,7 @@ async function wizPublish(){
     if(state.grist) refetch(); else render();
   }catch(err){
     console.warn("publish failed",err);
-    w.busy=false; w.msg="Publish failed — check access and try again."; renderWizard();
+    w.busy=false; w.msg="Publish failed - check access and try again."; renderWizard();
   }
 }
 
@@ -1287,7 +1287,7 @@ async function pullTables(){
 async function refetch(){ if(!state.grist)return; try{ await pullTables(); }catch(e){ console.warn("fetch failed",e); } render(); }
 
 // ============================================================
-//  GRIST WIRING — sample first, flip to live once Grist answers
+//  GRIST WIRING - sample first, flip to live once Grist answers
 // ============================================================
 if(typeof grist!=="undefined"){
   try{ grist.ready({ requiredAccess:"full" }); }catch(e){}

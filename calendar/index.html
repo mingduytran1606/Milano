@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   * { box-sizing: border-box; }
-  /* Shared Milano palette — kept in sync with the Inbox widget (light + dark). */
+  /* Shared Milano palette - kept in sync with the Inbox widget (light + dark). */
   :root{
     --bg:#f6f7f9; --panel:#ffffff; --ink:#1d2733; --muted:#6b7683;
     --line:#e2e5ea; --line2:#eef1f4; --sw-off:#cfd4d1;
@@ -459,7 +459,7 @@
   <div id="jobModalCard">
     <div class="jm-head">
       <div class="jm-title"></div>
-      <span class="jm-gear" title="Edit this panel — choose fields and order">&#9998;</span>
+      <span class="jm-gear" title="Edit this panel - choose fields and order">&#9998;</span>
       <span class="jm-close" title="Close">&times;</span>
     </div>
     <div class="jm-body"></div>
@@ -497,7 +497,7 @@
   var DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   // sidebar reads these columns off the jobs table when they exist
   var JOB_COLS = { addr:'Job_Address', client:'Client_Label', stage:'Stage', assigned:'Assigned_To', jid:'Job_ID', payment:'Payment_Status' };
-  // Stage / payment pill colours — kept in sync with the Inbox widget.
+  // Stage / payment pill colours - kept in sync with the Inbox widget.
   // These are FALLBACK values (mirror of the Inbox's current palette); at runtime the
   // calendar reads the Inbox widget's live "Save for everyone" colours from the doc
   // (its section's customView.widgetOptions.colors) via loadInboxColors(), so recolours
@@ -598,17 +598,17 @@
   var catalogueCache = null;   // Catalogue rows (product labels + picker)
   var stoneMetaByColId = {};   // Stone_Order col meta (Order_Status choices + colours)
   var catLabelCol = 'Product_Full';
-  var catTableId = null;       // resolved Catalogue table id (from the Product ref) — for picker refresh
+  var catTableId = null;       // resolved Catalogue table id (from the Product ref) - for picker refresh
   var stoneLoad = null;        // in-flight/So-far ensureStoneLoaded() promise
   // Stone_Order / Catalogue col ids (match the brief + Inbox widget)
   var STONE = { table:'Stone_Order', catalogue:'Catalogue', job:'Job', product:'Product', status:'Order_Status',
     scope:'Scope_Qty', order:'Ordered_Qty', deliv:'Delivery_Qty', price:'Product_Price_slab',
     note:'Note', orderDate:'Order_Date', delivDate:'Delivery_Date' };
-  // Never write these back — Grist formulas / rollups / locally-mirrored ref labels. TABLE-AWARE:
+  // Never write these back - Grist formulas / rollups / locally-mirrored ref labels. TABLE-AWARE:
   // Scope_Qty / Ordered_Qty are read-only rollups on Jobs_Detail but EDITABLE on Stone_Order.
   function isReadonlyCol(role, col){
     if (col === 'id' || col === 'manualSort' || col === 'Job_ID' || col === 'Client_Label' || col === 'Stones' || col === 'Inst_Dates') return true;
-    // Any Grist formula/rollup column, detected from the schema — writing one raises
+    // Any Grist formula/rollup column, detected from the schema - writing one raises
     // "Can't save value to formula column …" and fails the whole save.
     if (isFormulaColRole(role, col)) return true;
     // Hardcoded fallback (metadata not yet loaded): known rollups + mirrored ref labels.
@@ -628,7 +628,7 @@
   function gristToLocalDate(v) {
     if (v === null || v === undefined || v === '') return null;
     // onRecords delivers Date columns as JS Date objects (UTC midnight);
-    // raw numbers (epoch seconds) can appear too — handle both.
+    // raw numbers (epoch seconds) can appear too - handle both.
     var d = (v instanceof Date) ? v : new Date(Number(v) * 1000);
     if (isNaN(d)) return null;
     return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
@@ -689,7 +689,7 @@
     return s;
   }
 
-  // normalize a Ref cell to its row id — Grist may deliver a plain number,
+  // normalize a Ref cell to its row id - Grist may deliver a plain number,
   // an encoded ['R', tableId, rowId], or a Reference object with .rowId
   function refId(v) {
     if (typeof v === 'number' && v) return v;
@@ -746,7 +746,7 @@
     return (jobMetaByColId[JOB_COLS.payment] && jobMetaByColId[JOB_COLS.payment].choiceOptions)
         || (metaByColId[JOB_COLS.payment] && metaByColId[JOB_COLS.payment].choiceOptions) || {};
   }
-  // Assignees present across the jobs, for the pill bar (stable — derived from all jobs).
+  // Assignees present across the jobs, for the pill bar (stable - derived from all jobs).
   function navPeople() {
     var set = {}, jobs = (jobsCache && jobsCache.length) ? jobsCache : jobsFromRecords();
     jobs.forEach(function (j) { (j.assigned || []).forEach(function (a) { if (a) set[a] = true; }); });
@@ -905,7 +905,7 @@
   function renderCardTemplate(str, tokens, host, ctx) {
     var added = [];
     String(str == null ? '' : str).split('\n').forEach(function (lineStr) {
-      if (/^\s*(-{3,}|—+|\*{3,})\s*$/.test(lineStr)) {   // a line of --- (or ———) = section divider
+      if (/^\s*(-{3,}|-+|\*{3,})\s*$/.test(lineStr)) {   // a line of --- (or ---) = section divider
         var hr = document.createElement('div'); hr.className = 'cdivider'; host.appendChild(hr); added.push(hr); return;
       }
       var line = document.createElement('div'); line.className = 'cline';
@@ -1003,7 +1003,7 @@
     var fields = {};
     var copyCols = [mappingsCache.startDate, mappingsCache.title, mappingsCache.type, mappingsCache.groupBy, mappingsCache.seqNote]
       .concat(mappingsCache.details || []);
-    // Never copy Grist formula columns (e.g. a computed "n/total" seq label) — creating a row with a
+    // Never copy Grist formula columns (e.g. a computed "n/total" seq label) - creating a row with a
     // value for a formula column raises a ValueError and the whole duplicate fails.
     copyCols.forEach(function (c) { if (c != null && !isFormulaCol(c) && rec[c] != null && rec[c] !== '') fields[c] = rec[c]; });
     grist.getTable().create({ fields: fields })
@@ -1139,10 +1139,10 @@
     var row = document.createElement('div'); row.className = 'ce-btnrow';
     var bMe = document.createElement('button'); bMe.type = 'button'; bMe.className = 'ce-save ghost'; bMe.textContent = 'Save just for me';
     bMe.title = 'Keep this design on your device only';
-    bMe.addEventListener('click', function () { cardScope = 'me'; saveLocalCards(); setScopeNote('Saved — just for you.'); });
+    bMe.addEventListener('click', function () { cardScope = 'me'; saveLocalCards(); setScopeNote('Saved - just for you.'); });
     var bAll = document.createElement('button'); bAll.type = 'button'; bAll.className = 'ce-save primary'; bAll.textContent = 'Save for everyone';
     bAll.title = 'Share this design with everyone on the doc';
-    bAll.addEventListener('click', function () { cardScope = 'everyone'; publishCards(); saveLocalCards(); setScopeNote('Saved — shared with everyone.'); });
+    bAll.addEventListener('click', function () { cardScope = 'everyone'; publishCards(); saveLocalCards(); setScopeNote('Saved - shared with everyone.'); });
     row.appendChild(bMe); row.appendChild(bAll);
     foot.appendChild(row);
     body.appendChild(foot);
@@ -1207,7 +1207,7 @@
         var job = (jobsCache || []).find(function (x) { return x.id === jobRowId; });
         var jobName = job ? (job.client || job.addr || job.jid) : 'this job';
         var note = prompt('Schedule installation for ' + jobName + ' on ' + fmtDate(day) + '.\n' +
-                          'Add a note (optional) — or Cancel to abort:', '');
+                          'Add a note (optional) - or Cancel to abort:', '');
         if (note === null) return;   // cancelled -> no visit created
         note = note.trim();
         var idx = dropIndex(el, e.clientY, -1);
@@ -1252,7 +1252,7 @@
       if (e.target !== el) return;
       if (!mappingsCache) return;
       var note = prompt('Create a new installation on ' + fmtDate(day) + '.\n' +
-                        'Add a note (optional) — or Cancel to abort:', '');
+                        'Add a note (optional) - or Cancel to abort:', '');
       if (note === null) return;   // cancelled
       note = note.trim();
       var fields = {};
@@ -1380,7 +1380,7 @@
           vd.className = 'vd';
           vd.textContent = (i + 1) + '/' + visits.length + ' · ' + fmtShort(d) + ' ' + d.getFullYear();
           row.appendChild(vd);
-          if (note) row.appendChild(document.createTextNode(' — ' + note));
+          if (note) row.appendChild(document.createTextNode(' - ' + note));
           row.title = 'Show this install on the calendar';
           row.addEventListener('click', function (e) {
             e.stopPropagation();
@@ -1742,7 +1742,7 @@
     host.innerHTML = '';
     var hd = document.createElement('div'); hd.className = 'fhead'; hd.textContent = 'Saved views'; host.appendChild(hd);
     if (!savedViews.length) {
-      var em = document.createElement('div'); em.className = 'vempty'; em.textContent = 'None yet — set up filters/sort, then Save current as…';
+      var em = document.createElement('div'); em.className = 'vempty'; em.textContent = 'None yet - set up filters/sort, then Save current as…';
       host.appendChild(em);
     }
     savedViews.slice().sort(function (a, b) { return a.name.toLowerCase().localeCompare(b.name.toLowerCase()); })
@@ -1817,7 +1817,7 @@
   // assignees shown as neutral initials avatars + name (no colour)
   function jmAssignees(names) {
     var wrap = document.createElement('span');
-    if (!names.length) { wrap.textContent = '—'; return wrap; }
+    if (!names.length) { wrap.textContent = '-'; return wrap; }
     names.forEach(function (nm, i) {
       if (i) wrap.appendChild(document.createTextNode('  '));
       wrap.appendChild(avatarSpan(nm));
@@ -1908,7 +1908,7 @@
     if (pid != null && catalogueCache) { var c = catalogueCache.find(function (x) { return x.id === pid; }); if (c && c[catLabelCol]) return String(c[catLabelCol]); }
     if (r.Product_Code) return String(r.Product_Code);
     if (r.Product_Supplier) return String(r.Product_Supplier);
-    return '—';
+    return '-';
   }
 
   // ---- draft buffer: every edit is held here until Save (Discard restores) ----
@@ -1987,14 +1987,14 @@
     }).then(function () {
       if (currentDetailJob) { var j = (jobsCache || []).find(function (x) { return x.id === currentDetailJob.id; }); if (j) currentDetailJob = j; }
       render(); refreshDetail(currentDetailJob); updateEditBar();
-    }).catch(function (e) { console.error('save failed', e); alert("Couldn't save to Grist — your changes are kept here so you can try again.\n\n" + ((e && e.message) || e)); });
+    }).catch(function (e) { console.error('save failed', e); alert("Couldn't save to Grist - your changes are kept here so you can try again.\n\n" + ((e && e.message) || e)); });
   }
   function discardEdit(){
     if (!edit.dirty) return;
     if (edit.base) {
       jobsCache = edit.base.jobs; recordsCache = edit.base.visits;
       // Only restore stone if it was actually loaded when the edit began. If the first edit happened
-      // before ensureStoneLoaded() resolved, base.stone is [] — restoring it would blank the cache
+      // before ensureStoneLoaded() resolved, base.stone is [] - restoring it would blank the cache
       // permanently (the !==null guard stops a reload). Force a fresh load instead.
       if (edit.baseStoneLoaded) stoneCache = edit.base.stone; else reloadStone();
     }
@@ -2020,7 +2020,7 @@
     setTimeout(function () { document.addEventListener('click', closeFloatMenu, true); }, 0); }
   function pillDropdown(current, choices, meta, onPick, emptyLabel){
     var b = elx('span', 'je-pill');
-    var paint = function (v) { b.textContent = v || emptyLabel || '—'; b.style.background = v ? fillColorFor(meta, v) : 'var(--line2)'; b.style.color = v ? textColorFor(meta, v) : 'var(--muted)'; };
+    var paint = function (v) { b.textContent = v || emptyLabel || '-'; b.style.background = v ? fillColorFor(meta, v) : 'var(--line2)'; b.style.color = v ? textColorFor(meta, v) : 'var(--muted)'; };
     paint(current);
     b.addEventListener('click', function (e) {
       e.stopPropagation(); closeFloatMenu();
@@ -2083,7 +2083,7 @@
   function renderJobEditor(job){
     var body = document.querySelector('#jobModal .jm-body'); if (!body) return;
     body.innerHTML = '';
-    if (!job.id) { body.appendChild(elx('div', 'jm-empty', "This install isn't linked to a job record yet — open it in the Inbox to add job details.")); renderFooter(job); return; }
+    if (!job.id) { body.appendChild(elx('div', 'jm-empty', "This install isn't linked to a job record yet - open it in the Inbox to add job details.")); renderFooter(job); return; }
     var raw = job.raw || (job.raw = {});
 
     // header: job id chip + address
@@ -2098,9 +2098,9 @@
     // stage / payment / assigned
     var pills = elx('div', 'je-pills');
     var stageChoices = choiceKeys(jobMetaByColId[JOB_COLS.stage]) || Object.keys(STAGE_COLORS);
-    pills.appendChild(pillDropdown(job.stage || raw[JOB_COLS.stage] || '', stageChoices, jobMetaByColId[JOB_COLS.stage], function (v) { setJobField(job, JOB_COLS.stage, v); }, 'Stage —'));
+    pills.appendChild(pillDropdown(job.stage || raw[JOB_COLS.stage] || '', stageChoices, jobMetaByColId[JOB_COLS.stage], function (v) { setJobField(job, JOB_COLS.stage, v); }, 'Stage -'));
     var payChoices = choiceKeys(jobMetaByColId[JOB_COLS.payment]) || Object.keys(PAY_COLORS);
-    pills.appendChild(pillDropdown(job.payment || raw[JOB_COLS.payment] || '', payChoices, jobMetaByColId[JOB_COLS.payment], function (v) { setJobField(job, JOB_COLS.payment, v); }, 'Payment —'));
+    pills.appendChild(pillDropdown(job.payment || raw[JOB_COLS.payment] || '', payChoices, jobMetaByColId[JOB_COLS.payment], function (v) { setJobField(job, JOB_COLS.payment, v); }, 'Payment -'));
     var asg = elx('span', 'je-assign'); var names = listVals(raw[JOB_COLS.assigned]);
     if (names.length) { names.forEach(function (nm) { asg.appendChild(avatarSpan(nm)); }); } else { asg.appendChild(elx('span', 'je-assign-add', '+ staff')); }
     asg.title = 'Click to change who is assigned';
@@ -2162,7 +2162,7 @@
       var sdel = elx('span', 'je-del', '×'); sdel.title = 'Delete this stone line'; sdel.addEventListener('click', function (e) { e.stopPropagation(); removeStoneLine(job, r); }); top.appendChild(sdel);
       card.appendChild(top);
       var srowc = elx('div', 'je-stone-row');
-      srowc.appendChild(pillDropdown(String(r[STONE.status] || ''), statusChoices, stoneMetaByColId[STONE.status], function (v) { setStoneField(r, STONE.status, v); }, 'Status —'));
+      srowc.appendChild(pillDropdown(String(r[STONE.status] || ''), statusChoices, stoneMetaByColId[STONE.status], function (v) { setStoneField(r, STONE.status, v); }, 'Status -'));
       card.appendChild(srowc);
       var qrow = elx('div', 'je-qrow');
       [['scope', 'Scope'], ['order', 'Order'], ['deliv', 'Deliv']].forEach(function (q) {
@@ -2172,8 +2172,8 @@
         qi.addEventListener('change', function () { setStoneField(r, col, qi.value === '' ? null : Number(qi.value)); });
         wrap.appendChild(qi); qrow.appendChild(wrap);
       });
-      // Price / slab is a Grist formula (looked up from the product) — read-only, never written back.
-      var pwrap = elx('label', 'je-q'); pwrap.title = 'Price / slab — from the product; edit the product to change it';
+      // Price / slab is a Grist formula (looked up from the product) - read-only, never written back.
+      var pwrap = elx('label', 'je-q'); pwrap.title = 'Price / slab - from the product; edit the product to change it';
       pwrap.appendChild(elx('span', 'je-qlbl', 'Price $'));
       pwrap.appendChild(elx('span', 'je-qin je-ro', (r[STONE.price] != null && r[STONE.price] !== '') ? String(r[STONE.price]) : '0'));
       qrow.appendChild(pwrap);
@@ -2457,7 +2457,7 @@
       grist.docApi.fetchTable('_grist_Tables_column')
     ]).then(function (res) {
       var data = res[0], tables = res[1], cols = res[2];
-      // column metadata for the jobs table (labels/types/colours) — powers the details popup
+      // column metadata for the jobs table (labels/types/colours) - powers the details popup
       var tref = tables.id[tables.tableId.indexOf(jobsTable)];
       var jm = {};
       for (var c = 0; c < cols.id.length; c++) {
@@ -2590,7 +2590,7 @@
       { name: 'type', title: 'Colour by', optional: true, description: 'Choice column used for the title colour + stage filter (e.g. Stage)' },
       { name: 'details', title: 'Detail lines', optional: true, allowMultiple: true, description: 'Extra fields shown under the title' },
       { name: 'seqNote', title: 'Install note', optional: true, description: 'Per-install note shown in the bottom "Installation n/N: note" line' },
-      { name: 'groupBy', title: 'Group by (job)', optional: true, description: 'Reference to the job — links installs together and powers the jobs sidebar' },
+      { name: 'groupBy', title: 'Group by (job)', optional: true, description: 'Reference to the job - links installs together and powers the jobs sidebar' },
       { name: 'orderBy', title: 'Manual order', type: 'Numeric', optional: true, description: 'Numeric column that stores the hand-arranged order of cards within a day' }
     ],
     allowSelectBy: true
@@ -2621,7 +2621,7 @@
     }
     if (Array.isArray(opts.savedViews)) savedViews = opts.savedViews;
     if ('activeView' in opts) activeViewName = opts.activeView || null;
-    // restore the filters/sort of the saved view that was active last session — once
+    // restore the filters/sort of the saved view that was active last session - once
     if (!viewsLoaded) {
       viewsLoaded = true;
       var v = findView(activeViewName);

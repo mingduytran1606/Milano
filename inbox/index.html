@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Milano — Inbox</title>
+<title>Milano - Inbox</title>
 <script src="https://milano.getgrist.com/grist-plugin-api.js"></script>
 <style>
   :root{
@@ -328,7 +328,7 @@
   .field textarea{resize:vertical;min-height:52px}
   .field .ro{color:var(--ink);font-weight:500}
   /* Sectioned grid: [Product Scope Status Price] | [Order qty · date] | [Deliv qty · date] | [Note]
-     12 tracks — the three 1px tracks are the vertical dividers between sections. */
+     12 tracks - the three 1px tracks are the vertical dividers between sections. */
   .stone-head{display:grid;grid-template-columns:minmax(140px,1.2fr) 48px 150px 64px 1px 48px 140px 1px 48px 140px 1px minmax(140px,1fr);gap:8px;padding:0 0 8px;align-items:end}
   .stonecard .card-body{overflow-x:auto}
   .stonecard .stone-head,.stonecard .line{grid-template-columns:minmax(140px,1.2fr) 48px 150px 64px 1px 48px 140px 1px 48px 140px 1px minmax(140px,1fr);min-width:1010px}
@@ -569,7 +569,7 @@
     <div class="list-head">
       <span class="t">Jobs</span><span class="count" id="jobCount">0</span>
       <div class="head-actions">
-        <button class="resetbtn" id="hardReset" type="button" title="Reset the list — clear the search, all filters (stage / payment / assignee) and grouping">
+        <button class="resetbtn" id="hardReset" type="button" title="Reset the list - clear the search, all filters (stage / payment / assignee) and grouping">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
           <span>Reset</span>
         </button>
@@ -651,7 +651,7 @@
 
 <script>
 /* ============================================================
-   Milano — Consolidated Inbox widget (master–detail)
+   Milano - Consolidated Inbox widget (master–detail)
    Toolbar (search · Views · Filter · Sort · Display) styled to
    match the Milano calendar widget. Right pane: the selected
    job's details + stone order + installations, editable in place.
@@ -683,7 +683,7 @@ let STAGES = Object.keys(STAGE_C);
 let PAYS   = Object.keys(PAY_C);
 let ORDS   = Object.keys(ORD_C);
 
-// ---- Summary card font sizes (px) — tweak any element's size here ----
+// ---- Summary card font sizes (px) - tweak any element's size here ----
 const SUMMARY_FONT = {
   client:22, jobid:11, address:13, inputDate:13,
   label:10, scopeNum:24, scopeUnit:12,
@@ -692,7 +692,7 @@ const SUMMARY_FONT = {
 };
 function applySummaryFont(el){ const f=state.summaryFont||SUMMARY_FONT; for(const k in SUMMARY_FONT){ el.style.setProperty("--fs-"+k, (f[k]!=null?f[k]:SUMMARY_FONT[k])+"px"); } }
 
-// ---- List job-card font sizes (px) — tweak each element here ----
+// ---- List job-card font sizes (px) - tweak each element here ----
 // `base` is the default body size (the Customize > Card text size slider overrides it).
 const LIST_CARD_FONT = { base:12.5, client:13, address:12, pill:10, avatar:10 };
 
@@ -709,9 +709,9 @@ const FIELD_DEFS = [
   ["address","Address"],["stage","Stage"],["assigned","Assigned"],
   ["payment","Payment"],["scope","Scope qty"],["meas","Meas. date"],["input","Input date"]
 ];
-// Customisable job-card elements — WHAT shows (state.fields) + WHERE/order (state.cardOrder).
+// Customisable job-card elements - WHAT shows (state.fields) + WHERE/order (state.cardOrder).
 const CARD_FIELDS=[
-  {key:"client",  label:"Client name", block:false, render:j=>$("span","jnmtext",esc(j.Client_Label)||"—")},
+  {key:"client",  label:"Client name", block:false, render:j=>$("span","jnmtext",esc(j.Client_Label)||"-")},
   {key:"stage",   label:"Stage",       block:false, render:j=>j.Stage?pill(j.Stage,STAGE_C,{xs:true}):null},
   {key:"jobid",   label:"Job ID",      block:false, render:j=>j.Job_ID?$("span","qid",esc(j.Job_ID)):null},
   {key:"address", label:"Address",     block:true,  render:j=>{ const a=esc(j.Job_Address||j.Address_Formatted); return a?$("div","jad",a):null; }},
@@ -736,9 +736,9 @@ const TOKENS={
   client:  {desc:"Client name",         el:j=>txt(j.Client_Label)},
   jobid:   {desc:"Job ID",              el:j=>txt(j.Job_ID)},
   address: {desc:"Address",             el:j=>txt(j.Job_Address||j.Address_Formatted)},
-  stage:   {desc:"Stage — colour pill", el:j=>j.Stage?pill(j.Stage,STAGE_C,{xs:true}):null},
-  payment: {desc:"Payment — colour pill",el:j=>j.Payment_Status?pill(j.Payment_Status,PAY_C,{xs:true}):null},
-  assigned:{desc:"Assigned — avatars",  el:j=>choiceList(j.Assigned_To).length?avatarStack(j.Assigned_To,true):null},
+  stage:   {desc:"Stage - colour pill", el:j=>j.Stage?pill(j.Stage,STAGE_C,{xs:true}):null},
+  payment: {desc:"Payment - colour pill",el:j=>j.Payment_Status?pill(j.Payment_Status,PAY_C,{xs:true}):null},
+  assigned:{desc:"Assigned - avatars",  el:j=>choiceList(j.Assigned_To).length?avatarStack(j.Assigned_To,true):null},
   scope:   {desc:"Scope qty",           el:j=>txt(j.Scope_Qty!=null?j.Scope_Qty:0)},
   ordered: {desc:"Ordered qty",         el:j=>txt(j.Ordered_Qty!=null?j.Ordered_Qty:0)},
   inwh:    {desc:"In-WH qty",           el:j=>txt(j.In_WH_Qty!=null?j.In_WH_Qty:0)},
@@ -824,7 +824,7 @@ function pill(val,colors,opts){
     // (a native <select> paints the whole control one colour).
     const trig=$("span","pill pill-select"+(opts.xs?" xs":"")); trig.style.background=t.bg;
     const d=$("span","pdot"); d.style.background=t.dot; trig.appendChild(d);
-    trig.appendChild(document.createTextNode(val||"—"));
+    trig.appendChild(document.createTextNode(val||"-"));
     trig.appendChild($("span","pcaret","▾"));
     trig.onclick=e=>{ e.stopPropagation(); openChoicePicker(trig,{value:val,options:opts.options||Object.keys(colors),colors,onpick:opts.onchange}); };
     return trig;
@@ -844,7 +844,7 @@ function softChoice(val,colors,opts){
   opts=opts||{};
   const t=softTint(colors[val]); const trig=$("span","spill editable"); trig.style.background=t.bg;
   const d=$("span","sdot"); d.style.background=t.dot; trig.appendChild(d);
-  trig.appendChild(document.createTextNode(val||"—"));
+  trig.appendChild(document.createTextNode(val||"-"));
   trig.appendChild($("span","pcaret","▾"));
   trig.onclick=e=>{ e.stopPropagation(); openChoicePicker(trig,{value:val,options:opts.options||Object.keys(colors),colors,onpick:opts.onchange}); };
   return trig;
@@ -924,7 +924,7 @@ function avatarStack(names,sm){
 const LSKEY="milano_inbox_prefs_v2";
 const state = { jobs:[], stone:[], inst:[], clients:[], catalogue:[], selectedId:null, grist:false,
   ref:{ client:null, product:null },   // resolved from the Grist schema (or DEMO_REF standalone)
-  formulaCols:{},                       // {tableId:{colId:true}} — Grist formula/rollup cols, detected from
+  formulaCols:{},                       // {tableId:{colId:true}} - Grist formula/rollup cols, detected from
                                         // the schema; the write path never sends these (brief §5)
   stoneNoteH:null,                      // shared height for stone-order note boxes
   stoneColW:null,                       // persisted stone-order column widths (px)
@@ -1019,13 +1019,13 @@ const TMP_BASE=1e9;                                   // temp row-ids for unsave
 let _tmpSeq=TMP_BASE;
 function nextTmpId(){ return ++_tmpSeq; }
 function isTempId(id){ return typeof id==="number" && id>=TMP_BASE; }
-// Columns that are Grist formulas/rollups (or locally-mirrored ref labels) — never write these
+// Columns that are Grist formulas/rollups (or locally-mirrored ref labels) - never write these
 // back. This is TABLE-AWARE: Scope_Qty / Ordered_Qty are read-only rollups on Jobs_Detail but
 // EDITABLE columns on Stone_Order, so they must only be blocked for the job, not the stone line.
 const ROLE_TABLE={job:"Jobs_Detail",stone:"Stone_Order",visit:"Inst_"};
 function isReadonlyCol(role,col){
   if(col==="id"||col==="manualSort"||col==="Job_ID"||col==="Client_Label"||col==="Stones"||col==="Inst_Dates") return true;
-  // Any Grist formula/rollup column, detected from the schema — writing one raises
+  // Any Grist formula/rollup column, detected from the schema - writing one raises
   // "Can't save value to formula column …" and fails the whole save (brief §5).
   const t=ROLE_TABLE[role], fc=t&&state.formulaCols&&state.formulaCols[t];
   if(fc && fc[col]) return true;
@@ -1099,7 +1099,7 @@ async function flushDraftToGrist(){
   });
   adds.sort((a,b)=>rank(a.table)-rank(b.table));
   // Track whether any AddRecord has actually committed. If a later batch throws, the caller must
-  // resync from Grist rather than retry — otherwise the already-created rows (still holding temp ids
+  // resync from Grist rather than retry - otherwise the already-created rows (still holding temp ids
   // in state) would be added a SECOND time, duplicating them. Updates/removes are keyed by id and
   // idempotent, so only committed adds set this flag.
   state._partialFlush=false;
@@ -1117,7 +1117,7 @@ async function flushDraftToGrist(){
   updates.forEach(u=>tail.push(["UpdateRecord",u.table,resolve(u.id),resolveFields(u.fields)]));
   removes.forEach(u=>tail.push(["RemoveRecord",u.table,resolve(u.id)]));
   if(tail.length) await grist.docApi.applyUserActions(tail);
-  state._partialFlush=false;   // fully applied — nothing half-committed
+  state._partialFlush=false;   // fully applied - nothing half-committed
   return idMap;
 }
 async function saveDraft(){
@@ -1142,7 +1142,7 @@ async function saveDraft(){
         renderAll(); updateSaveBar();
         alert("Some changes were saved before an error occurred, so the view was refreshed from Grist.\n\nPlease re-check the job and re-enter anything that didn't save.\n\n"+((e&&e.message)||e));
       }else{
-        alert("Couldn't save to Grist — your changes are kept here so you can try again.\n\n"+((e&&e.message)||e));
+        alert("Couldn't save to Grist - your changes are kept here so you can try again.\n\n"+((e&&e.message)||e));
       }
       return;
     }
@@ -1218,7 +1218,7 @@ function finishRefSetup(){
   if(state.ref.product && !state.ref.product.cols) state.ref.product.cols=productDisplayCols(state.ref.product);
 }
 // Drop any label part that's already fully contained (case-insensitive) in a
-// longer part — so when the name already spells out supplier/code we don't
+// longer part - so when the name already spells out supplier/code we don't
 // repeat them, e.g. ["Lavistone","LS313","Lavistone | LS313 | Neutra 20mm"]
 // collapses to just "Lavistone | LS313 | Neutra 20mm".
 function dedupeLabelParts(parts){
@@ -1246,11 +1246,11 @@ function stoneProductLabel(r){
   if(r.Product_Code) return dedupeLabelParts([r.Product_Supplier,r.Product_Code]).join(" · ");
   if(r.Product_Supplier) return r.Product_Supplier;
   if(r.Stone) return r.Stone;
-  return "—";
+  return "-";
 }
 // Auto-advance a stone line's Order Status from its data (order/delivery date + qty).
 // Only advances from "not-yet" states; never overrides delivered-variants, On hold,
-// Cancelled, N/A or Return — so manual choices are preserved.
+// Cancelled, N/A or Return - so manual choices are preserved.
 const PRE_ORDER_STATES=["","3. Awaiting Order","7. Not Delivered Yet","1. No Stock"];
 // "6. Delivered" / "Delivered by …" but NOT "Not Delivered Yet".
 function isDeliveredStatus(r){ const low=String(r.Order_Status||"").toLowerCase(); return /deliver/.test(low) && !/not deliver/.test(low); }
@@ -1258,7 +1258,7 @@ function autoStatus(r){
   const s=String(r.Order_Status||""), low=s.toLowerCase();
   const isDelivered = isDeliveredStatus(r);
   // Date-driven: entering a delivery date advances to Delivered, an order date to Placed Order.
-  // Never override a deliberate On hold / Cancelled / Return / N/A (substring test — statuses are
+  // Never override a deliberate On hold / Cancelled / Return / N/A (substring test - statuses are
   // prefixed like "5. On hold", so an exact-match list never caught them).
   if(/cancel|n\/a|return|on hold/.test(low)) return null;
   if(toDate(r.Delivery_Date) && !isDelivered) return "6. Delivered";
@@ -1278,7 +1278,7 @@ function agoText(verb,n){ if(n==null) return "";
 function stoneDateInput(r,col){
   const wrap=$("div","ldate");
   const di=document.createElement("input"); di.type="date"; di.className="ldateinp"; di.value=dateInput(r[col]);
-  di.title = col==="Order_Date" ? "Order date — sets the status to Placed Order" : "Delivery date — sets the status to Delivered";
+  di.title = col==="Order_Date" ? "Order date - sets the status to Placed Order" : "Delivery date - sets the status to Delivered";
   di.onchange=()=>updateStoneAuto(r,{[col]:toEpochSec(di.value)});
   wrap.appendChild(di); return wrap;
 }
@@ -1344,16 +1344,16 @@ function createClientAndSet(j,name){
 }
 
 // ============================================================
-//  FUN DEFAULTS 👻  — nothing should show up blank or go missing
+//  FUN DEFAULTS 👻  - nothing should show up blank or go missing
 // ============================================================
 // A stone line with no Job is invisible in this job-organised view (it only
 // shows on the whole-table Stone Order board), so we adopt any orphans into a
 // catch-all "Ghost Job". New jobs get a playful placeholder client + the Ghost
-// assignee, so a half-entered job still reads nicely instead of "—".
+// assignee, so a half-entered job still reads nicely instead of "-".
 const GHOST_ASSIGNEE = "Nè Hé";
 const GHOST_RED = "#e5484d";                        // Nè Hé's avatar/pill colour (red, not the grey default)
 const GHOST_JOB_CLIENT = "👻 Ghost Job (unclaimed stones)";
-// The catch-all job — matched by its client label (or the address sentinel in the no-client fallback).
+// The catch-all job - matched by its client label (or the address sentinel in the no-client fallback).
 // The stone select/relocate controls are shown only here.
 function isGhostJob(j){ return !!j && (String(j.Client_Label||"")===GHOST_JOB_CLIENT || String(j.Job_Address||"")===GHOST_JOB_CLIENT); }
 const GHOST_ADDRESS = "ê nha";                      // placeholder address for the catch-all Ghost Job
@@ -1380,12 +1380,12 @@ async function ensureGhostJob(){
       clientId=(cr&&cr.retValues&&cr.retValues[0])||null;
     }
   } else {
-    // no client ref — match/mark the ghost job by a sentinel address instead
+    // no client ref - match/mark the ghost job by a sentinel address instead
     const j=(state.jobs||[]).find(x=>String(x.Job_Address||"")===GHOST_JOB_CLIENT); if(j) return j.id;
   }
   const jf={Stage:"Quote", Assigned_To:["L",GHOST_ASSIGNEE]};
   if(clientId!=null){ jf.Client_Name=clientId; jf.Job_Address=GHOST_ADDRESS; }
-  else jf.Job_Address=GHOST_JOB_CLIENT;   // no client ref — reuse the address field as the match sentinel
+  else jf.Job_Address=GHOST_JOB_CLIENT;   // no client ref - reuse the address field as the match sentinel
   const jr=await grist.docApi.applyUserActions([["AddRecord","Jobs_Detail",null,jf]]);
   return (jr&&jr.retValues&&jr.retValues[0])||null;
 }
@@ -1394,7 +1394,7 @@ async function ensureGhostJob(){
 let _adopting=false;
 async function adoptOrphanStones(){
   if(!state.grist || state.dirty || _adopting) return;
-  // Grist delivers an EMPTY Ref column as 0 (not null), so test falsiness — 0/null/"" all mean
+  // Grist delivers an EMPTY Ref column as 0 (not null), so test falsiness - 0/null/"" all mean
   // "no job". (A real Job id is a positive row number.) Missing this is why orphans slipped through.
   const orphans=(state.stone||[]).filter(r=>!refId(r.Job));
   if(!orphans.length) return;
@@ -1468,7 +1468,7 @@ function openJobPicker(recs,anchor){
   recs=[].concat(recs);
   const m=document.getElementById("jobPicker"); m.innerHTML="";
   const sw=$("div","pp-search"); const si=document.createElement("input"); si.type="text";
-  si.placeholder=(recs.length>1?("Move "+recs.length+" stones to job — search…"):"Move to job — search client / address…"); si.autocomplete="off";
+  si.placeholder=(recs.length>1?("Move "+recs.length+" stones to job - search…"):"Move to job - search client / address…"); si.autocomplete="off";
   sw.appendChild(si); m.appendChild(sw);
   const list=$("div","pp-list"); m.appendChild(list);
   const cur=recs.length===1?refId(recs[0].Job):null;
@@ -1530,7 +1530,7 @@ function editProductProfile(r,anchor){
   else openProductPicker(r,anchor);
 }
 
-// ---- Assigned (ChoiceList) — editable multi-select ----
+// ---- Assigned (ChoiceList) - editable multi-select ----
 function currentAssignees(j){ return choiceList(j.Assigned_To); }
 function assigneeOptions(){
   const fromData=[...new Set((state.jobs||[]).flatMap(j=>choiceList(j.Assigned_To)))].filter(Boolean);
@@ -1567,7 +1567,7 @@ function openAssignPicker(j,anchor){
 }
 function assignedCell(j){
   const wrap=$("div","assign-cell");
-  wrap.appendChild(currentAssignees(j).length?avatarStack(j.Assigned_To):$("span","ro","—"));
+  wrap.appendChild(currentAssignees(j).length?avatarStack(j.Assigned_To):$("span","ro","-"));
   if(assigneeOptions().length){
     wrap.classList.add("editable"); wrap.title="Click to change who's assigned";
     const pen=$("span","pencil"); pen.innerHTML="&#9998;"; wrap.appendChild(pen);
@@ -1576,7 +1576,7 @@ function assignedCell(j){
   return wrap;
 }
 function escapeRe(s){ return String(s).replace(/[.*+?^${}()|[\]\\]/g,"\\$&"); }
-// Guess the supplier from a product name — match a known supplier, else the first
+// Guess the supplier from a product name - match a known supplier, else the first
 // "|"-segment (names look like "WF | Marble | Biancatto…"), else the first word.
 function deduceSupplier(name,options){
   name=String(name||"").trim(); if(!name) return "";
@@ -1617,7 +1617,7 @@ function openRecordForm(refInfo,title,prefillName,onCreated,existingRow){
   const cols=refInfo.cols||{}, nameCol=cols.name||refInfo.labelCol;
   const inputs={}; let supplierApi=null, nameEl=null;
   (refInfo.editable||[]).forEach(col=>{
-    const canWrite=!col.isRef;                        // skip nested Ref cols — set those in Grist
+    const canWrite=!col.isRef;                        // skip nested Ref cols - set those in Grist
     const initial = existingRow ? existingRow[col.colId]
                   : (canWrite && col.colId===nameCol && prefillName ? prefillName : "");
     const f=$("div","form-field"+(canWrite?"":" skip")); f.appendChild($("label",null,col.label));
@@ -1637,7 +1637,7 @@ function openRecordForm(refInfo,title,prefillName,onCreated,existingRow){
     }
     if(!canWrite) el.disabled=true;
     f.appendChild(el);
-    if(!canWrite) f.appendChild($("div","form-hint","Reference field — set this in Grist after creating."));
+    if(!canWrite) f.appendChild($("div","form-hint","Reference field - set this in Grist after creating."));
     inputs[col.colId]={get,col,canWrite,el}; body.appendChild(f);
   });
   if(!Object.keys(inputs).length) body.appendChild($("div","form-hint","No editable fields found for this table."));
@@ -1666,7 +1666,7 @@ function clientLookupInput(j,R,inp,menu){
     const exact=rows.some(c=>String(c[lc]||"").toLowerCase()===ql);
     if(ql && !exact){ const cr=$("div","lookup-row create","＋ Create “"+q.trim()+"”");
       cr.onmousedown=e=>{ e.preventDefault(); menu.hidden=true; createClientAndSet(j,q.trim()); }; menu.appendChild(cr); }
-    if(!menu.childNodes.length) menu.appendChild($("div","lookup-empty","No clients yet — type a name to create one."));
+    if(!menu.childNodes.length) menu.appendChild($("div","lookup-empty","No clients yet - type a name to create one."));
   }
   inp.onfocus=()=>{ draw(inp.value); menu.hidden=false; };
   inp.oninput=()=>{ draw(inp.value); menu.hidden=false; };
@@ -1676,7 +1676,7 @@ function clientLookupInput(j,R,inp,menu){
 function clientTitle(j){
   const R=state.ref.client;
   const wrap=$("div","ctitle-wrap");
-  const span=$("span","client",esc(j.Client_Label)||"—");
+  const span=$("span","client",esc(j.Client_Label)||"-");
   if(!R){ wrap.appendChild(span); return wrap; }
   span.classList.add("editable"); span.title="Click to change client";
   span.onclick=()=>{
@@ -1729,14 +1729,14 @@ function renderViewsMenu(){
     row.onclick=()=>applyView(v);
     host.appendChild(row);
   });
-  if(!state.savedViews.length) host.appendChild($("div","pempty","None yet — set filters/sort/fields, then save below."));
+  if(!state.savedViews.length) host.appendChild($("div","pempty","None yet - set filters/sort/fields, then save below."));
   host.appendChild($("div","psep"));
   if(dirty){
     const upd=$("div","paction",'⟳ Update "'+state.activeView+'" with these tweaks'); upd.onclick=()=>updateView(); host.appendChild(upd);
     const rev=$("div","paction",'↩ Revert to saved "'+state.activeView+'"'); rev.onclick=()=>{ const v=findView(state.activeView); if(v) applyView(v); }; host.appendChild(rev);
   }
-  const saveAll=$("div","paction",'＋ Save for everyone…'); saveAll.title="Team view — stored in the Grist doc for all viewers"; saveAll.onclick=()=>saveViewAs(true); host.appendChild(saveAll);
-  const saveMe=$("div","paction",'＋ Save just for me…'); saveMe.title="Personal view — this browser only"; saveMe.onclick=()=>saveViewAs(false); host.appendChild(saveMe);
+  const saveAll=$("div","paction",'＋ Save for everyone…'); saveAll.title="Team view - stored in the Grist doc for all viewers"; saveAll.onclick=()=>saveViewAs(true); host.appendChild(saveAll);
+  const saveMe=$("div","paction",'＋ Save just for me…'); saveMe.title="Personal view - this browser only"; saveMe.onclick=()=>saveViewAs(false); host.appendChild(saveMe);
   if(state.activeView||filterCount()||state.filter.q){
     const clr=$("div","paction danger","✕ Clear (show all)"); clr.onclick=()=>clearView(); host.appendChild(clr);
   }
@@ -1836,7 +1836,7 @@ function renderSortMenu(){
       savePrefs(); renderSortMenu(); renderList(); };
     host.appendChild(row);
   });
-  // stage-order editor — shown whenever stage drives either sort level
+  // stage-order editor - shown whenever stage drives either sort level
   if(state.sort.key==="stage"||state.sort2.key==="stage"){
     host.appendChild($("div","psep"));
     host.appendChild($("div","phead","Stage order (drag to reorder)"));
@@ -1855,9 +1855,9 @@ function renderSortMenu(){
     });
     host.appendChild(list);
     // save the order for the whole team or just this browser (like views)
-    const soAll=$("div","paction",'＋ Save order for everyone'); soAll.title="Team stage order — stored in the Grist doc";
+    const soAll=$("div","paction",'＋ Save order for everyone'); soAll.title="Team stage order - stored in the Grist doc";
     soAll.onclick=()=>{ state.stageOrderShared=true; savePrefs(); pushSharedStageOrder(); renderSortMenu(); };
-    const soMe=$("div","paction",'＋ Save order just for me'); soMe.title="Personal stage order — this browser only";
+    const soMe=$("div","paction",'＋ Save order just for me'); soMe.title="Personal stage order - this browser only";
     soMe.onclick=()=>{ state.stageOrderShared=false; savePrefs(); renderSortMenu(); };
     host.appendChild(soAll); host.appendChild(soMe);
     host.appendChild($("div","phint", state.stageOrderShared ? "Shared with everyone" : "Personal to this browser"));
@@ -1897,7 +1897,7 @@ function insertAtCursor(ta,text){
   const s=ta.selectionStart==null?ta.value.length:ta.selectionStart, e=ta.selectionEnd==null?ta.value.length:ta.selectionEnd;
   ta.value=ta.value.slice(0,s)+text+ta.value.slice(e); ta.selectionStart=ta.selectionEnd=s+text.length;
 }
-// Team-shared widget config — written to the Grist document ONLY when the user
+// Team-shared widget config - written to the Grist document ONLY when the user
 // explicitly picks "Save for everyone". "Save just for me" keeps everything in
 // localStorage and stops following the team design.
 let _sharedSig=null;   // last shared config seen/pushed, to detect real changes
@@ -1940,7 +1940,7 @@ function updateGrouping(){ const g=findGrouping(state.activeGrouping); if(!g)ret
   g.grouping=JSON.parse(JSON.stringify(normalizeGrouping(state.grouping))); savePrefs(); pushSharedGroupings(); renderGroupMenu(); updateToolbar(); }
 function applyGrouping(g){ state.grouping=normalizeGrouping(g.grouping); state.activeGrouping=g.name; savePrefs(); closeMenus(); renderList(); updateToolbar(); }
 // Returns true once the grouping is actually stored in the library, false if the
-// user cancelled — callers (e.g. the card editor) use this to know whether to close.
+// user cancelled - callers (e.g. the card editor) use this to know whether to close.
 function saveGroupingAs(){
   const name=prompt('Name this grouping (e.g. "By client", "By stage"):', state.activeGrouping||""); if(!name)return false;
   const cfg=JSON.parse(JSON.stringify(state.grouping||{by:"",rules:[],restMode:"value"}));
@@ -1968,7 +1968,7 @@ function renderGroupMenu(){
     row.onclick=()=>applyGrouping(g);
     host.appendChild(row);
   });
-  if(!state.savedGroupings.length) host.appendChild($("div","pempty","None yet — tap Create new grouping below to build one."));
+  if(!state.savedGroupings.length) host.appendChild($("div","pempty","None yet - tap Create new grouping below to build one."));
   host.appendChild($("div","psep"));
   if(gdirty){
     const upd=$("div","paction",'⟳ Update "'+state.activeGrouping+'" with these tweaks'); upd.onclick=()=>updateGrouping(); host.appendChild(upd);
@@ -1978,7 +1978,7 @@ function renderGroupMenu(){
     const save=$("div","paction","＋ Save current grouping as…"); save.onclick=saveGroupingAs; host.appendChild(save);
     const edit=$("div","paction","⚙ Edit the current grouping…"); edit.onclick=()=>{ closeMenus(); state._cardTab="group"; openCardEditor(); }; host.appendChild(edit);
   }
-  // Always offer a fresh start — clears the working grouping so the editor opens blank.
+  // Always offer a fresh start - clears the working grouping so the editor opens blank.
   const create=$("div","paction primary","＋ Create new grouping…"); create.onclick=()=>{ state.grouping={by:"",rules:[],restMode:"value"}; state.activeGrouping=""; savePrefs(); closeMenus(); state._cardTab="group"; openCardEditor(); }; host.appendChild(create);
 }
 function renderGroupingEditor(host){
@@ -1993,7 +1993,7 @@ function renderGroupingEditor(host){
   if(!g.by) return;                                   // nothing else until a column is chosen
   const byLabel=(GROUP_FIELDS.find(f=>f.key===g.by)||{}).label||g.by;
   // 2) optional value-remap rules ON that column
-  host.appendChild($("div","grp-sub","Custom groups (optional) — bucket "+byLabel+" values:"));
+  host.appendChild($("div","grp-sub","Custom groups (optional) - bucket "+byLabel+" values:"));
   g.rules.forEach((rule,idx)=>{
     const row=$("div","grp-rule");
     row.appendChild($("span","grp-if","if "+byLabel));
@@ -2031,7 +2031,7 @@ function openCardEditor(){
     // The footer's "Save just for me / for everyone" store the CARD DESIGN only.
     // On the Grouping tab they don't apply (the grouping has its own Save button
     // in the panel), so hide them there to avoid the "I saved but nothing showed"
-    // trap. Reset stays — it's tab-aware and clears the grouping on this tab.
+    // trap. Reset stays - it's tab-aware and clears the grouping on this tab.
     const dm=w!=="card"?"none":"";
     const bMe=document.getElementById("cardSaveMe"), bAll=document.getElementById("cardSaveAll");
     if(bMe) bMe.style.display=dm; if(bAll) bAll.style.display=dm;
@@ -2070,10 +2070,10 @@ function openCardEditor(){
 
   // ---- Grouping panel ----
   const gwrap=$("div","grp-editor"); panelGroup.appendChild(gwrap); renderGroupingEditor(gwrap);
-  panelGroup.appendChild($("div","tpl-help","Pick one column to group by. Add custom rules to bucket its values (first match wins) — handy when a column like Client has too many values."));
+  panelGroup.appendChild($("div","tpl-help","Pick one column to group by. Add custom rules to bucket its values (first match wins) - handy when a column like Client has too many values."));
   // Save the grouping to the library right here. The footer's design-save
   // buttons do NOT store the grouping, so without this a freshly-built grouping
-  // was never named or added to the Group menu — it just vanished on close.
+  // was never named or added to the Group menu - it just vanished on close.
   const gsaveRow=$("div","grp-saverow"); gsaveRow.style.cssText="margin-top:12px;display:flex;gap:8px;align-items:center;";
   const gsave=$("button","btn-primary","＋ Save this grouping…"); gsave.type="button";
   gsave.title="Name it and add it to the Group menu (shared with everyone)";
@@ -2098,9 +2098,9 @@ const HFIELD={ Client_Label:"Client", Client_Name:"Client", Job_Address:"Address
   Installation_Detail:"Install note", Input_Date:"Input date" };
 const HTABLE={ Jobs_Detail:"Job", Stone_Order:"Stone line", Inst_:"Installation" };
 function hVal(k,v){
-  if(v==null||v==="") return "—";
-  if(/date/i.test(k)) return fmtDate(v)||"—";
-  if(Array.isArray(v)) return choiceList(v).join(", ")||"—";
+  if(v==null||v==="") return "-";
+  if(/date/i.test(k)) return fmtDate(v)||"-";
+  if(Array.isArray(v)) return choiceList(v).join(", ")||"-";
   return String(v);
 }
 function openHistory(job){
@@ -2163,7 +2163,7 @@ function hardReset(){
 }
 
 // ============================================================
-//  RENDER — list
+//  RENDER - list
 // ============================================================
 function selectedJob(){ return state.jobs.find(j=>j.id===state.selectedId)||null; }
 function normalizeStageOrder(){
@@ -2192,7 +2192,7 @@ function fontStepper(labelText,obj,key,onchange){
   dec.onclick=()=>set(obj[key]-0.5); inc.onclick=()=>set(obj[key]+0.5);
   row.appendChild(dec); row.appendChild(val); row.appendChild(inc); return row;
 }
-// Curated pastel palette — the pre-selected colours offered in the panel.
+// Curated pastel palette - the pre-selected colours offered in the panel.
 const PALETTE=[
   "#ffb3ba","#ffccb3","#ffe0b3","#fff3b3","#f2f7b3","#d4f0b3","#b3f0bf","#b3f0dd",
   "#b3ecf0","#b3d9f7","#b3c2f7","#c7b8f7","#dcb8f7","#f2b8f7","#f7b8d8","#eef1f4"];
@@ -2261,7 +2261,7 @@ function buildFormatPanel(){
     if(people.length) people.forEach(n=> body.appendChild(colorRow(n, avatarColor(n), DEFAULT_AVATAR, v=>{ state.colors.assignee[n]=v; savePrefs(); renderAll(); })));
     else body.appendChild($("div","fs-row","No assignees yet."));
   });
-  // save choice — team design vs personal
+  // save choice - team design vs personal
   const saveRow=$("div","fmt-saverow");
   const sAll=$("button","fmt-save primary","Save for everyone"); sAll.title="Store this design in the Grist doc so every viewer gets it";
   sAll.onclick=()=>{ saveForEveryone(); sAll.textContent="Saved ✓"; setTimeout(()=>{sAll.textContent="Save for everyone";},1200); };
@@ -2297,7 +2297,7 @@ function cmpJobs(a,b){
   return String(a.Client_Label||"").localeCompare(String(b.Client_Label||""));
 }
 // Stone text per job, so a search can match a stone name/product even when the
-// user can't recall the client — folds the job's stone lines + the Stones rollup.
+// user can't recall the client - folds the job's stone lines + the Stones rollup.
 function stoneTextByJob(){
   const m={};
   state.stone.forEach(s=>{ const id=refId(s.Job); if(id==null)return;
@@ -2410,7 +2410,7 @@ function renderCardBody(j,tplOverride){
     if(gt>=0){
       // ">>" splits the row into two columns: everything before it stays left
       // (grows, truncates if long); everything after is pinned to the right edge
-      // on a single line — a clean split, no wrapping or floating.
+      // on a single line - a clean split, no wrapping or floating.
       el.classList.add("split");
       const left=$("span","tside tleft"); renderInline(line.slice(0,gt),j,left);
       const right=$("span","tside tright"); renderInline(line.slice(gt+2),j,right);
@@ -2421,7 +2421,7 @@ function renderCardBody(j,tplOverride){
     if(el.textContent.trim()==="" && !el.querySelector(".pill,.avatar")) return;   // line rendered to nothing → skip
     body.appendChild(el);
   });
-  if(!body.childNodes.length) body.appendChild($("span","jnmtext",esc(j.Client_Label)||esc(j.Job_ID)||"—"));
+  if(!body.childNodes.length) body.appendChild($("span","jnmtext",esc(j.Client_Label)||esc(j.Job_ID)||"-"));
   return body;
 }
 // ---------- list grouping (CASE-style rules + "group the rest by a field") ----------
@@ -2499,7 +2499,7 @@ function select(id){
   if(state.dirty){
     confirmUnsaved().then(choice=>{
       if(choice==="cancel") return;
-      // After a save, a temp id we're switching to is remapped to its real id — translate it so we
+      // After a save, a temp id we're switching to is remapped to its real id - translate it so we
       // don't land on a now-nonexistent row (blank detail pane).
       if(choice==="save") saveDraft().then(()=>{ const m=state._lastIdMap; if(m&&m[id]!=null) id=m[id]; go(); });
       else { discardDraft(); go(); }
@@ -2510,7 +2510,7 @@ function select(id){
 }
 
 // ============================================================
-//  RENDER — detail
+//  RENDER - detail
 // ============================================================
 function renderDetail(){
   const app=document.getElementById("detail"); app.innerHTML="";
@@ -2546,7 +2546,7 @@ function renderDetail(){
 
   const cols=$("div","sum-cols");
   if(state.sumLeftPct) cols.style.setProperty("--sumL",state.sumLeftPct+"%");
-  // LEFT — scope + note
+  // LEFT - scope + note
   const colL=$("div","sum-l");
   const scopeBlk=$("div","sum-blk");
   scopeBlk.appendChild($("span","sum-lbl","Scope"));
@@ -2554,7 +2554,7 @@ function renderDetail(){
     // Group stone lines by order status, groups ordered by total slabs desc.
     // Rendering depends on how many statuses/colours are present (see below).
     const groups=new Map();
-    stone.forEach(r=>{ const s=r.Order_Status||"—"; if(!groups.has(s)) groups.set(s,[]); groups.get(s).push(r); });
+    stone.forEach(r=>{ const s=r.Order_Status||"-"; if(!groups.has(s)) groups.set(s,[]); groups.get(s).push(r); });
     const qtyOf=rows=>rows.reduce((m,r)=>m+(Number(r.Scope_Qty)||0),0);
     const total=qtyOf(stone);
     const multiStatus=groups.size>1;
@@ -2574,7 +2574,7 @@ function renderDetail(){
         const n=qtyOf(rows);
         const head=$("div", multiStatus?"stgrp-head":"scope-n"); head.title=s;
         head.appendChild($(multiStatus?"span":"b", multiStatus?"stgrp-n":null, String(n)));
-        head.appendChild($("span", multiStatus?"stgrp-l":null, (n===1?"slab ":"slabs ")+(stripNo(s)||"—").toLowerCase()));
+        head.appendChild($("span", multiStatus?"stgrp-l":null, (n===1?"slab ":"slabs ")+(stripNo(s)||"-").toLowerCase()));
         sl.appendChild(head);
         // Merge identical stone lines within this status group: same product
         // label collapses to one bulleted row; notes are combined (de-duped).
@@ -2619,12 +2619,12 @@ function renderDetail(){
     document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up); };
   cols.appendChild(ssp);
 
-  // RIGHT — measure date + installations
+  // RIGHT - measure date + installations
   const colR=$("div","sum-r");
   const mrow=$("div","drow");
   mrow.appendChild($("span","dl","Measure date"));
   const mv=$("span","dv"); const me=$("span","efield");
-  me.appendChild($("span",null,fmtDate(j.Meas_Date)||"—"));
+  me.appendChild($("span",null,fmtDate(j.Meas_Date)||"-"));
   const mpen=$("span","pencil"); mpen.innerHTML="&#9998;"; me.appendChild(mpen);
   me.onclick=()=>{ const di=document.createElement("input"); di.type="date"; di.className="hmv-date"; di.value=dateInput(j.Meas_Date);
     di.onchange=()=>update("Jobs_Detail",j.id,{Meas_Date:toEpochSec(di.value)}); di.onblur=()=>renderDetail();
@@ -2707,7 +2707,7 @@ function renderDetail(){
       prod.title="Double-click to pick a different product";
       prod.ondblclick=e=>{ e.stopPropagation(); openProductPicker(r,prod); };
     }
-    // Move this stone line to another job (split it out of the Ghost Job) — Ghost Job only.
+    // Move this stone line to another job (split it out of the Ghost Job) - Ghost Job only.
     if(ghost){
       const mvb=$("span","pencil movejob"); mvb.textContent="⇄"; mvb.title="Move this stone line to another job";
       mvb.onclick=e=>{ e.stopPropagation(); openJobPicker([r],mvb); };
@@ -2727,8 +2727,8 @@ function renderDetail(){
     else if(toDate(r.Order_Date)) ageTxt=agoText("Ordered",relDays(r.Order_Date));
     if(ageTxt) scell.appendChild($("div","statusage",ageTxt));
     line.appendChild(scell);
-    // Price / slab is a read-only Grist formula (looked up from the product) — edit via the product.
-    const pw=$("div","lprice ro"); pw.title="Price / slab — from the product profile; edit the product to change it";
+    // Price / slab is a read-only Grist formula (looked up from the product) - edit via the product.
+    const pw=$("div","lprice ro"); pw.title="Price / slab - from the product profile; edit the product to change it";
     const pv=(r.Product_Price_slab!=null&&r.Product_Price_slab!=="")?r.Product_Price_slab:0;
     pw.appendChild(document.createTextNode("$"+pv));
     line.appendChild(pw);
@@ -2787,7 +2787,7 @@ async function refetch(){
 // grist-plugin-api.js loads from a public URL even outside Grist, so the mere
 // presence of `grist` doesn't mean we're embedded. We render sample data first
 // (in BOOT, below) so the pane is never blank in a plain browser / preview /
-// artifact, then — only once Grist actually answers — flip to live mode, swap
+// artifact, then - only once Grist actually answers - flip to live mode, swap
 // in the real tables and re-render. Edits write back to Grist only after that
 // flip; before it (or when there's no Grist at all) they mutate the local demo.
 function goLive(){ if(!state.grist) state.grist=true; }
@@ -2797,7 +2797,7 @@ if(typeof grist!=="undefined"){
   try{ grist.onRecord(rec=>{
     if(rec && rec.id!=null){
       if(state.grist && state.dirty && rec.id!==state.selectedId){
-        // cursor moved elsewhere while this job has unsaved edits — ask first
+        // cursor moved elsewhere while this job has unsaved edits - ask first
         confirmUnsaved().then(choice=>{
           if(choice==="cancel"){ try{ grist.setCursorPos({rowId:state.selectedId}); }catch(e){} return; }
           const apply=()=>{ state.selectedId=rec.id; renderList(); renderDetail(); };
@@ -2809,7 +2809,7 @@ if(typeof grist!=="undefined"){
     }
     if(state.grist){ renderList(); renderDetail(); }
   }); }catch(e){}
-  // Shared card template — stored in the widget's doc options so it applies to EVERY viewer.
+  // Shared card template - stored in the widget's doc options so it applies to EVERY viewer.
   // Team design lives in the widget's doc options. It is adopted only while this
   // viewer is "following" it (templateShared): saving "for everyone" turns that
   // on, saving "just for me" turns it off. First run follows an existing team
@@ -2817,7 +2817,7 @@ if(typeof grist!=="undefined"){
   // in-progress card edit isn't clobbered).
   try{ grist.onOptions(opts=>{
     opts=opts||{};
-    // Shared views are per-view team assets — adopted by EVERYONE, independent of
+    // Shared views are per-view team assets - adopted by EVERYONE, independent of
     // the design-following toggle. Merge team views with this viewer's personal ones.
     const incViews = Array.isArray(opts.sharedViews) ? opts.sharedViews : null;
     if(incViews){
@@ -2826,20 +2826,20 @@ if(typeof grist!=="undefined"){
       personal.forEach(v=>{ if(!merged.some(x=>x.name===v.name)) merged.push(v); });
       if(JSON.stringify(merged)!==JSON.stringify(state.savedViews)){ state.savedViews=merged; renderList(); updateToolbar(); }
     }
-    // Saved-grouping LIBRARY — a team asset adopted by EVERYONE, independent of
+    // Saved-grouping LIBRARY - a team asset adopted by EVERYONE, independent of
     // the card-design "for everyone" toggle (same as shared views above). Kept
     // out of the templateShared gate below so viewers on a personal card design
     // still see team groupings in their menu.
     if(Array.isArray(opts.savedGroupings) && JSON.stringify(opts.savedGroupings)!==JSON.stringify(state.savedGroupings)){
       state.savedGroupings=opts.savedGroupings.slice(); renderGroupMenu(); updateToolbar();
     }
-    // "NEW" badge stamps — a team-shared, self-expiring map of recently-created jobs.
+    // "NEW" badge stamps - a team-shared, self-expiring map of recently-created jobs.
     if(opts.recentJobs && typeof opts.recentJobs==="object"){
       const merged=Object.assign({},opts.recentJobs);
       for(const k in state.recentJobs){ if(isTempId(Number(k))) merged[k]=state.recentJobs[k]; }  // keep my own unsaved stamps
       if(JSON.stringify(merged)!==JSON.stringify(state.recentJobs)){ state.recentJobs=merged; pruneRecent(); renderList(); }
     }
-    // Stage order — a team ordering adopted by everyone following it (also independent of the design toggle).
+    // Stage order - a team ordering adopted by everyone following it (also independent of the design toggle).
     if(Array.isArray(opts.sharedStageOrder) && opts.sharedStageOrder.length){
       if(state.stageOrderShared==null) state.stageOrderShared=true;   // first run: follow the team order if one exists
       if(state.stageOrderShared && JSON.stringify(opts.sharedStageOrder)!==JSON.stringify(state.stageOrder)){
@@ -2854,7 +2854,7 @@ if(typeof grist!=="undefined"){
     const J=v=>JSON.stringify(v);
     let changed=false, fontChanged=false, colorChanged=false;
     if(!editing && shared!=null && state.cardTemplate!==shared){ state.cardTemplate=shared; changed=true; }
-    // NB: the active grouping is intentionally NOT adopted — it's personal, so the
+    // NB: the active grouping is intentionally NOT adopted - it's personal, so the
     // widget always defaults to "No grouping" and the team's grouping is never forced.
     // (The saved-grouping LIBRARY is adopted above, before the templateShared gate.)
     if(typeof opts.cardFontSize==="number" && opts.cardFontSize!==state.cardFontSize){ state.cardFontSize=opts.cardFontSize; fontChanged=true; }
@@ -2869,7 +2869,7 @@ if(typeof grist!=="undefined"){
   }); }catch(e){}
   // This resolves only when a real Grist host answers; otherwise we stay in demo
   // mode instead of hanging. We load the schema and real tables FIRST, then flip
-  // to live — so no edit in the connecting window can write a sample row-id.
+  // to live - so no edit in the connecting window can write a sample row-id.
   grist.docApi.fetchTable("Jobs_Detail").then(async ()=>{
     try{
       const sc=await loadGristSchema();
@@ -2879,7 +2879,7 @@ if(typeof grist!=="undefined"){
       state.formulaCols=sc.formulaCols||{};   // never write Grist formula/rollup cols
       applyGristChoices(sc);
       finishRefSetup();
-    }catch(e){ state.ref.client=null; state.ref.product=null; console.warn("schema introspection failed — lookups disabled",e); }
+    }catch(e){ state.ref.client=null; state.ref.product=null; console.warn("schema introspection failed - lookups disabled",e); }
     try{ await pullTables(); }catch(e){ console.warn("initial fetch failed",e); }
     goLive();
     renderAll();
@@ -2897,7 +2897,7 @@ window._test=function(jobs,stone,inst,clients,catalogue){
   snapshotClean();   // clean baseline for the draft/save diff
   renderAll();
 };
-// Demo schema — mirrors what loadGristSchema() produces, so the lookup/picker/
+// Demo schema - mirrors what loadGristSchema() produces, so the lookup/picker/
 // create-new code paths are exercised identically when testing without Grist.
 const DEMO_REF={
   client:{ targetTableId:"Client", labelCol:"Name",
@@ -2957,8 +2957,8 @@ const SAMPLE_STONE=[
 ];
 const SAMPLE_INST=[
   { id:1, Job:2, Installation_date:1784332800, Installation_Detail:"to collect $2625" },
-  { id:2, Job:8, Installation_date:1785196800, Installation_Detail:"kitchen only — level 1" },
-  { id:3, Job:8, Installation_date:1786060800, Installation_Detail:"bathrooms — level 1 & 2" },
+  { id:2, Job:8, Installation_date:1785196800, Installation_Detail:"kitchen only - level 1" },
+  { id:3, Job:8, Installation_date:1786060800, Installation_Detail:"bathrooms - level 1 & 2" },
   { id:4, Job:2001, Installation_date:1781740800, Installation_Detail:"" }
 ];
 

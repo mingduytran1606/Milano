@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Milano — Catalogue Search</title>
+<title>Milano - Catalogue Search</title>
 <script src="https://milano.getgrist.com/grist-plugin-api.js"></script>
 <style>
   :root{
@@ -219,6 +219,74 @@
 
   .demo-tag{position:fixed;bottom:9px;left:11px;font-size:10px;color:var(--muted);background:var(--panel);
     border:1px solid var(--line);border-radius:20px;padding:2px 9px;opacity:.75;z-index:40}
+
+  /* ---- "not in catalogue" tag + generic buttons ---- */
+  .ctag{margin-left:auto;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;
+    color:#9a6b00;background:#fff4d6;border-radius:999px;padding:1px 8px;white-space:nowrap}
+  @media (prefers-color-scheme:dark){ .ctag{color:#ffd98a;background:#3a2f10} }
+  :root[data-theme="dark"] .ctag{color:#ffd98a;background:#3a2f10}
+  .prod-sub .ctag{margin-left:0}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid var(--line);
+    background:var(--panel);color:var(--ink);border-radius:9px;font:inherit;font-size:12.5px;font-weight:600;
+    cursor:pointer;white-space:nowrap}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary:hover{filter:brightness(1.05)}
+  .btn.primary[disabled]{opacity:.5;cursor:not-allowed;filter:none}
+  .btn.sm{padding:5px 10px;font-size:12px}
+
+  /* ---- add-order button in the search header ---- */
+  .add-order{width:100%;justify-content:center;margin-top:2px}
+
+  /* ---- wizard overlay ---- */
+  .scrim{position:fixed;inset:0;background:rgba(10,15,20,.42);z-index:70}
+  .scrim[hidden]{display:none}
+  .wiz{position:fixed;z-index:80;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:min(560px,calc(100vw - 28px));max-height:calc(100vh - 40px);display:flex;flex-direction:column;
+    background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.35);overflow:hidden}
+  .wiz-head{flex:0 0 auto;padding:14px 16px;border-bottom:1px solid var(--line2);display:flex;align-items:center;gap:10px}
+  .wiz-head .wh-t{font-weight:800;font-size:15px}
+  .wiz-x{margin-left:auto;cursor:pointer;color:var(--muted);border:0;background:transparent;font-size:18px;line-height:1;padding:4px}
+  .wiz-x:hover{color:var(--ink)}
+  .steps{display:flex;gap:6px;padding:12px 16px 0}
+  .step-dot{flex:1 1 0;height:5px;border-radius:20px;background:var(--line)}
+  .step-dot.on{background:var(--accent)}
+  .step-dot.done{background:var(--accent-ink)}
+  .wiz-sub{padding:8px 16px 0;color:var(--muted);font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+  .wiz-body{flex:1 1 auto;overflow-y:auto;padding:12px 16px 4px;display:flex;flex-direction:column;gap:14px}
+  .fld{display:flex;flex-direction:column;gap:5px}
+  .fld>label{font-size:12px;font-weight:700;color:var(--ink)}
+  .fld .hint{font-size:11px;color:var(--muted);font-weight:400}
+  .fld .req{color:var(--danger);font-weight:700}
+  .fld input[type=text],.fld input[type=number],.fld textarea,.tinput{
+    width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);font:inherit;font-size:13px;outline:none}
+  .fld input:focus,.fld textarea:focus,.tinput:focus{border-color:var(--accent)}
+  .fld textarea{resize:vertical;min-height:52px}
+  .ac{position:relative}
+  .ac-list{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:5;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;box-shadow:0 12px 30px rgba(0,0,0,.2);max-height:210px;overflow:auto;padding:4px}
+  .ac-row{padding:7px 9px;border-radius:7px;cursor:pointer;font-size:12.5px}
+  .ac-row:hover,.ac-row.on{background:var(--line2)}
+  .ac-new{color:var(--accent-ink);font-weight:700}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip-t{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:20px;padding:4px 10px;
+    font-size:12px;cursor:pointer;background:var(--bg);user-select:none}
+  .chip-t.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+  .selbox{border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:var(--accent-soft);display:flex;align-items:center;gap:9px;font-size:12.5px}
+  .selbox .sb-main{font-weight:700}
+  .selbox .sb-sub{color:var(--muted);font-size:11px}
+  .selbox .sb-x{margin-left:auto;cursor:pointer;color:var(--muted);font-size:14px}
+  .jobpick{display:flex;flex-direction:column;gap:6px;max-height:180px;overflow:auto}
+  .jobopt{border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer;display:flex;gap:8px;align-items:center}
+  .jobopt:hover{border-color:var(--accent)}
+  .jobopt.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--accent-soft)}
+  .jobopt .jo-id{font-weight:800;color:var(--accent-ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:11px}
+  .jobopt .jo-main{min-width:0}
+  .jobopt .jo-addr{color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row2{display:flex;gap:10px}.row2>*{flex:1 1 0;min-width:0}
+  .wiz-foot{flex:0 0 auto;padding:12px 16px;border-top:1px solid var(--line2);display:flex;align-items:center;gap:10px}
+  .wiz-foot .msg{color:var(--danger);font-size:12px;font-weight:600}
+  .wiz-foot .grow{flex:1 1 auto}
 </style>
 </head>
 <body>
@@ -228,9 +296,10 @@
       <div class="search-title">Catalogue <span class="count" id="resCount">0</span></div>
       <div class="search">
         <svg class="sic" viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input id="q" type="text" placeholder="Search catalogue — product, code, supplier…" autocomplete="off">
+        <input id="q" type="text" placeholder="Search catalogue - product, code, supplier…" autocomplete="off">
         <span class="clr" id="qClr" title="Clear" hidden>&times;</span>
       </div>
+      <button class="btn primary add-order" id="addBtn" title="Add a new stone order (tied to a job)">＋ New stone order</button>
     </div>
     <div class="results" id="results"></div>
   </div>
@@ -243,14 +312,16 @@
 <button class="cfg-fab" id="cfgBtn" title="Configure table columns">&#9881;</button>
 <div class="pop" id="choicePop" hidden></div>
 <div class="pop" id="cfgPop" hidden></div>
+<div id="wizPop" hidden></div>
+<div class="scrim" id="scrim" hidden></div>
 <div class="demo-tag" id="demoTag" hidden>demo data</div>
 
 <script>
 "use strict";
 /* ============================================================
-   Milano — Catalogue Search widget
+   Milano - Catalogue Search widget
    Left: search the Catalogue (product · code · supplier).
-   Right: click a product → its full ORDER HISTORY — every
+   Right: click a product → its full ORDER HISTORY - every
    Stone_Order line that used it, across all jobs, with the
    order/delivery dates + qtys, status, INV and note. Each
    history row is editable in place and writes back to
@@ -315,39 +386,82 @@ function agoText(verb,n){ if(n==null) return "";
 // ---- state ----
 const LSKEY="milano_catalogue_prefs_v1";
 const state={
-  stone:[], jobs:[], catalogue:[], grist:false,
-  ref:{ product:null },
+  stone:[], jobs:[], catalogue:[], clients:[], grist:false,
+  ref:{ product:null, client:null },
+  assignChoices:null,
   q:"", selectedCatId:null, selectedMonth:null, statusView:"active", searchW:null, colCfg:null,
-  jobById:{}, catById:{}, ordersByCat:{}
+  jobById:{}, catById:{}, virtualById:{}, ordersByCat:{}, wiz:null
 };
 window._catsearch=state;
 function loadPrefs(){ try{ return JSON.parse(localStorage.getItem(LSKEY))||{}; }catch(e){ return {}; } }
 function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ searchW:state.searchW, colCfg:state.colCfg })); }catch(e){} }
 
+// ---- column resolution (don't hardcode the Catalogue's column ids) ----
+function pickColId(cols,rx,fallback){ const c=(cols||[]).find(c=>rx.test(c.colId||"")); return c?c.colId:(fallback||null); }
+function productDisplayCols(refInfo){ const e=refInfo.editable||[];
+  return { supplier:pickColId(e,/suppl|brand|vendor/i), code:pickColId(e,/code|sku|item/i),
+    name:pickColId(e,/name|desc|title|stone/i,refInfo.labelCol), price:pickColId(e,/price|slab|cost|rate/i) }; }
+function dedupeLabelParts(parts){ const p=parts.map(v=>v==null?"":String(v).trim()).filter(Boolean); const norm=s=>s.toLowerCase();
+  return p.filter((v,i)=>!p.some((w,j)=>{ if(i===j)return false; const a=norm(v),b=norm(w);
+    return a===b ? j<i : (b.length>a.length && b.includes(a)); })); }
+function choiceList(v){ return Array.isArray(v) ? v.slice(v[0]==="L"?1:0).filter(x=>x!=null&&x!=="") : (v!=null&&v!==""?[v]:[]); }
+function clientLabel(c){ const R=state.ref.client; return (R&&R.labelCol&&c[R.labelCol]) || c.Name || c.Client || ("#"+c.id); }
+function jobClientName(j){ return (j&&(j.Client_Label||"")).trim(); }
+function assigneeOptions(){
+  const fromData=[...new Set((state.jobs||[]).flatMap(j=>choiceList(j.Assigned_To)))].filter(Boolean);
+  const base=state.assignChoices&&state.assignChoices.length ? state.assignChoices.slice() : [];
+  fromData.forEach(a=>{ if(!base.includes(a)) base.push(a); });
+  return base.sort((a,b)=>a.localeCompare(b));
+}
+
+// ---- resolved catalogue field accessors ----
+function catSupplier(c){ const cols=state.ref.product&&state.ref.product.cols; return (cols&&cols.supplier&&c[cols.supplier]) || c.Supplier || ""; }
+function catCode(c){ const cols=state.ref.product&&state.ref.product.cols; return (cols&&cols.code&&c[cols.code]) || c.Code || ""; }
+function catName(c){ const cols=state.ref.product&&state.ref.product.cols; return (cols&&cols.name&&c[cols.name]) || c.Name || ""; }
+
 // ---- lookups ----
 function reindex(){
   state.jobById={}; state.jobs.forEach(j=>state.jobById[j.id]=j);
   state.catById={}; state.catalogue.forEach(c=>state.catById[c.id]=c);
-  // Group every stone line under the catalogue product it references.
-  state.ordersByCat={};
-  (state.stone||[]).forEach(r=>{ const pid=refId(r.Product); if(pid==null)return;
-    (state.ordersByCat[pid]=state.ordersByCat[pid]||[]).push(r); });
+  // Group every stone line under the catalogue product it references. Lines whose
+  // Product is missing / unmatched are grouped into a synthetic ("virtual") catalogue
+  // entry keyed by their free-text stone name + supplier, so stones that were only ever
+  // typed onto orders (e.g. "Peraway") are still searchable and have a history view.
+  state.ordersByCat={}; state.virtualById={};
+  (state.stone||[]).forEach(r=>{
+    const pid=refId(r.Product);
+    let key;
+    if(pid!=null && state.catById[pid]){ key=pid; }
+    else {
+      const nm=(r.Stone||r.Product_Code||"").trim(), sup=(r.Product_Supplier||"").trim();
+      if(!nm && !sup) return;                      // nothing identifiable - skip
+      key="v:"+(sup+"|"+nm).toLowerCase();
+      if(!state.virtualById[key]) state.virtualById[key]={ id:key, _virtual:true,
+        Supplier:sup, Code:(r.Product_Code||""), Name:(r.Stone||"").trim()||nm };
+    }
+    (state.ordersByCat[key]=state.ordersByCat[key]||[]).push(r);
+  });
 }
+function catByAnyId(id){ return state.catById[id] || state.virtualById[id] || null; }
 function jobFor(r){ return state.jobById[refId(r.Job)]||null; }
 function catFor(r){ return state.catById[refId(r.Product)]||null; }
-function catLabel(c){ return (c.Product_Full && String(c.Product_Full).trim())
-  || [c.Supplier,c.Code].filter(Boolean).join(" · ") || ("#"+c.id); }
+function catLabel(c){
+  const name=catName(c);
+  if(name) return dedupeLabelParts([catSupplier(c),catCode(c),name]).join(" · ");
+  if(c.Product_Full && String(c.Product_Full).trim()) return String(c.Product_Full).trim();
+  return dedupeLabelParts([catSupplier(c),catCode(c)]).join(" · ") || ("#"+c.id);
+}
 function catalogueHaystack(c){ let s=catLabel(c)||"";
   for(const k in c){ if(k==="id")continue; const v=c[k]; if(typeof v==="string") s+=" "+v; } return s.toLowerCase(); }
 function priceOf(c){ const v=c&&c.Price_Slab; return (v!=null&&v!=="")?v:0; }
 function supplierFor(r){ const c=catFor(r); return r.Product_Supplier || (c&&c.Supplier) || ""; }
 function ordersFor(catId){ return state.ordersByCat[catId]||[]; }
-function jobClient(j){ return j ? ((String(j.Client_Label||"")).trim() || (String(j.Job_Address||"")).trim() || j.Job_ID || ("#"+j.id)) : "—"; }
+function jobClient(j){ return j ? ((String(j.Client_Label||"")).trim() || (String(j.Job_Address||"")).trim() || j.Job_ID || ("#"+j.id)) : "-"; }
 function jobAddr(j){ return j ? ((String(j.Address_Formatted||j.Job_Address||"")).trim()) : ""; }
 function jobCode(j){ return j ? (j.Job_ID || ("#"+j.id)) : ""; }
 
 // ============================================================
-//  SEARCH — rank catalogue products by closeness to the query
+//  SEARCH - rank catalogue products by closeness to the query
 // ============================================================
 function scoreText(hay,q){
   if(!hay) return 0; hay=String(hay).toLowerCase();
@@ -359,17 +473,22 @@ function scoreText(hay,q){
 }
 function scoreCat(c,q){
   let best=0;
-  [catLabel(c), c.Code, c.Supplier].forEach(f=>{ const s=scoreText(f,q); if(s>best)best=s; });
+  [catLabel(c), catName(c), catCode(c), catSupplier(c)].forEach(f=>{ const s=scoreText(f,q); if(s>best)best=s; });
+  if(best<78){                                   // also match the free-text stone names on this product's orders
+    for(const o of ordersFor(c.id)){ const s=scoreText(o.Stone,q); if(s>best)best=s; if(best>=78)break; }
+  }
   if(best===0 && catalogueHaystack(c).includes(q)) best=20;   // any other string field
   return best;
 }
+// Real catalogue rows + synthetic entries for stones that only exist on orders.
+function allCatEntries(){ return (state.catalogue||[]).concat(Object.keys(state.virtualById).map(k=>state.virtualById[k])); }
 function rankedCatalogue(){
   const q=state.q.trim().toLowerCase();
-  const list=state.catalogue||[];
-  if(!q) return [...list].sort((a,b)=>catLabel(a).localeCompare(catLabel(b)));
+  const list=allCatEntries();
+  if(!q) return [...list].sort((a,b)=> (a._virtual?1:0)-(b._virtual?1:0) || catLabel(a).localeCompare(catLabel(b)));
   return list.map(c=>({c,s:scoreCat(c,q)}))
     .filter(x=>x.s>0)
-    .sort((a,b)=>b.s-a.s || catLabel(a.c).localeCompare(catLabel(b.c)))
+    .sort((a,b)=>b.s-a.s || (a.c._virtual?1:0)-(b.c._virtual?1:0) || catLabel(a.c).localeCompare(catLabel(b.c)))
     .map(x=>x.c);
 }
 
@@ -396,17 +515,19 @@ function renderResults(){
 
 function catalogueCard(c){
   const n=ordersFor(c.id).length;
-  const card=$("div","ccard"+(c.id===state.selectedCatId?" on":""));
+  const card=$("div","ccard"+(c.id===state.selectedCatId?" on":"")+(c._virtual?" virt":""));
   card.onclick=()=>{ state.selectedCatId=c.id; render(); };
 
   const top=$("div","ctop");
   top.appendChild($("div","cname",catLabel(c)));
+  if(c._virtual) top.appendChild($("span","ctag","not in catalogue"));
   card.appendChild(top);
 
   const meta=$("div","cmeta");
-  if(c.Supplier) meta.appendChild($("span","csup",c.Supplier));
-  if(c.Code) meta.appendChild($("span","ccode","Code "+c.Code));
-  meta.appendChild($("span","cprice","$"+priceOf(c)+"/slab"));
+  const sup=catSupplier(c), code=catCode(c);
+  if(sup) meta.appendChild($("span","csup",sup));
+  if(code) meta.appendChild($("span","ccode","Code "+code));
+  if(!c._virtual) meta.appendChild($("span","cprice","$"+priceOf(c)+"/slab"));
   const badge=$("span","cbadge"+(n?"":" zero"), n?(n+" order"+(n===1?"":"s")):"no orders");
   meta.appendChild(badge);
   card.appendChild(meta);
@@ -415,23 +536,32 @@ function catalogueCard(c){
 
 function renderDetail(){
   const app=document.getElementById("detail"); app.innerHTML="";
-  const c=state.catById[state.selectedCatId];
+  const c=catByAnyId(state.selectedCatId);
   if(!c){ app.appendChild($("div","detail-empty","Search the catalogue, then pick a product to see its profile and order history.")); return; }
   const allOrders=ordersFor(c.id);
   const byDateDesc=(a,b)=>{ const da=+toDate(a.Order_Date)||0, db=+toDate(b.Order_Date)||0; return db-da || (b.id||0)-(a.id||0); };
 
-  // ═══ Section 1 — Stone profile ═══
+  // ═══ Section 1 - Stone profile ═══
   const s1=$("div","section");
   const head=$("div","prod-head");
   const tw=$("div","prod-title");
   tw.appendChild($("div","prod-name",catLabel(c)));
   const sub=$("div","prod-sub");
-  if(c.Supplier) sub.appendChild($("span","psup",c.Supplier));
-  if(c.Code) sub.appendChild($("span",null,"Code "+c.Code));
+  const sup=catSupplier(c), code=catCode(c);
+  if(sup) sub.appendChild($("span","psup",sup));
+  if(code) sub.appendChild($("span",null,"Code "+code));
+  if(c._virtual) sub.appendChild($("span","ctag","not in catalogue"));
   tw.appendChild(sub);
   head.appendChild(tw);
-  const price=$("div","prod-price"); price.appendChild(document.createTextNode("$"+priceOf(c)));
-  price.appendChild($("small",null,"per slab")); head.appendChild(price);
+  if(c._virtual){
+    const add=$("button","btn primary sm","＋ Add to catalogue");
+    add.title="Create a Catalogue product from this stone and link its orders to it";
+    add.onclick=()=>promoteVirtual(c);
+    head.appendChild(add);
+  } else {
+    const price=$("div","prod-price"); price.appendChild(document.createTextNode("$"+priceOf(c)));
+    price.appendChild($("small",null,"per slab")); head.appendChild(price);
+  }
   s1.appendChild(head);
   // all-time context (the scoreboard below is month-scoped, so summarise lifetime here)
   const lifeJobs=new Set(allOrders.map(r=>refId(r.Job)).filter(v=>v!=null));
@@ -445,11 +575,11 @@ function renderDetail(){
   s1.appendChild(life);
   app.appendChild(s1);
 
-  // ═══ Section 2 — Status Summary (pills switch the status view; grouped by date) ═══
+  // ═══ Section 2 - Status Summary (pills switch the status view; grouped by date) ═══
   const s2=$("div","section");
   s2.appendChild(sectionHead("Status summary",null,null));
   const VIEWS=[
-    { key:"active",    label:"Active order", sub:"placed & awaiting delivery", filter:isActiveOrder,       dateField:"Order_Date",    empty:"No active orders — nothing placed and awaiting delivery." },
+    { key:"active",    label:"Active order", sub:"placed & awaiting delivery", filter:isActiveOrder,       dateField:"Order_Date",    empty:"No active orders - nothing placed and awaiting delivery." },
     { key:"delivered", label:"Delivered",    sub:"grouped by delivery date",   filter:isDeliveredStatus,   dateField:"Delivery_Date", empty:"Nothing delivered for this product yet." }
   ];
   let sv=state.statusView; if(!VIEWS.some(v=>v.key===sv)) sv="active"; state.statusView=sv;
@@ -470,7 +600,7 @@ function renderDetail(){
   else s2.appendChild(groupedOrderTable(svRows, view.dateField));
   app.appendChild(s2);
 
-  // ═══ Section 3 — Order history by month ═══
+  // ═══ Section 3 - Order history by month ═══
   const s3=$("div","section");
   s3.appendChild(sectionHead("Order history",null,null));
 
@@ -521,7 +651,7 @@ function renderDetail(){
   if(!orders.length) s3.appendChild($("div","hist-none","No orders for this product in "+selLabel+"."));
   else s3.appendChild(orderTable(orders));
 
-  // scoreboard — now below the table (for the selected month)
+  // scoreboard - now below the table (for the selected month)
   const jobs=new Set(orders.map(r=>refId(r.Job)).filter(v=>v!=null));
   const ordered=orders.reduce((s,r)=>s+num(r.Ordered_Qty),0);
   const delivered=orders.reduce((s,r)=>s+num(r.Delivery_Qty),0);
@@ -532,7 +662,7 @@ function renderDetail(){
   stats.appendChild(stat(delivered,"slabs delivered"));
   s3.appendChild(stats);
 
-  // histogram — daily ordered slabs for the selected month across the whole supplier
+  // histogram - daily ordered slabs for the selected month across the whole supplier
   s3.appendChild(histogram(c));
   app.appendChild(s3);
 }
@@ -589,7 +719,7 @@ function histogram(c){
     const total=d.cur+d.other;
     const col=$("div","bar-col"+(total?"":" zero")+(allTime&&d.key===state.selectedMonth?" sel":""));
     const label = allTime ? monthLabelOf(d.key) : (d.day+" "+monthLabelOf(sel));
-    col.title=label+(total?(" — "+total+" slab"+(total===1?"":"s")+" ("+d.cur+" this stone, "+d.other+" other)"):" — no orders");
+    col.title=label+(total?(" - "+total+" slab"+(total===1?"":"s")+" ("+d.cur+" this stone, "+d.other+" other)"):" - no orders");
     col.appendChild($("div","bar-v",total?String(total):""));
     const bar=$("div","bar");
     if(d.cur>0){ const s=$("div","seg cur"); s.style.height=Math.max(2,d.cur/max*H)+"px"; bar.appendChild(s); }
@@ -617,7 +747,7 @@ const COL_DEFS={
   orderdate:{label:"Order date",     w:"124px", min:124, build:r=>dateCell(r,"Order_Date")},
   deliv:    {label:"Deliv", num:true, w:"52px",  min:52, build:r=>numCell(r,"Delivery_Qty",true,x=>num(x.Delivery_Qty)<num(x.Ordered_Qty))},
   delivdate:{label:"Delivery date",  w:"124px", min:124, build:r=>dateCell(r,"Delivery_Date")},
-  inv:      {label:"INV",            w:"84px",  min:84,  build:r=>textCell(r,"INV","—")},
+  inv:      {label:"INV",            w:"84px",  min:84,  build:r=>textCell(r,"INV","-")},
   note:     {label:"Note",           w:"minmax(120px,1.3fr)", min:120, build:r=>textCell(r,"Note","Note…")},
   scope:    {label:"Scope", num:true, w:"54px", min:54,  build:r=>numCell(r,"Scope_Qty",false)},
   price:    {label:"$/slab",num:true, w:"74px", min:74,  build:priceCell}
@@ -647,7 +777,7 @@ function priceCell(r){ const c=catFor(r);
   const v=(r.Product_Price_slab!=null&&r.Product_Price_slab!=="")?r.Product_Price_slab:(c?c.Price_Slab:0);
   return $("div","hro","$"+(v!=null&&v!==""?v:0)); }
 
-// Flat table (one month already chosen) — used by the monthly history section.
+// Flat table (one month already chosen) - used by the monthly history section.
 function orderTable(rows){
   const vis=visibleCols(), tpl=gridTemplate(vis);
   const wrap=$("div","htbl-wrap"); const tbl=$("div","htbl"); tbl.style.minWidth=minWidthOf(vis)+"px";
@@ -682,7 +812,7 @@ function groupedOrderTable(rows,dateField){
 // ---- floating column configuration ----
 function openConfig(){
   const m=document.getElementById("cfgPop"); m.className="pop cfgpop"; m.innerHTML="";
-  m.appendChild($("div","cfg-h","Table columns — show & order"));
+  m.appendChild($("div","cfg-h","Table columns - show & order"));
   const cfg=ensureColCfg();
   cfg.forEach((cc,i)=>{
     const row=$("div","cfgrow");
@@ -793,6 +923,310 @@ function updateStoneAuto(r,fields){
   if(auto && auto!==r.Order_Status) fields.Order_Status=auto;
   update(r.id,fields);
 }
+// Create a record. Demo: push into the matching local array with a fresh id.
+// Live: AddRecord and resolve to the new rowId (retValues[0]). Returns Promise<rowId>.
+function addRecord(table,fields){
+  if(!state.grist){
+    const bag={ Stone_Order:state.stone, Jobs_Detail:state.jobs, Client:state.clients, Catalogue:state.catalogue }[table]
+      || (state.ref.product&&table===state.ref.product.targetTableId&&state.catalogue)
+      || (state.ref.client&&table===state.ref.client.targetTableId&&state.clients);
+    const arr=Array.isArray(bag)?bag:[];
+    const id=(arr.reduce((m,r)=>Math.max(m,typeof r.id==="number"?r.id:0),0)||0)+1;
+    arr.push(Object.assign({id},fields)); reindex(); render();
+    return Promise.resolve(id);
+  }
+  return grist.docApi.applyUserActions([["AddRecord",table,null,fields]])
+    .then(res=>{ const rv=(res&&res.retValues)||[]; return rv[0]; });
+}
+// Find an existing client by name (case-insensitive) or create one; resolves to its rowId.
+function ensureClient(name){
+  const R=state.ref.client, nm=(name||"").trim();
+  if(!nm) return Promise.resolve(null);
+  const existing=(state.clients||[]).find(c=>String(clientLabel(c)).toLowerCase()===nm.toLowerCase());
+  if(existing) return Promise.resolve(existing.id);
+  if(!R) return Promise.resolve(null);
+  const f={}; f[R.labelCol]=nm;
+  return addRecord(R.targetTableId,f);
+}
+// Create a Jobs_Detail row from the wizard's step-1 data; resolves to the job rowId.
+function createJob(o){
+  const f={};
+  if(state.ref.client && o.clientId!=null) f.Client_Name=o.clientId;    // Ref → rowId
+  if(o.address) f.Job_Address=o.address;
+  else if(!state.ref.client && o.clientName) f.Job_Address=o.clientName; // fallback sentinel
+  f.Assigned_To=["L",...(o.assignees||[])];
+  f.Stage="Quote";
+  if(!state.grist && o.clientName) f.Client_Label=o.clientName;         // mirror formula for demo
+  return addRecord("Jobs_Detail",f);
+}
+// Promote a "not in catalogue" (virtual) stone into a real Catalogue product, then relink
+// its orphan orders to the new product so the history moves with it.
+function promoteVirtual(c){
+  const R=state.ref.product, cols=(R&&R.cols)||{};
+  const f={}; if(cols.name)f[cols.name]=c.Name||""; else f.Name=c.Name||"";
+  if(c.Supplier){ if(cols.supplier)f[cols.supplier]=c.Supplier; else f.Supplier=c.Supplier; }
+  if(c.Code){ if(cols.code)f[cols.code]=c.Code; else f.Code=c.Code; }
+  const tbl=(R&&R.targetTableId)||"Catalogue";
+  const orphans=ordersFor(c.id).slice();
+  Promise.resolve(addRecord(tbl,f)).then(newId=>{
+    if(newId==null) return;
+    orphans.forEach(o=>update(o.id,{Product:newId}));
+    state.selectedCatId=newId;
+    if(state.grist) refetch(); else render();
+  }).catch(err=>console.warn("promote failed",err));
+}
+
+// ============================================================
+//  ADD-STONE-ORDER WIZARD (job-first, two steps)
+//  Rule enforced: every stone order ties to a Job. Step 1 finds/creates the job
+//  (customer → existing job or new job + address + assignee); step 2 picks/creates
+//  the stone product then publishes the Stone_Order line.
+// ============================================================
+function isGhost(j){ return !!j && /ghost/i.test(String(j.Client_Label||"")+String(j.Job_Address||"")); }
+function jobsForClient(clientId,clientName){
+  const nm=(clientName||"").trim().toLowerCase();
+  return (state.jobs||[]).filter(j=>{
+    if(isGhost(j)) return false;
+    if(clientId!=null && refId(j.Client_Name)===clientId) return true;
+    return nm && jobClientName(j).toLowerCase()===nm;
+  });
+}
+function distinctClients(){
+  if(state.ref.client && state.clients.length) return state.clients.map(c=>({id:c.id,name:clientLabel(c)}));
+  const seen={}, out=[];
+  (state.jobs||[]).forEach(j=>{ const n=jobClientName(j); if(n && !seen[n.toLowerCase()]){ seen[n.toLowerCase()]=1; out.push({id:null,name:n}); } });
+  return out;
+}
+function jobTitle(j){ return jobClient(j); }
+function openWizard(prefill){
+  state.wiz={ step:1, clientId:null, clientName:"", address:"", assignees:[],
+    jobMode:"new", jobId:null, product:null, stone:"", scopeQty:"", status:"", note:"",
+    addStone:false, busy:false, msg:"" };
+  if(prefill){ Object.assign(state.wiz,prefill); }
+  renderWizard();
+}
+function closeWizard(){ state.wiz=null;
+  const m=document.getElementById("wizPop"); m.hidden=true; m.innerHTML="";
+  document.getElementById("scrim").hidden=true; }
+
+function renderWizard(){
+  const w=state.wiz; if(!w)return;
+  const scrim=document.getElementById("scrim"); scrim.hidden=false; scrim.onclick=()=>{ if(!w.busy) closeWizard(); };
+  const m=document.getElementById("wizPop"); m.hidden=false; m.innerHTML="";
+  const wiz=$("div","wiz"); m.appendChild(wiz);
+
+  const head=$("div","wiz-head");
+  head.appendChild($("span","wh-t","New stone order"));
+  const x=$("button","wiz-x","✕"); x.onclick=()=>{ if(!w.busy) closeWizard(); }; head.appendChild(x);
+  wiz.appendChild(head);
+
+  const steps=$("div","steps");
+  [1,2].forEach(n=>steps.appendChild($("div","step-dot"+(w.step===n?" on":w.step>n?" done":""))));
+  wiz.appendChild(steps);
+  wiz.appendChild($("div","wiz-sub", w.step===1 ? "Step 1 of 2 · Which job is this for?" : "Step 2 of 2 · Stone & details"));
+
+  const body=$("div","wiz-body"); wiz.appendChild(body);
+  (w.step===1 ? wizStep1 : wizStep2)(body);
+
+  const foot=$("div","wiz-foot");
+  foot.appendChild($("span","msg",w.msg||""));
+  foot.appendChild($("span","grow"));
+  if(w.step===2){ const back=$("button","btn","Back"); back.onclick=()=>{ w.step=1; w.msg=""; renderWizard(); }; foot.appendChild(back); }
+  const primary=$("button","btn primary", w.step===1 ? "Next →" : (w.busy?"Publishing…":"Publish"));
+  primary.disabled=w.busy || !(w.step===1 ? canProceedStep1() : canPublish());
+  primary.onclick=()=>{ if(w.step===1){ w.step=2; w.msg=""; renderWizard(); } else wizPublish(); };
+  foot.appendChild(primary);
+  wiz.appendChild(foot);
+}
+function syncWizPrimary(){ const w=state.wiz, p=document.querySelector(".wiz-foot .btn.primary");
+  if(p) p.disabled=w.busy || !(w.step===1 ? canProceedStep1() : canPublish()); }
+
+// ---- step 1: job ----
+function canProceedStep1(){ const w=state.wiz;
+  if(w.jobMode==="existing") return w.jobId!=null;
+  return !!(w.clientName.trim() || w.address.trim()); }
+function wizStep1(body){
+  const w=state.wiz;
+  const fld=$("div","fld");
+  const lab=$("label"); lab.appendChild(document.createTextNode("Customer "));
+  lab.appendChild($("span","hint","- name of the client this order is for")); fld.appendChild(lab);
+  const ac=$("div","ac");
+  const inp=document.createElement("input"); inp.type="text"; inp.placeholder="Start typing a customer name…"; inp.value=w.clientName; inp.autocomplete="off";
+  ac.appendChild(inp);
+  const drop=$("div","ac-list"); drop.hidden=true; ac.appendChild(drop);
+  fld.appendChild(ac); body.appendChild(fld);
+
+  function pickClient(c){ w.clientId=c.id; w.clientName=c.name; w.jobMode="new"; w.jobId=null; drop.hidden=true; renderWizard(); }
+  function drawDrop(){
+    const q=inp.value.trim().toLowerCase(); drop.innerHTML="";
+    distinctClients().filter(c=>c.name.toLowerCase().includes(q)).slice(0,8)
+      .forEach(c=>{ const row=$("div","ac-row",c.name); row.onmousedown=e=>{ e.preventDefault(); pickClient(c); }; drop.appendChild(row); });
+    const exact=distinctClients().some(c=>c.name.toLowerCase()===q);
+    if(q && !exact){ const row=$("div","ac-row ac-new","＋ New customer “"+inp.value.trim()+"”");
+      row.onmousedown=e=>{ e.preventDefault(); pickClient({id:null,name:inp.value.trim()}); }; drop.appendChild(row); }
+    drop.hidden=!drop.children.length;
+  }
+  inp.oninput=()=>{ w.clientName=inp.value; w.clientId=null; drawDrop(); syncWizPrimary(); };
+  inp.onfocus=drawDrop; inp.onblur=()=>setTimeout(()=>{ drop.hidden=true; },150);
+
+  const jobs=jobsForClient(w.clientId,w.clientName);
+  if(w.clientName.trim() && jobs.length){
+    const jf=$("div","fld");
+    const jl=$("label"); jl.appendChild(document.createTextNode("Attach to job "));
+    jl.appendChild($("span","hint","- reuse an existing job, or create a new one below")); jf.appendChild(jl);
+    const pick=$("div","jobpick");
+    jobs.forEach(j=>{
+      const opt=$("div","jobopt"+(w.jobMode==="existing"&&w.jobId===j.id?" on":""));
+      opt.appendChild($("span","jo-id",j.Job_ID||("#"+j.id)));
+      const main=$("div","jo-main"); main.appendChild($("div",null,jobTitle(j)));
+      if(jobAddr(j)) main.appendChild($("div","jo-addr",jobAddr(j)));
+      opt.appendChild(main);
+      opt.onclick=()=>{ w.jobMode="existing"; w.jobId=j.id; renderWizard(); };
+      pick.appendChild(opt);
+    });
+    const nu=$("div","jobopt"+(w.jobMode==="new"?" on":""));
+    nu.appendChild($("span","jo-id","＋")); nu.appendChild($("div","jo-main","New job for this customer"));
+    nu.onclick=()=>{ w.jobMode="new"; w.jobId=null; renderWizard(); };
+    pick.appendChild(nu);
+    jf.appendChild(pick); body.appendChild(jf);
+  }
+
+  if(w.jobMode!=="existing"){
+    const af=$("div","fld");
+    const al=$("label"); al.appendChild(document.createTextNode("Job address "));
+    al.appendChild($("span","hint","- site address for this job")); af.appendChild(al);
+    const ai=document.createElement("input"); ai.type="text"; ai.placeholder="e.g. 19 Stephens St, Balwyn North VIC 3104"; ai.value=w.address;
+    ai.oninput=()=>{ w.address=ai.value; syncWizPrimary(); }; af.appendChild(ai); body.appendChild(af);
+
+    const asf=$("div","fld");
+    const asl=$("label"); asl.appendChild(document.createTextNode("Assigned to "));
+    asl.appendChild($("span","hint","- optional; tap to assign")); asf.appendChild(asl);
+    const chips=$("div","chips"); const opts=assigneeOptions();
+    if(!opts.length) chips.appendChild($("span","hint","No assignee options yet."));
+    opts.forEach(name=>{
+      const c=$("div","chip-t"+(w.assignees.includes(name)?" on":""),name);
+      c.onclick=()=>{ const i=w.assignees.indexOf(name); if(i<0)w.assignees.push(name); else w.assignees.splice(i,1); renderWizard(); };
+      chips.appendChild(c);
+    });
+    asf.appendChild(chips); body.appendChild(asf);
+  }
+  setTimeout(()=>{ if(!w.clientName) inp.focus(); },0);
+}
+
+// ---- step 2: stone ----
+function canPublish(){ const w=state.wiz; return !w.addStone && !!((w.product&&w.product.id!=null) || w.stone.trim()); }
+function wizStep2(body){
+  const w=state.wiz;
+  const job = w.jobMode==="existing" ? state.jobById[w.jobId] : null;
+  const recap=$("div","selbox");
+  const rc=$("div");
+  rc.appendChild($("div","sb-main", job ? jobTitle(job) : (w.clientName.trim()||"New job")));
+  rc.appendChild($("div","sb-sub", job ? (jobAddr(job)||("Job "+(job.Job_ID||"#"+job.id))) : (w.address.trim()||"New job will be created")));
+  recap.appendChild(rc); body.appendChild(recap);
+
+  if(w.addStone){ wizAddStoneForm(body); return; }
+
+  const pf=$("div","fld");
+  const pl=$("label"); pl.appendChild(document.createTextNode("Stone / profile "));
+  pl.appendChild($("span","hint","- pick from the catalogue, or add a new one")); pf.appendChild(pl);
+  if(w.product && w.product.id!=null){
+    const sel=$("div","selbox");
+    const s=$("div"); s.appendChild($("div","sb-main",catLabel(w.product))); sel.appendChild(s);
+    const rm=$("span","sb-x","✕"); rm.title="Change"; rm.onclick=()=>{ w.product=null; renderWizard(); }; sel.appendChild(rm);
+    pf.appendChild(sel);
+  } else {
+    const ac=$("div","ac");
+    const inp=document.createElement("input"); inp.type="text"; inp.placeholder="Search stone / supplier / code…"; inp.value=w.stone; inp.autocomplete="off";
+    ac.appendChild(inp);
+    const drop=$("div","ac-list"); drop.hidden=true; ac.appendChild(drop);
+    pf.appendChild(ac);
+    function drawDrop(){
+      const q=inp.value.trim().toLowerCase(); drop.innerHTML="";
+      (state.catalogue||[]).filter(c=>!q||catLabel(c).toLowerCase().includes(q)).slice(0,8)
+        .forEach(c=>{ const row=$("div","ac-row",catLabel(c)); row.onmousedown=e=>{ e.preventDefault(); w.product=c; w.stone=""; renderWizard(); }; drop.appendChild(row); });
+      const add=$("div","ac-row ac-new","＋ Add new stone"+(inp.value.trim()?" “"+inp.value.trim()+"”":""));
+      add.onmousedown=e=>{ e.preventDefault(); w.addStone=true; w._newStoneName=inp.value.trim(); renderWizard(); };
+      drop.appendChild(add); drop.hidden=false;
+    }
+    inp.oninput=()=>{ w.stone=inp.value; drawDrop(); syncWizPrimary(); };
+    inp.onfocus=drawDrop; inp.onblur=()=>setTimeout(()=>{ drop.hidden=true; },150);
+    pf.appendChild($("span","hint","Not in the catalogue? Type the name and choose “Add new stone”."));
+  }
+  body.appendChild(pf);
+
+  const row2=$("div","row2");
+  const qf=$("div","fld"); qf.appendChild($("label",null,"Scope qty (slabs)"));
+  const qi=document.createElement("input"); qi.type="number"; qi.min="0"; qi.placeholder="0"; qi.value=w.scopeQty;
+  qi.oninput=()=>{ w.scopeQty=qi.value; }; qf.appendChild(qi); row2.appendChild(qf);
+  const sf=$("div","fld"); sf.appendChild($("label",null,"Initial status"));
+  const sel=document.createElement("select"); sel.className="tinput";
+  [""].concat(ORDS).forEach(v=>{ const o=document.createElement("option"); o.value=v; o.textContent=statusLabel(v); if(v===w.status)o.selected=true; sel.appendChild(o); });
+  sel.onchange=()=>{ w.status=sel.value; }; sf.appendChild(sel); row2.appendChild(sf);
+  body.appendChild(row2);
+
+  const nf=$("div","fld"); nf.appendChild($("label",null,"Note"));
+  const nt=document.createElement("textarea"); nt.placeholder="Optional note…"; nt.value=w.note;
+  nt.oninput=()=>{ w.note=nt.value; }; nf.appendChild(nt); body.appendChild(nf);
+}
+function wizAddStoneForm(body){
+  const w=state.wiz;
+  const wrap=$("div","fld"); wrap.appendChild($("label",null,"Add a new stone to the catalogue"));
+  const nl=$("label"); nl.style.marginTop="4px"; nl.appendChild(document.createTextNode("Name ")); nl.appendChild($("span","req","*"));
+  wrap.appendChild(nl);
+  const nameI=document.createElement("input"); nameI.type="text"; nameI.placeholder="Stone name / profile (required)"; nameI.value=w._newStoneName||"";
+  wrap.appendChild(nameI);
+  const row=$("div","row2");
+  const sc1=$("div","fld"); const supL=$("label"); supL.appendChild(document.createTextNode("Supplier ")); supL.appendChild($("span","req","*")); sc1.appendChild(supL);
+  const supI=document.createElement("input"); supI.type="text"; supI.placeholder="Supplier (required)"; sc1.appendChild(supI);
+  const sc2=$("div","fld"); sc2.appendChild($("label",null,"Code")); const codeI=document.createElement("input"); codeI.type="text"; codeI.placeholder="Code (optional)"; sc2.appendChild(codeI);
+  row.appendChild(sc1); row.appendChild(sc2); wrap.appendChild(row);
+  const acts=$("div","chips"); acts.style.marginTop="6px";
+  const add=$("button","btn primary","Add stone"); const cancel=$("button","btn","Cancel");
+  add.onclick=()=>{
+    const nm=nameI.value.trim(), sup=supI.value.trim();
+    if(!nm || !sup){ w.msg="Name and supplier are both required."; renderWizard(); return; }
+    const R=state.ref.product, cols=(R&&R.cols)||{};
+    const f={}; if(cols.name)f[cols.name]=nm; else f.Name=nm;
+    if(cols.supplier)f[cols.supplier]=sup; else f.Supplier=sup;
+    if(codeI.value.trim()){ if(cols.code)f[cols.code]=codeI.value.trim(); else f.Code=codeI.value.trim(); }
+    const tbl=(R&&R.targetTableId)||"Catalogue";
+    Promise.resolve(addRecord(tbl,f)).then(newId=>{
+      w.product=Object.assign({id:newId},f,{Name:nm,Supplier:sup,Code:codeI.value.trim()});
+      w.addStone=false; w.stone=""; w.msg=""; w._newStoneName=""; renderWizard();
+    }).catch(err=>{ console.warn("add stone failed",err); w.msg="Could not add stone."; renderWizard(); });
+  };
+  cancel.onclick=()=>{ w.addStone=false; w.msg=""; renderWizard(); };
+  acts.appendChild(add); acts.appendChild(cancel); wrap.appendChild(acts);
+  body.appendChild(wrap);
+  setTimeout(()=>nameI.focus(),0);
+}
+async function wizPublish(){
+  const w=state.wiz; if(!w||w.busy||!canPublish())return;
+  w.busy=true; w.msg=""; renderWizard();
+  try{
+    let jobId=w.jobId;
+    if(w.jobMode!=="existing" || jobId==null){
+      const clientId = state.ref.client ? await ensureClient(w.clientName) : null;
+      jobId = await createJob({clientId, clientName:w.clientName.trim(), address:w.address.trim(), assignees:w.assignees});
+    }
+    if(jobId==null) throw new Error("no job id");
+    const f={ Job:jobId };
+    if(w.product && w.product.id!=null) f.Product=w.product.id;
+    const cols=state.ref.product&&state.ref.product.cols;
+    const stoneName=(w.product && ((cols&&cols.name&&w.product[cols.name])||w.product.Name)) || w.stone.trim();
+    if(stoneName) f.Stone=stoneName;
+    if(w.scopeQty!=="" && w.scopeQty!=null) f.Scope_Qty=Number(w.scopeQty);
+    if(w.status) f.Order_Status=w.status;
+    if(w.note.trim()) f.Note=w.note.trim();
+    const newId=await addRecord("Stone_Order",f);
+    if(w.product && w.product.id!=null) state.selectedCatId=w.product.id;   // jump the search to the ordered stone
+    closeWizard();
+    if(state.grist) refetch(); else render();
+  }catch(err){
+    console.warn("publish failed",err);
+    w.busy=false; w.msg="Publish failed - check access and try again."; renderWizard();
+  }
+}
 
 // ============================================================
 //  SCHEMA INTROSPECTION (Product ref target + live status choices/colours)
@@ -815,7 +1249,8 @@ async function loadGristSchema(){
     const col=colsOf(parentTableId).find(c=>c.colId===colId); if(!col)return null;
     const m=/^Ref(?:List)?:(.+)$/.exec(col.type||""); if(!m)return null;
     const targetTableId=m[1], vis=col.visibleCol&&colByRowId[col.visibleCol];
-    return { colId, targetTableId, labelCol:(vis&&vis.colId)||bestLabelCol(targetTableId) };
+    return { colId, targetTableId, labelCol:(vis&&vis.colId)||bestLabelCol(targetTableId),
+      editable:colsOf(targetTableId).filter(isEditable) };
   }
   function colChoices(tableId,colId){ const c=colsOf(tableId).find(x=>x.colId===colId); return c?choicesOf(c):null; }
   function colChoiceColors(tableId,colId){ const c=colsOf(tableId).find(x=>x.colId===colId); return c?choiceColorsOf(c):{}; }
@@ -844,12 +1279,15 @@ async function pullTables(){
   if(state.ref.product){
     try{ const cat=await grist.docApi.fetchTable(state.ref.product.targetTableId); state.catalogue=columnarToRows(cat); }catch(e){}
   }
+  if(state.ref.client){
+    try{ const cl=await grist.docApi.fetchTable(state.ref.client.targetTableId); state.clients=columnarToRows(cl); }catch(e){}
+  }
   reindex();
 }
 async function refetch(){ if(!state.grist)return; try{ await pullTables(); }catch(e){ console.warn("fetch failed",e); } render(); }
 
 // ============================================================
-//  GRIST WIRING — sample first, flip to live once Grist answers
+//  GRIST WIRING - sample first, flip to live once Grist answers
 // ============================================================
 if(typeof grist!=="undefined"){
   try{ grist.ready({ requiredAccess:"full" }); }catch(e){}
@@ -858,6 +1296,9 @@ if(typeof grist!=="undefined"){
     try{
       const sc=await loadGristSchema();
       state.ref.product=sc.refInfo("Stone_Order","Product");
+      if(state.ref.product) state.ref.product.cols=productDisplayCols(state.ref.product);
+      state.ref.client=sc.refInfo("Jobs_Detail","Client_Name");
+      state.assignChoices=sc.colChoices("Jobs_Detail","Assigned_To")||null;
       applyStatusSchema(sc);
     }catch(e){ console.warn("schema introspection failed",e); }
     try{ await pullTables(); }catch(e){ console.warn("initial fetch failed",e); }
@@ -868,22 +1309,28 @@ if(typeof grist!=="undefined"){
 // ============================================================
 //  SAMPLE DATA (standalone / preview)
 // ============================================================
-const SAMPLE_JOBS=[
-  { id:2,  Job_ID:"J0002", Client_Label:"Annie",       Job_Address:"31 Harridge St, Rosebud VIC 3939", Address_Formatted:"31 Harridge St, Rosebud VIC 3939", Stage:"Live" },
-  { id:8,  Job_ID:"J0008", Client_Label:"Home owner",  Job_Address:"1/162 Kambrook Rd, Caulfield North VIC 3161", Address_Formatted:"1/162 Kambrook Rd, Caulfield North VIC 3161", Stage:"Live" },
-  { id:14, Job_ID:"J0014", Client_Label:"Harry Aboda", Job_Address:"105 Point Nepean Rd, Dromana VIC 3936", Address_Formatted:"105 Point Nepean Rd, Dromana VIC 3936", Stage:"On hold" },
-  { id:19, Job_ID:"J0019", Client_Label:"Naz",         Job_Address:"19 Stephens St, Balwyn North VIC 3104", Address_Formatted:"19 Stephens St, Balwyn North VIC 3104", Stage:"Live" },
-  { id:23, Job_ID:"J0023", Client_Label:"Louis",       Job_Address:"11 Banksia Ct, Croydon South VIC 3136", Address_Formatted:"11 Banksia Ct, Croydon South VIC 3136", Stage:"WIP" }
+const SAMPLE_CLIENTS=[
+  { id:1, Name:"Annie" }, { id:2, Name:"Home owner" }, { id:3, Name:"Harry Aboda" },
+  { id:4, Name:"Naz" },   { id:5, Name:"Louis" }
 ];
+const SAMPLE_JOBS=[
+  { id:2,  Job_ID:"J0002", Client_Name:1, Client_Label:"Annie",       Job_Address:"31 Harridge St, Rosebud VIC 3939", Address_Formatted:"31 Harridge St, Rosebud VIC 3939", Stage:"Live", Assigned_To:["L","Minh","Alex"] },
+  { id:8,  Job_ID:"J0008", Client_Name:2, Client_Label:"Home owner",  Job_Address:"1/162 Kambrook Rd, Caulfield North VIC 3161", Address_Formatted:"1/162 Kambrook Rd, Caulfield North VIC 3161", Stage:"Live", Assigned_To:["L","Sam"] },
+  { id:14, Job_ID:"J0014", Client_Name:3, Client_Label:"Harry Aboda", Job_Address:"105 Point Nepean Rd, Dromana VIC 3936", Address_Formatted:"105 Point Nepean Rd, Dromana VIC 3936", Stage:"On hold", Assigned_To:["L","Alex"] },
+  { id:19, Job_ID:"J0019", Client_Name:4, Client_Label:"Naz",         Job_Address:"19 Stephens St, Balwyn North VIC 3104", Address_Formatted:"19 Stephens St, Balwyn North VIC 3104", Stage:"Live", Assigned_To:["L","Minh"] },
+  { id:23, Job_ID:"J0023", Client_Name:5, Client_Label:"Louis",       Job_Address:"11 Banksia Ct, Croydon South VIC 3136", Address_Formatted:"11 Banksia Ct, Croydon South VIC 3136", Stage:"WIP", Assigned_To:["L"] }
+];
+// NB: the live Catalogue stores the colour in a `Name` column (no `Product_Full`);
+// the sample mirrors that so the resolved-column code path is exercised locally.
 const SAMPLE_CAT=[
-  {id:101,Supplier:"Lavistone",  Code:"LS303", Product_Full:"Lavistone · LS303 · Cararra Lux 20mm",   Price_Slab:700},
-  {id:102,Supplier:"YDL",        Code:"1888",  Product_Full:"YDL · 1888 · Kalala Bianco 20mm",        Price_Slab:820},
-  {id:103,Supplier:"Caesarstone",Code:"CS5100",Product_Full:"Caesarstone · CS5100 · Vanilla Noir 20mm",Price_Slab:960},
-  {id:104,Supplier:"Lavistone",  Code:"LSU401",Product_Full:"Lavistone · LSU401 · Taj Classico 20mm", Price_Slab:640},
-  {id:105,Supplier:"Caesarstone",Code:"CS4001",Product_Full:"Caesarstone · CS4001 · Fresh Concrete 20mm",Price_Slab:710},
-  {id:106,Supplier:"YDL",        Code:"YDLQ",  Product_Full:"YDL · YDLQ · Calacatta Gold 20mm",       Price_Slab:1180},
-  {id:107,Supplier:"WF",         Code:"3420",  Product_Full:"WF · Marble · Biancatto 3420x2010x20mm", Price_Slab:0},
-  {id:108,Supplier:"Zenith",     Code:"ZN12",  Product_Full:"Zenith · ZN12 · Statuario 20mm",         Price_Slab:890}
+  {id:101,Supplier:"Lavistone",  Code:"LS303", Name:"Cararra Lux 20mm",   Price_Slab:700},
+  {id:102,Supplier:"YDL",        Code:"1888",  Name:"Kalala Bianco 20mm", Price_Slab:820},
+  {id:103,Supplier:"Caesarstone",Code:"CS5100",Name:"Vanilla Noir 20mm",  Price_Slab:960},
+  {id:104,Supplier:"Lavistone",  Code:"LSU401",Name:"Taj Classico 20mm",  Price_Slab:640},
+  {id:105,Supplier:"Caesarstone",Code:"CS4001",Name:"Fresh Concrete 20mm",Price_Slab:710},
+  {id:106,Supplier:"YDL",        Code:"YDLQ",  Name:"Calacatta Gold 20mm",Price_Slab:1180},
+  {id:107,Supplier:"WF",         Code:"3420",  Name:"Biancatto 3420x2010x20mm",Price_Slab:0},
+  {id:108,Supplier:"Zenith",     Code:"ZN12",  Name:"Statuario 20mm",     Price_Slab:890}
 ];
 // Note: LS303 (101) is ordered on multiple jobs, so its history has several rows.
 const SAMPLE_STONE=[
@@ -897,11 +1344,19 @@ const SAMPLE_STONE=[
   { id:8, Job:23, Product:108, Product_Code:"ZN12",  Product_Supplier:"Zenith",     Scope_Qty:5, Ordered_Qty:5, Delivery_Qty:5, Order_Status:"6. Delivered",   Order_Date:1782518400, Delivery_Date:1783728000, INV:"INV-31990", Note:"" },
   { id:9, Job:23, Product:101, Product_Code:"LS303", Product_Supplier:"Lavistone",  Scope_Qty:2, Ordered_Qty:2, Delivery_Qty:0, Order_Status:"5. On hold",     Order_Date:null, Delivery_Date:null, INV:"", Note:"client to confirm colour" },
   { id:10,Job:14, Product:101, Product_Code:"LS303", Product_Supplier:"Lavistone",  Scope_Qty:6, Ordered_Qty:6, Delivery_Qty:6, Order_Status:"6. Delivered",   Order_Date:1781740800, Delivery_Date:1782518400, INV:"INV-31740", Note:"laundry + vanity" },
-  { id:11,Job:19, Product:101, Product_Code:"LS303", Product_Supplier:"Lavistone",  Scope_Qty:3, Ordered_Qty:3, Delivery_Qty:0, Order_Status:"4. Awaiting Pickup",Order_Date:1785801600, Delivery_Date:null, INV:"", Note:"" }
+  { id:11,Job:19, Product:101, Product_Code:"LS303", Product_Supplier:"Lavistone",  Scope_Qty:3, Ordered_Qty:3, Delivery_Qty:0, Order_Status:"4. Awaiting Pickup",Order_Date:1785801600, Delivery_Date:null, INV:"", Note:"" },
+  // orphan: only typed as free-text on orders, never added to the Catalogue (Product is null)
+  { id:12,Job:14, Product:null, Product_Code:"SS411", Product_Supplier:"Smartstone", Stone:"Peraway Mont 20mm", Scope_Qty:6, Ordered_Qty:6, Delivery_Qty:0, Order_Status:"2.  Placed Order",Order_Date:1785196800, Delivery_Date:null, INV:"", Note:"waterfall island" },
+  { id:13,Job:19, Product:null, Product_Code:"SS411", Product_Supplier:"Smartstone", Stone:"Peraway Mont 20mm", Scope_Qty:4, Ordered_Qty:0, Delivery_Qty:0, Order_Status:"3. Awaiting Order",Order_Date:null, Delivery_Date:null, INV:"", Note:"" }
 ];
-const DEMO_REF={ product:{ targetTableId:"Catalogue", labelCol:"Product_Full" } };
-window._test=function(stone,jobs,catalogue){
-  state.stone=stone||[]; state.jobs=jobs||[]; state.catalogue=catalogue||[]; reindex(); render();
+// Demo schema map mirrors what live introspection produces (Catalogue labelled by `Name`,
+// resolved supplier/code/name cols; Client table) so the same code paths run in preview.
+const DEMO_REF={ product:{ targetTableId:"Catalogue", labelCol:"Name",
+    cols:{ supplier:"Supplier", code:"Code", name:"Name", price:"Price_Slab" } },
+  client:{ targetTableId:"Client", labelCol:"Name" } };
+const DEMO_ASSIGNEES=["Minh","Alex","Sam","WF"];
+window._test=function(stone,jobs,catalogue,clients){
+  state.stone=stone||[]; state.jobs=jobs||[]; state.catalogue=catalogue||[]; state.clients=clients||[]; reindex(); render();
 };
 
 // ============================================================
@@ -925,17 +1380,21 @@ qInput.oninput=e=>{ state.q=e.target.value; state.selectedCatId=null; render(); 
 document.getElementById("qClr").onclick=()=>{ state.q=""; qInput.value=""; state.selectedCatId=null; render(); qInput.focus(); };
 document.getElementById("choicePop").onclick=e=>e.stopPropagation();
 document.getElementById("cfgPop").onclick=e=>e.stopPropagation();
+document.getElementById("wizPop").onclick=e=>e.stopPropagation();
 document.getElementById("cfgBtn").onclick=e=>{ e.stopPropagation();
   const m=document.getElementById("cfgPop"); if(m.hidden) openConfig(); else m.hidden=true; };
+document.getElementById("addBtn").onclick=e=>{ e.stopPropagation(); openWizard(); };
 document.addEventListener("click",closePops);
-document.addEventListener("keydown",e=>{ if(e.key==="Escape") closePops(); });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ if(state.wiz&&!state.wiz.busy) closeWizard(); else closePops(); } });
 
 { const p=loadPrefs(); if(p.searchW) state.searchW=p.searchW; if(Array.isArray(p.colCfg)) state.colCfg=p.colCfg; }
 ensureColCfg();
 initSplitter();
 // Sample-first so the pane is never blank; the live wiring above flips + replaces it.
 if(!state.ref.product) state.ref.product=DEMO_REF.product;
-window._test(SAMPLE_STONE,SAMPLE_JOBS,SAMPLE_CAT);
+if(!state.ref.client)  state.ref.client=DEMO_REF.client;
+if(!state.assignChoices) state.assignChoices=DEMO_ASSIGNEES;
+window._test(SAMPLE_STONE,SAMPLE_JOBS,SAMPLE_CAT,SAMPLE_CLIENTS);
 </script>
 </body>
 </html>

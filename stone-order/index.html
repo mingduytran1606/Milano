@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Milano — Stone Order Board</title>
+<title>Milano - Stone Order Board</title>
 <script src="https://milano.getgrist.com/grist-plugin-api.js"></script>
 <style>
   :root{
@@ -197,7 +197,7 @@
 <script>
 "use strict";
 // ============================================================
-//  Milano — Stone Order Board (Kanban by Order_Status)
+//  Milano - Stone Order Board (Kanban by Order_Status)
 //  Single-file Grist custom widget. Reads the whole Stone_Order
 //  table across all jobs; cards editable in place + drag between
 //  columns to change status. Complements the per-job Inbox widget.
@@ -209,7 +209,7 @@ const STATUS_ORDER=[
   UNSET,
   "1. No Stock",
   "3. Awaiting Order",
-  "2.  Placed Order",                      // NB: two spaces after "2." — the real choice value
+  "2.  Placed Order",                      // NB: two spaces after "2." - the real choice value
   "7. Not Delivered Yet",
   "4. Awaiting Pickup",
   "5. On hold",
@@ -238,7 +238,7 @@ const STATUS_COLORS={
 const STATUS_MANUAL=["Delivered by WF/Aboda/Client","5. On hold","Cancelled","N/A","Return"];
 // "completed / closed" columns (Hide-done toggle collapses these)
 const STATUS_DONE=["6. Delivered","Delivered by WF/Aboda/Client","Cancelled","N/A","Return"];
-// summary tiles — each is a group of statuses
+// summary tiles - each is a group of statuses
 const TILES=[
   { key:"toorder",  name:"Needs ordering", color:"#FED6FB", set:[UNSET,"1. No Stock","3. Awaiting Order"] },
   { key:"onorder",  name:"On order",       color:"#FEF47A", set:["2.  Placed Order","7. Not Delivered Yet"] },
@@ -296,7 +296,7 @@ function productLabel(r){
 }
 function catLabel(c){ return c.Product_Full || [c.Supplier,c.Code].filter(Boolean).join(" | ") || ("#"+c.id); }
 function supplierFor(r){ const c=catFor(r); return r.Product_Supplier || (c&&c.Supplier) || ""; }
-function jobTitle(j){ if(!j)return "—";
+function jobTitle(j){ if(!j)return "-";
   return (j.Client_Label||"").trim() || (j.Job_Address||"").trim() || j.Job_ID || ("#"+j.id); }
 function jobAddr(j){ return j ? ((j.Address_Formatted||j.Job_Address||"").trim()) : ""; }
 
@@ -335,7 +335,7 @@ function statusPill(r){
   trig.appendChild($("span","pcaret","▾"));
   trig.onclick=e=>{ e.stopPropagation();
     openPicker("statusPop",trig,STATUS_ORDER.map(v=>({v,label:statusLabel(v),color:statusColor(v)})),s,val=>{
-      update(r.id,{Order_Status:val});             // manual set — do NOT run auto-rule
+      update(r.id,{Order_Status:val});             // manual set - do NOT run auto-rule
     });
   };
   trig.draggable=false;
@@ -451,7 +451,7 @@ function renderTiles(){
     const el=$("div","tile"+(state.tile===t.key?" on":""));
     const nm=$("div","tn"); const dot=$("i"); dot.style.background=t.color; nm.appendChild(dot); nm.appendChild(document.createTextNode(t.name)); el.appendChild(nm);
     el.appendChild($("div","tv",String(rows.length)));
-    el.appendChild($("div","ts",slabs?(slabs+" slabs"):"—"));
+    el.appendChild($("div","ts",slabs?(slabs+" slabs"):"-"));
     el.onclick=()=>{ state.tile=(state.tile===t.key?null:t.key); render(); };
     wrap.appendChild(el);
   });
@@ -491,7 +491,7 @@ function buildColumn(status,rows){
   col.appendChild(head);
 
   const body=$("div","col-body");
-  if(!rows.length){ body.appendChild($("div","col-empty","—")); }
+  if(!rows.length){ body.appendChild($("div","col-empty","-")); }
   else if(state.subgroup==="supplier"){
     const groups={}; rows.forEach(r=>{ const k=supplierFor(r)||"(no supplier)"; (groups[k]=groups[k]||[]).push(r); });
     Object.keys(groups).sort((a,b)=>a.localeCompare(b)).forEach(sup=>{
@@ -596,7 +596,7 @@ function dateLine(r,col,verb){
   const dl=$("div","dl");
   const set=toDate(r[col]);
   dl.appendChild(document.createTextNode(verb+" "));
-  const b=$("b",null,set?fmtDMY(r[col]):"— set"); dl.appendChild(b);
+  const b=$("b",null,set?fmtDMY(r[col]):"- set"); dl.appendChild(b);
   dl.onmousedown=e=>e.stopPropagation();
   dl.onclick=()=>{
     const di=document.createElement("input"); di.type="date"; di.value=dateInput(r[col]);
@@ -653,7 +653,7 @@ async function pullTables(){
 async function refetch(){ if(!state.grist)return; try{ await pullTables(); }catch(e){ console.warn("fetch failed",e); } render(); }
 
 // ============================================================
-//  GRIST WIRING — sample first, flip to live only once Grist answers
+//  GRIST WIRING - sample first, flip to live only once Grist answers
 // ============================================================
 function goLive(){ if(!state.grist) state.grist=true; }
 if(typeof grist!=="undefined"){
@@ -663,7 +663,7 @@ if(typeof grist!=="undefined"){
     try{
       const sc=await loadGristSchema();
       state.ref.product=sc.refInfo("Stone_Order","Product");
-    }catch(e){ state.ref.product=null; console.warn("schema introspection failed — product picker limited",e); }
+    }catch(e){ state.ref.product=null; console.warn("schema introspection failed - product picker limited",e); }
     try{ await pullTables(); }catch(e){ console.warn("initial fetch failed",e); }
     goLive(); render();
   }).catch(()=>{});

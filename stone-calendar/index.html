@@ -30,27 +30,17 @@
     background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
   .app{height:100%;display:flex;flex-direction:column;padding:14px;gap:12px}
 
-  /* ---- top bar ---- */
-  .topbar{flex:0 0 auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-  .nav{display:flex;align-items:center;gap:6px}
-  .navbtn{width:32px;height:32px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:var(--ink);
-    cursor:pointer;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center}
-  .navbtn:hover{border-color:var(--accent);color:var(--accent-ink)}
-  .title{font-size:18px;font-weight:800;letter-spacing:.2px;min-width:170px}
-  .today{font:inherit;font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:9px;border:1px solid var(--line);
-    background:var(--panel);color:var(--ink);cursor:pointer}
-  .today:hover{border-color:var(--accent);color:var(--accent-ink)}
-  .spacer{flex:1 1 auto}
-  .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
-  .seg button{border:0;background:var(--panel);color:var(--muted);padding:7px 13px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
-  .seg button+button{border-left:1px solid var(--line)}
-  .seg button.on{background:var(--accent-soft);color:var(--accent-ink);font-weight:700}
-  .assign{font:inherit;font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:9px;border:1px solid var(--line);
-    background:var(--panel);color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+  /* ---- toolbar: search + sort + assignee filter + cards, all on one line ---- */
+  .toolbar{flex:0 0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .assign{font:inherit;font-size:12.5px;font-weight:600;padding:9px 13px;border-radius:11px;border:1px solid var(--line);
+    background:var(--panel);color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;gap:7px;white-space:nowrap;box-shadow:var(--shadow)}
   .assign:hover{border-color:var(--accent)}
   .assign.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink)}
+  /* filter row: order count + status pills */
+  .filterbar{flex:0 0 auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .count{font-size:14px;font-weight:800;letter-spacing:.2px;white-space:nowrap}
   /* status filter pills (replace the old ordered/delivered legend) */
-  .statusbar{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:8px}
+  .statusbar{flex:1 1 auto;display:flex;flex-wrap:wrap;gap:8px}
   .sfp{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--panel);
     border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:600;color:var(--ink);cursor:pointer;user-select:none}
   .sfp:hover{border-color:var(--accent)}
@@ -61,7 +51,7 @@
   .sfp.on .cnt{background:rgba(22,179,120,.18);color:var(--accent-ink)}
 
   /* ---- top stone search bar ---- */
-  .searchbar{flex:0 0 auto;position:relative;display:flex;align-items:center}
+  .searchbar{flex:1 1 260px;min-width:220px;position:relative;display:flex;align-items:center}
   .searchbar svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);width:17px;height:17px;stroke:var(--muted);fill:none;pointer-events:none}
   .searchbar input{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--panel);
     border:1px solid var(--line);border-radius:11px;padding:11px 96px 11px 40px;box-shadow:var(--shadow)}
@@ -201,20 +191,21 @@
 </head>
 <body>
 <div class="app">
-  <div class="searchbar">
-    <svg viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-    <input id="stoneSearch" type="text" placeholder="Search stone - name, supplier, code…" autocomplete="off">
-    <span class="clr" id="searchClr" title="Clear" hidden>&times;</span>
-    <span class="match" id="matchCount" hidden></span>
-  </div>
-  <div class="topbar">
-    <div class="title" id="title">Stone orders</div>
-    <div class="spacer"></div>
-    <button class="assign" id="sortBtn" title="Sort the agenda">↕ Sort ▾</button>
+  <div class="toolbar">
+    <div class="searchbar">
+      <svg viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input id="stoneSearch" type="text" placeholder="Search stone - name, supplier, code…" autocomplete="off">
+      <span class="clr" id="searchClr" title="Clear" hidden>&times;</span>
+      <span class="match" id="matchCount" hidden></span>
+    </div>
+    <button class="assign" id="sortBtn" title="Sort the agenda">Sort: Oldest first ▾</button>
     <button class="assign" id="assignBtn">All assignees ▾</button>
     <button class="assign" id="cardsBtn" title="Customise how cards appear">⚙ Cards</button>
   </div>
-  <div class="statusbar" id="statusbar"></div>
+  <div class="filterbar">
+    <span class="count" id="title">Stone orders</span>
+    <div class="statusbar" id="statusbar"></div>
+  </div>
   <div class="body" id="body">
     <div class="agenda" id="agenda"></div>
   </div>
@@ -420,7 +411,7 @@ function render(){
   else mc.hidden=true;
 
   // sort button label reflects the current direction
-  document.getElementById("sortBtn").textContent = "↕ "+(state.sortDir==="desc"?"Newest first":"Oldest first")+" ▾";
+  document.getElementById("sortBtn").textContent = "Sort: "+(state.sortDir==="desc"?"Newest first":"Oldest first")+" ▾";
 
   // status filter pills (with a job count each)
   renderStatusbar();

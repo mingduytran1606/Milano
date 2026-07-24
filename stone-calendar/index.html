@@ -245,13 +245,26 @@
    ============================================================ */
 
 // ---- status model ----
+// These are only FALLBACK colours for standalone/preview. The real Order_Status
+// choices + colours are read LIVE from Grist metadata on go-live (see applyStatusModel)
+// so the chips, pills and order always match the Stone Order page exactly. Keep the
+// keys here identical to the live Grist choice values (no "1./2." number prefixes).
 const ORD_DEFAULT = {
-  "2.  Placed Order":"#FEF47A","3. Awaiting Order":"#FED6FB","6. Delivered":"#98FD90",
-  "4. Awaiting Pickup":"#75B5FC","7. Not Delivered Yet":"#CCFEFE","5. On hold":"#FEE7C3",
-  "1. No Stock":"#FD8182","Cancelled":"#DCDCDC","Delivered by WF":"#E1FEDE",
-  "Delivered by Aboda":"#E1FEDE","Delivered by Client":"#E1FEDE","Return":"#CCFEFE","N/A":"#e9edf1"};
+  "Placed Order":"#FEF47A","Awaiting Order":"#FED6FB","Delivered":"#98FD90",
+  "Awaiting Pickup":"#75B5FC","Not Delivered Yet":"#CCFEFE","On hold":"#FEE7C3",
+  "No Stock":"#FD8182","Cancelled":"#DCDCDC","Delivered by WF":"#FFFFFF",
+  "Delivered by Aboda":"#FFFFFF","Delivered by Client":"#FFFFFF","Return":"#DCDCDC",
+  "Milano Pickup":"#e9edf1","N/A":"#e9edf1"};
 const ORD_C = Object.assign({}, ORD_DEFAULT);
+let STATUS_ORDER = Object.keys(ORD_DEFAULT);   // live choice order from Grist once known
 const statusColor = s => ORD_C[s] || "#e9edf1";
+// Overlay the live Order_Status choices/colours from Grist over the fallbacks above,
+// so a single source of truth (the Grist column) drives colours + pill order.
+function applyStatusModel(m){ if(!m) return;
+  const opts=m.options||{};
+  Object.keys(opts).forEach(k=>{ const f=opts[k]&&opts[k].fillColor; if(f) ORD_C[k]=f; });
+  if(Array.isArray(m.choices)&&m.choices.length) STATUS_ORDER=m.choices.slice();
+}
 const statusLabel = s => (s==null||s==="") ? "To sort" : s;
 const SPECIAL_COL = /^(manualSort|gristHelper_|id$)/;
 // Delivered = any status meaning delivered, regardless of who delivered it.
@@ -259,12 +272,12 @@ function isDeliveredStatus(r){ const low=String(r.Order_Status||"").toLowerCase(
 // Named status-filter groups — this is also the pill order. "Delivered" groups every
 // delivered status together; extra pills are added for any other status found in the data.
 const PRIMARY_GROUPS=[
-  { key:"awaiting_order",  label:"Awaiting Order",   statuses:["3. Awaiting Order"] },
-  { key:"ordered",         label:"Ordered",          statuses:["2.  Placed Order"] },
-  { key:"awaiting_pickup", label:"Awaiting Pick Up", statuses:["4. Awaiting Pickup"] },
-  { key:"delivered",       label:"Delivered",        match:isDeliveredStatus, color:"6. Delivered" }
+  { key:"awaiting_order",  label:"Awaiting Order",   statuses:["Awaiting Order"] },
+  { key:"ordered",         label:"Ordered",          statuses:["Placed Order"] },
+  { key:"awaiting_pickup", label:"Awaiting Pick Up", statuses:["Awaiting Pickup"] },
+  { key:"delivered",       label:"Delivered",        match:isDeliveredStatus, color:"Delivered" }
 ];
-const PRIMARY_STATUSES=new Set(["3. Awaiting Order","2.  Placed Order","4. Awaiting Pickup"]);
+const PRIMARY_STATUSES=new Set(["Awaiting Order","Placed Order","Awaiting Pickup"]);
 function matchGroup(g,r){ if(!g||g.key==="all")return true; if(g.match)return g.match(r);
   return (g.statuses||[]).includes(String(r.Order_Status||"")); }
 // All + primary groups + one pill per other status present in the data.
@@ -273,7 +286,9 @@ function statusPills(){
   const extra=new Set();
   (state.stone||[]).forEach(r=>{ if(!calDateOf(r))return; const s=String(r.Order_Status||"");
     if(isDeliveredStatus(r)||PRIMARY_STATUSES.has(s))return; extra.add(s); });
-  [...extra].sort().forEach(s=>pills.push({ key:"s:"+s, label:statusLabel(s), statuses:[s], color:s }));
+  const ord=s=>{ const i=STATUS_ORDER.indexOf(s); return i<0?999:i; };   // follow the live Grist choice order
+  [...extra].sort((a,b)=>(ord(a)-ord(b))||String(a).localeCompare(String(b)))
+    .forEach(s=>pills.push({ key:"s:"+s, label:statusLabel(s), statuses:[s], color:s }));
   return pills;
 }
 function findGroup(key){ return statusPills().find(p=>p.key===key)||null; }
@@ -758,7 +773,13 @@ async function loadGristSchema(){
     const targetTableId=mt[1], vis=col.visibleCol&&colByRowId[col.visibleCol];
     return { colId, targetTableId, labelCol:(vis&&vis.colId)||bestLabelCol(targetTableId) };
   }
-  return { refInfo };
+  // the live Order_Status choice list + per-choice colours, straight from the column def
+  function choiceModel(parentTableId,colId){
+    const col=colsOf(parentTableId).find(c=>c.colId===colId); if(!col)return null;
+    let wo={}; try{ wo=JSON.parse(col.widgetOptions||"{}")||{}; }catch(e){ return null; }
+    return { choices:wo.choices||[], options:wo.choiceOptions||{} };
+  }
+  return { refInfo, choiceModel };
 }
 async function pullTables(){
   const [so,jd]=await Promise.all([grist.docApi.fetchTable("Stone_Order"), grist.docApi.fetchTable("Jobs_Detail")]);
@@ -773,7 +794,8 @@ if(typeof grist!=="undefined"){
   try{ grist.onRecord(()=>{}); }catch(e){}
   try{ grist.onOptions(applyGristOptions); }catch(e){}   // adopt the shared card design
   grist.docApi.fetchTable("Stone_Order").then(async ()=>{
-    try{ const sc=await loadGristSchema(); state.ref.product=sc.refInfo("Stone_Order","Product"); }catch(e){ console.warn("schema failed",e); }
+    try{ const sc=await loadGristSchema(); state.ref.product=sc.refInfo("Stone_Order","Product");
+         applyStatusModel(sc.choiceModel("Stone_Order","Order_Status")); }catch(e){ console.warn("schema failed",e); }
     try{ await pullTables(); }catch(e){ console.warn("initial fetch failed",e); }
     state.grist=true; render();
   }).catch(()=>{});
@@ -799,13 +821,13 @@ const SAMPLE_CAT=[
 // Dates chosen around July 2026 so the sample month is populated.
 const D=(y,m,d)=>Math.floor(Date.UTC(y,m-1,d)/1000);
 const SAMPLE_STONE=[
-  { id:1, Job:2,  Product:101, Product_Code:"LS303", Product_Supplier:"Lavistone",  Scope_Qty:2, Ordered_Qty:2, Delivery_Qty:2, Order_Status:"6. Delivered",     Order_Date:D(2026,7,5),  Delivery_Date:D(2026,7,18) },
-  { id:2, Job:8,  Product:102, Product_Code:"1888",  Product_Supplier:"YDL",        Scope_Qty:2, Ordered_Qty:2, Delivery_Qty:0, Order_Status:"2.  Placed Order",  Order_Date:D(2026,7,9),  Delivery_Date:null },
-  { id:3, Job:8,  Product:103, Product_Code:"CS5100",Product_Supplier:"Caesarstone",Scope_Qty:2, Ordered_Qty:2, Delivery_Qty:0, Order_Status:"7. Not Delivered Yet",Order_Date:D(2026,7,9), Delivery_Date:null },
-  { id:5, Job:14, Product:107, Product_Code:"3420",  Product_Supplier:"WF",         Scope_Qty:8, Ordered_Qty:8, Delivery_Qty:0, Order_Status:"4. Awaiting Pickup", Order_Date:D(2026,7,15), Delivery_Date:null },
-  { id:6, Job:19, Product:104, Product_Code:"LSU401",Product_Supplier:"Lavistone",  Scope_Qty:4, Ordered_Qty:4, Delivery_Qty:4, Order_Status:"6. Delivered",     Order_Date:D(2026,7,2),  Delivery_Date:D(2026,7,22) },
-  { id:8, Job:23, Product:101, Product_Code:"LS303", Product_Supplier:"Lavistone",  Scope_Qty:5, Ordered_Qty:5, Delivery_Qty:5, Order_Status:"6. Delivered",     Order_Date:D(2026,6,28), Delivery_Date:D(2026,7,10) },
-  { id:9, Job:23, Product:104, Product_Code:"LSU401",Product_Supplier:"Lavistone",  Scope_Qty:2, Ordered_Qty:2, Delivery_Qty:0, Order_Status:"3. Awaiting Order", Order_Date:D(2026,7,24), Delivery_Date:null }
+  { id:1, Job:2,  Product:101, Product_Code:"LS303", Product_Supplier:"Lavistone",  Scope_Qty:2, Ordered_Qty:2, Delivery_Qty:2, Order_Status:"Delivered",        Order_Date:D(2026,7,5),  Delivery_Date:D(2026,7,18) },
+  { id:2, Job:8,  Product:102, Product_Code:"1888",  Product_Supplier:"YDL",        Scope_Qty:2, Ordered_Qty:2, Delivery_Qty:0, Order_Status:"Placed Order",      Order_Date:D(2026,7,9),  Delivery_Date:null },
+  { id:3, Job:8,  Product:103, Product_Code:"CS5100",Product_Supplier:"Caesarstone",Scope_Qty:2, Ordered_Qty:2, Delivery_Qty:0, Order_Status:"Not Delivered Yet", Order_Date:D(2026,7,9), Delivery_Date:null },
+  { id:5, Job:14, Product:107, Product_Code:"3420",  Product_Supplier:"WF",         Scope_Qty:8, Ordered_Qty:8, Delivery_Qty:0, Order_Status:"Awaiting Pickup",   Order_Date:D(2026,7,15), Delivery_Date:null },
+  { id:6, Job:19, Product:104, Product_Code:"LSU401",Product_Supplier:"Lavistone",  Scope_Qty:4, Ordered_Qty:4, Delivery_Qty:4, Order_Status:"Delivered",        Order_Date:D(2026,7,2),  Delivery_Date:D(2026,7,22) },
+  { id:8, Job:23, Product:101, Product_Code:"LS303", Product_Supplier:"Lavistone",  Scope_Qty:5, Ordered_Qty:5, Delivery_Qty:5, Order_Status:"Delivered",        Order_Date:D(2026,6,28), Delivery_Date:D(2026,7,10) },
+  { id:9, Job:23, Product:104, Product_Code:"LSU401",Product_Supplier:"Lavistone",  Scope_Qty:2, Ordered_Qty:2, Delivery_Qty:0, Order_Status:"Awaiting Order",    Order_Date:D(2026,7,24), Delivery_Date:null }
 ];
 const DEMO_REF={ product:{ targetTableId:"Catalogue", labelCol:"Product_Full" } };
 window._test=function(stone,jobs,catalogue){

@@ -9,8 +9,7 @@ to this repo, **push to `main` = deploy**.
 |---|---|---|---|
 | `inbox/` | Consolidated Inbox (jobs master–detail) | *(inbox site)* | serves at **root** (`index.html`) |
 | `stone-order/` | Stone Order Board (procurement Kanban by status) | *(stone-order site)* | serves at **root** (`index.html`) |
-| `stone-search/` | Catalogue Search (find a product → its full order history across jobs) | *(stone-search site)* | serves at **root** (`index.html`) |
-| `stone-calendar/` | Stone Order Calendar (each line on its order date until delivered, then its delivery date) | *(stone-calendar site)* | serves at **root** (`index.html`) |
+| `stone-calendar/` | Stone Order Calendar (Agenda / Month / Week; each line on its order date until delivered, then its delivery date) with a top **stone search** bar that live-filters events. Merges the old Catalogue Search in. | *(stone-calendar site)* | serves at **root** (`index.html`) |
 | `calendar/` | Installations calendar + jobs sidebar | `silly-paletas-da1298` | serves at **root** (`index.html`) |
 | `address/` | Address autocomplete / new-job creator | `milanoaddresswidget` | **`/milano-address-widget.html`** (root 404s — keep the filename!) |
 | `stage-summary/` | Stage summary counts | *(stage-summary site)* | `/milano-stage-summary-widget.html` |
@@ -45,10 +44,9 @@ by the next push).
   **SELECT BY** = the Jobs list section.
 - Stone Order Board: Custom widget on the Stone Order page, **Table = Stone_Order**,
   **Access = Full**, **SELECT BY** = unset (whole-table procurement board).
-- Catalogue Search: Custom widget, **Table = Stone_Order**, **Access = Full**,
-  **SELECT BY** = unset (searches the whole Catalogue; picks its own selection).
 - Stone Order Calendar: Custom widget, **Table = Stone_Order**, **Access = Full**,
-  **SELECT BY** = unset (plots every line by order/delivery date across the month).
+  **SELECT BY** = unset (plots every line by order/delivery date; the top search bar
+  filters events by stone name / supplier / code). Replaces the old Catalogue Search widget.
 - Calendar: mapped to `Inst_`; Access = Full.
 - Address/new-job: mapped to Jobs_Detail; needs `?key=GOOGLE_KEY` query param.
 - Stage summary: Access = Read table.

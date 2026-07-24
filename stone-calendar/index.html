@@ -96,7 +96,10 @@
     border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
   .ag-day{display:flex;gap:14px;align-items:flex-start;padding:11px 14px;border-bottom:1px solid var(--line2)}
   .ag-date{flex:0 0 130px;font-size:12.5px;font-weight:700;color:var(--muted)}
-  .ag-date .tdy{display:inline-block;margin-top:3px;font-size:10px;color:#fff;background:var(--accent);border-radius:5px;padding:0 6px}
+  /* today: a light accent bar + accent-coloured date, no heavy filled pill */
+  .ag-day.today{box-shadow:inset 3px 0 0 var(--accent)}
+  .ag-day.today .ag-date{color:var(--accent-ink)}
+  .ag-date .tdy{display:block;margin-top:1px;font-size:10px;font-weight:700;color:var(--accent-ink);letter-spacing:.02em}
   .ag-evs{flex:1 1 auto;display:flex;flex-direction:column;gap:5px;min-width:0}
   .ag-empty{color:var(--muted);text-align:center;padding:40px;font-size:13px}
 
@@ -165,6 +168,8 @@
   .ce-segm button{border:0;background:var(--panel);color:var(--muted);padding:5px 10px;font:inherit;font-size:11.5px;font-weight:600;cursor:pointer;min-width:30px}
   .ce-segm button+button{border-left:1px solid var(--line)}
   .ce-segm button.on{background:var(--accent-soft);color:var(--accent-ink);font-weight:700}
+  .ce-wstep{display:inline-flex;align-items:center;gap:6px}
+  .ce-wstep .ce-fval{min-width:26px}
   .ce-addsec{font:inherit;font-size:12.5px;font-weight:600;color:var(--accent-ink);background:var(--accent-soft);
     border:1px dashed var(--accent);border-radius:9px;padding:9px 12px;cursor:pointer;width:100%;margin-top:2px}
   .ce-addsec:hover{filter:brightness(1.03)}
@@ -313,7 +318,7 @@ window._stonecal=state;
 // \n = new line — plus a style (plain / pill / in-highlight) and an alignment.
 const STYLES=["plain","pill","highlight"];        // highlight = pill in the line's Order_Status colour
 const ALIGNS=["left","centre","right"];
-const DEFAULT_EVENT_COLS=[{ tpl:'**{client}** · {product}', style:'plain', align:'left' }];
+const DEFAULT_EVENT_COLS=[{ tpl:'**{client}** · {product}', style:'plain', align:'left', width:1 }];
 let eventCardCols=cloneCols(DEFAULT_EVENT_COLS);
 let cardScope='everyone', eventCardFont=10.5;
 const CARD_LS='milano_stonecal_cards';
@@ -321,7 +326,8 @@ const EVENT_TOKENS={ client:'Client', job:'Job ID', stage:'Job stage', address:'
   code:'Product code', status:'Status pill', scope:'Scope qty', ordered:'Ordered qty', delivered:'Delivered qty',
   orderdate:'Order date', deliverydate:'Delivery date', inv:'Invoice #', note:'Note', price:'$ / slab', assigned:'Assignee avatars' };
 function cloneCols(cols){ return (cols||[]).map(c=>({ tpl:String(c.tpl||""),
-  style:STYLES.includes(c.style)?c.style:'plain', align:ALIGNS.includes(c.align)?c.align:'left' })); }
+  style:STYLES.includes(c.style)?c.style:'plain', align:ALIGNS.includes(c.align)?c.align:'left',
+  width:Math.max(1,Math.min(6,Math.round(Number(c.width)||1))) })); }
 // Accept either the new columns array or an old single-string template.
 function normaliseCols(v){
   if(Array.isArray(v) && v.length) return cloneCols(v).slice(0,4);
@@ -452,7 +458,7 @@ function renderAgenda(byYmd,dayKeys){
   dayKeys.forEach(k=>{
     const d=dateFromYmd(k);
     const evs=eventsOn(byYmd,d); if(!evs.length) return;
-    const row=$("div","ag-day");
+    const row=$("div","ag-day"+(k===todayK?" today":""));
     const dc=$("div","ag-date");
     dc.appendChild(document.createTextNode(DOW[(d.getDay()+6)%7]+" "+d.getDate()+" "+MONTHS[d.getMonth()].slice(0,3)+" "+d.getFullYear()));
     if(k===todayK) dc.appendChild($("div","tdy","Today"));
@@ -462,15 +468,47 @@ function renderAgenda(byYmd,dayKeys){
   });
 }
 // ---- template engine (markdown-ish → DOM), ported from the installations calendar ----
+// Connector = whitespace / punctuation that only makes sense *between* two values.
+const CARD_CONNECTOR=/^[\s·•|/\\,;:–—()\[\].-]+$/;
+// Parse a line into ordered parts: {text} literals and {node,empty} rendered tokens/format.
+function inlineParts(str,tokens,ctx){
+  const re=/\*\*([^*]+)\*\*|\*([^*]+)\*|==([^=]+)==|\{([a-z_]+)\}|([^{*=]+)|([\s\S])/g;
+  const has=el=>!!(el.textContent.trim()||el.children.length);
+  const parts=[]; let m;
+  while((m=re.exec(str))){
+    if(m[1]!=null){ const b=document.createElement("strong"); renderCardInline(m[1],tokens,b,ctx); parts.push({node:b,empty:!has(b)}); }
+    else if(m[2]!=null){ const it=document.createElement("em"); renderCardInline(m[2],tokens,it,ctx); parts.push({node:it,empty:!has(it)}); }
+    else if(m[3]!=null){ const bar=$("span","cbar"); if(ctx&&ctx.bar){ bar.style.background=ctx.bar.fill||"var(--line)"; bar.style.color=ctx.bar.text||"var(--ink)"; }
+      renderCardInline(m[3],tokens,bar,ctx); parts.push({node:bar,empty:!has(bar)}); }
+    else if(m[4]!=null){ const fn=tokens[m[4]];
+      if(fn){ const el=fn();
+        if(el==null) parts.push({empty:true});
+        else parts.push({node: typeof el==="string"?document.createTextNode(el):el, empty: typeof el==="string" && !el.trim()}); }
+      else parts.push({text:"{"+m[4]+"}"}); }
+    else parts.push({text: m[5]!=null?m[5]:m[6]});
+  }
+  return parts;
+}
+// Drop empty token parts, then any connector text left dangling at the ends or next to a
+// removed token — so an absent {scope}/{ordered}/… takes its surrounding "·", ":" etc. with it.
+function keepParts(parts){
+  const seq=parts.filter(p=>!p.empty).map(p=>{
+    if(p.text!=null) return { kind: CARD_CONNECTOR.test(p.text) ? "conn" : "text", text:p.text };
+    return { kind:"node", node:p.node };
+  });
+  const out=[];
+  for(const x of seq){ if(x.kind==="conn" && (!out.length || out[out.length-1].kind==="conn")) continue; out.push(x); }
+  while(out.length && out[out.length-1].kind==="conn") out.pop();
+  return out;
+}
 function renderCardTemplate(str,tokens,host,ctx){
   const added=[];
   String(str==null?"":str).split("\n").forEach(lineStr=>{
     if(/^\s*(-{3,}|—+|\*{3,})\s*$/.test(lineStr)){ const hr=$("div","cdivider"); host.appendChild(hr); added.push(hr); return; }
-    const line=$("div","cline"); const stats={tokens:0,filled:0};
-    renderCardInline(lineStr,tokens,line,ctx,stats);
-    if(stats.tokens>0 && stats.filled===0) return;             // whole line was empty tokens → drop
-    while(line.firstChild&&line.firstChild.nodeType===3&&!line.firstChild.textContent.trim()) line.removeChild(line.firstChild);
-    while(line.lastChild&&line.lastChild.nodeType===3&&!line.lastChild.textContent.trim()) line.removeChild(line.lastChild);
+    const kept=keepParts(inlineParts(lineStr,tokens,ctx));
+    if(!kept.length) return;                                   // nothing left to show → drop line
+    const line=$("div","cline");
+    kept.forEach(pt=>line.appendChild(pt.node!==undefined?pt.node:document.createTextNode(pt.text)));
     host.appendChild(line); added.push(line);
   });
   added.forEach((el,i)=>{ if(!el.classList.contains("cdivider"))return; let after=false;
@@ -526,7 +564,7 @@ function eventChip(e){
   const r=e.r, j=jobFor(r);
   const chip=$("div","ev");
   const cols=(eventCardCols&&eventCardCols.length)?eventCardCols:DEFAULT_EVENT_COLS;
-  chip.style.gridTemplateColumns="repeat("+cols.length+",minmax(0,1fr))";
+  chip.style.gridTemplateColumns=cols.map(c=>"minmax(0,"+(c.width||1)+"fr)").join(" ");
   const tint=softTint(statusColor(r.Order_Status));
   chip.style.background=tint.bg; chip.style.borderColor=tint.dot;
   const tokens=eventCardTokens(e), sb=statusBar(r);
@@ -593,13 +631,23 @@ function renderCardEditor(){
       const b=document.createElement("button"); b.type="button"; b.textContent=lab; b.title=title; if(col.align===v)b.className="on";
       b.onclick=()=>{ col.align=v; commit(); renderCardEditor(); }; alignSeg.appendChild(b); });
     opts.appendChild(alignSeg);
+    // per-column width (relative — how much of the card this column takes)
+    opts.appendChild($("span","ce-optlab","Width"));
+    const wStep=$("div","ce-wstep");
+    const wMinus=document.createElement("button"); wMinus.type="button"; wMinus.className="ce-fbtn"; wMinus.textContent="−";
+    wMinus.title="Narrower"; wMinus.onclick=()=>{ col.width=Math.max(1,(col.width||1)-1); commit(); renderCardEditor(); };
+    const wVal=$("span","ce-fval",(col.width||1)+"×");
+    const wPlus=document.createElement("button"); wPlus.type="button"; wPlus.className="ce-fbtn"; wPlus.textContent="+";
+    wPlus.title="Wider"; wPlus.onclick=()=>{ col.width=Math.min(6,(col.width||1)+1); commit(); renderCardEditor(); };
+    wStep.appendChild(wMinus); wStep.appendChild(wVal); wStep.appendChild(wPlus);
+    opts.appendChild(wStep);
     sec.appendChild(opts);
     body.appendChild(sec);
   });
 
   const add=document.createElement("button"); add.type="button"; add.className="ce-addsec";
   add.textContent="＋ Add section (column)"; add.disabled=eventCardCols.length>=4;
-  add.onclick=()=>{ if(eventCardCols.length<4){ eventCardCols.push({tpl:"",style:"plain",align:"left"}); commit(); renderCardEditor(); } };
+  add.onclick=()=>{ if(eventCardCols.length<4){ eventCardCols.push({tpl:"",style:"plain",align:"left",width:1}); commit(); renderCardEditor(); } };
   body.appendChild(add);
 
   // shared token palette — inserts into the last-focused section

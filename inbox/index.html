@@ -183,10 +183,39 @@
   .tline strong{font-weight:600;color:var(--ink);font-size:var(--lcf-client,13px)}
   .job .tline .pill.xs{font-size:var(--lcf-pill,10px)}
   .job .tline .avatar.sm{font-size:var(--lcf-avatar,10px)}
+  /* multi-column job card */
+  .jbody.cols{display:grid;gap:2px 12px;align-items:start}
+  .jcol{min-width:0}
+  .jcol.al-centre .tline{justify-content:center}
+  .jcol.al-right .tline{justify-content:flex-end}
 
   /* ---- job-card template editor ---- */
-  .tpl-ta{width:100%;min-height:92px;font-size:13px;line-height:1.5;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace}
+  .tpl-ta{width:100%;min-height:64px;font-size:13px;line-height:1.5;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace}
   .tpl-ta:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+  /* columns editor */
+  .cm-cols{display:flex;flex-direction:column;gap:9px}
+  .cm-col{border:1px solid var(--line);border-radius:11px;padding:9px;background:var(--bg)}
+  .cm-col-head{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+  .cm-col-n{font-size:10.5px;font-weight:800;color:var(--muted);background:var(--line2);border-radius:6px;padding:1px 7px}
+  .cm-col-mv,.cm-col-x{margin-left:0;cursor:pointer;color:var(--muted);border:1px solid var(--line);background:var(--panel);border-radius:7px;width:24px;height:24px;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center}
+  .cm-col-x{margin-left:auto}
+  .cm-col-mv:hover{border-color:var(--accent);color:var(--accent-ink)}
+  .cm-col-x:hover{border-color:var(--danger);color:var(--danger)}
+  .cm-col-mv.off,.cm-col-x.off{opacity:.25;pointer-events:none}
+  .cm-col-opts{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:8px}
+  .cm-lab{font-size:11px;font-weight:600;color:var(--muted)}
+  .cm-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .cm-seg button{border:0;background:var(--panel);color:var(--muted);padding:5px 10px;font:inherit;font-size:11.5px;font-weight:600;cursor:pointer;min-width:30px}
+  .cm-seg button+button{border-left:1px solid var(--line)}
+  .cm-seg button.on{background:var(--accent-soft);color:var(--accent-ink);font-weight:700}
+  .cm-wstep{display:inline-flex;align-items:center;gap:6px}
+  .cm-wb{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;font-size:15px}
+  .cm-wb:hover{border-color:var(--accent)}
+  .cm-wv{font-variant-numeric:tabular-nums;min-width:26px;text-align:center}
+  .cm-addcol{font:inherit;font-size:12.5px;font-weight:600;color:var(--accent-ink);background:var(--accent-soft);
+    border:1px dashed var(--accent);border-radius:10px;padding:9px 12px;cursor:pointer;width:100%}
+  .cm-addcol:hover{filter:brightness(1.03)}
+  .cm-addcol[disabled]{opacity:.5;cursor:not-allowed;border-style:solid}
   .tpl-sec{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 2px 7px}
   .tpl-prev{border:1px dashed var(--line);border-radius:10px;padding:10px 12px;background:var(--bg)}
   .tok-list{display:flex;flex-wrap:wrap;gap:6px}
@@ -746,6 +775,19 @@ const TOKENS={
   input:   {desc:"Input date",          el:j=>txt(fmtShort(j.Input_Date))},
 };
 const DEFAULT_TEMPLATE="**{client}** {stage}\n{address}\n{assigned}";
+// ---- job-card COLUMNS: the card is a row of 1-4 columns, each its own template + align + width ----
+const CARD_ALIGNS=["left","centre","right"];
+function normaliseCardCols(v, fallbackTpl){
+  if(Array.isArray(v) && v.length){
+    return v.slice(0,4).map(c=>({ tpl:String((c&&c.tpl)||""),
+      align:CARD_ALIGNS.includes(c&&c.align)?c.align:"left",
+      width:Math.max(1,Math.min(6,Math.round(Number(c&&c.width)||1))) }));
+  }
+  const t=(typeof fallbackTpl==="string"&&fallbackTpl.trim())?fallbackTpl:DEFAULT_TEMPLATE;
+  return [{ tpl:t, align:"left", width:1 }];
+}
+function cloneCardCols(cols){ return (cols||[]).map(c=>({tpl:c.tpl,align:c.align,width:c.width})); }
+function colsToTemplate(cols){ return (cols&&cols[0]&&cols[0].tpl)||DEFAULT_TEMPLATE; }   // legacy single-string mirror
 
 // ---- helpers ----
 const $ = (t,c,txt)=>{const e=document.createElement(t); if(c)e.className=c; if(txt!=null)e.textContent=txt; return e;};
@@ -937,7 +979,7 @@ const state = { jobs:[], stone:[], inst:[], clients:[], catalogue:[], selectedId
   listCardFont:Object.assign({},LIST_CARD_FONT), summaryFont:Object.assign({},SUMMARY_FONT),
   colors:{stage:{},payment:{},assignee:{},order:{}}, fmtCollapsed:{},
   schemaChoices:{stage:null,payment:null,order:null}, schemaChoiceColors:{stage:{},payment:{},order:{}},
-  cardTemplate:DEFAULT_TEMPLATE, templateShared:null, _sharedTemplate:null,
+  cardTemplate:DEFAULT_TEMPLATE, cardCols:normaliseCardCols(null,DEFAULT_TEMPLATE), templateShared:null, _sharedTemplate:null,
   grouping:{by:"",rules:[],restMode:"value"}, groupCollapsed:{},
   savedGroupings:[], activeGrouping:"",
   savedViews:[], activeView:"", filterDrill:null,
@@ -957,6 +999,7 @@ function snapshot(withMeta){
   const s={ q:state.filter.q, stage:cleanSet(state.filter.stage), assigned:cleanSet(state.filter.assigned),
     payment:cleanSet(state.filter.payment), sort:{key:state.sort.key,dir:state.sort.dir}, sort2:{key:state.sort2.key,dir:state.sort2.dir}, stageOrder:(state.stageOrder||STAGES).slice(), cardFontSize:state.cardFontSize||12.5, fields:Object.assign({},state.fields),
     cardOrder:(state.cardOrder||CARD_ORDER_DEFAULT).slice(), cardTemplate:state.cardTemplate||DEFAULT_TEMPLATE,
+    cardCols:cloneCardCols(state.cardCols),
     grouping:JSON.parse(JSON.stringify(state.grouping||{by:"",rules:[],restMode:"value"})) };
   if(withMeta) s.activeView=state.activeView;
   return s;
@@ -970,7 +1013,8 @@ function applyConfig(c){ if(!c)return;
   if(typeof c.cardFontSize==="number") state.cardFontSize=c.cardFontSize;
   state.fields=Object.assign(defaultFields(),c.fields||{});
   state.cardOrder=normalizeCardOrder(c.cardOrder);
-  state.cardTemplate=(typeof c.cardTemplate==="string"&&c.cardTemplate.trim())?c.cardTemplate:DEFAULT_TEMPLATE;
+  state.cardCols=normaliseCardCols(c.cardCols, c.cardTemplate);
+  state.cardTemplate=colsToTemplate(state.cardCols);
   state.grouping=normalizeGrouping(c.grouping);
   if("activeView" in c) state.activeView=c.activeView||""; }
 function sig(s){ return JSON.stringify({q:s.q||"",st:Object.keys(cleanSet(s.stage)).sort(),
@@ -1903,6 +1947,7 @@ function insertAtCursor(ta,text){
 let _sharedSig=null;   // last shared config seen/pushed, to detect real changes
 function sharedConfigObj(){
   return { cardTemplate:state.cardTemplate||DEFAULT_TEMPLATE,
+    cardCols:cloneCardCols(state.cardCols),
     cardFontSize:state.cardFontSize||12.5,
     listCardFont:state.listCardFont, summaryFont:state.summaryFont,
     colors:state.colors, fields:state.fields,
@@ -2039,8 +2084,60 @@ function openCardEditor(){
   tCard.onclick=()=>showTab("card"); tGroup.onclick=()=>showTab("group");
 
   // ---- Card layout panel ----
-  const ta=document.createElement("textarea"); ta.className="tpl-ta"; ta.spellcheck=false; ta.value=state.cardTemplate||DEFAULT_TEMPLATE;
-  ta.onblur=pushSharedTemplate; panelCard.appendChild(ta);
+  if(!Array.isArray(state.cardCols)||!state.cardCols.length) state.cardCols=normaliseCardCols(null,state.cardTemplate);
+  let activeTa=null, activeCol=null;                       // last-focused column — token chips insert here
+  const prev=$("div","tpl-prev");
+  function refresh(){
+    state.cardTemplate=colsToTemplate(state.cardCols); savePrefs(); renderList();
+    prev.innerHTML=""; const j=selectedJob()||state.jobs[0];
+    if(j) prev.appendChild(renderCardBody(j,state.cardCols)); else prev.appendChild($("div","tpl-help","No sample job to preview."));
+  }
+  panelCard.appendChild($("div","tpl-sec","Columns"));
+  const colsWrap=$("div","cm-cols"); panelCard.appendChild(colsWrap);
+  function drawCols(){
+    colsWrap.innerHTML="";
+    state.cardCols.forEach((col,i)=>{
+      const block=$("div","cm-col");
+      const head=$("div","cm-col-head");
+      head.appendChild($("span","cm-col-n","Column "+(i+1)));
+      const up=$("span","cm-col-mv"+(i===0?" off":""),"↑"); up.title="Move left";
+      up.onclick=()=>{ const a=state.cardCols; if(i>0){ [a[i-1],a[i]]=[a[i],a[i-1]]; refresh(); drawCols(); } };
+      const dn=$("span","cm-col-mv"+(i===state.cardCols.length-1?" off":""),"↓"); dn.title="Move right";
+      dn.onclick=()=>{ const a=state.cardCols; if(i<a.length-1){ [a[i+1],a[i]]=[a[i],a[i+1]]; refresh(); drawCols(); } };
+      const rm=$("span","cm-col-x"+(state.cardCols.length<=1?" off":""),"×"); rm.title="Remove column";
+      rm.onclick=()=>{ if(state.cardCols.length>1){ state.cardCols.splice(i,1); refresh(); drawCols(); } };
+      head.appendChild(up); head.appendChild(dn); head.appendChild(rm);
+      block.appendChild(head);
+      const t=document.createElement("textarea"); t.className="tpl-ta"; t.spellcheck=false; t.value=col.tpl;
+      t.oninput=()=>{ col.tpl=t.value; refresh(); };
+      t.onfocus=()=>{ activeTa=t; activeCol=col; };
+      t.onblur=pushSharedTemplate;
+      if(!activeTa){ activeTa=t; activeCol=col; }
+      block.appendChild(t);
+      const opts=$("div","cm-col-opts");
+      opts.appendChild($("span","cm-lab","Align"));
+      const aseg=$("div","cm-seg");
+      [["left","L","Left"],["centre","C","Centre"],["right","R","Right"]].forEach(([v,l,ti])=>{
+        const b=document.createElement("button"); b.type="button"; b.textContent=l; b.title=ti; if(col.align===v)b.className="on";
+        b.onclick=()=>{ col.align=v; refresh(); drawCols(); }; aseg.appendChild(b); });
+      opts.appendChild(aseg);
+      opts.appendChild($("span","cm-lab","Width"));
+      const wseg=$("div","cm-wstep");
+      const wm=document.createElement("button"); wm.type="button"; wm.className="cm-wb"; wm.textContent="−"; wm.title="Narrower";
+      wm.onclick=()=>{ col.width=Math.max(1,(col.width||1)-1); refresh(); drawCols(); };
+      const wv=$("span","cm-wv",(col.width||1)+"×");
+      const wp=document.createElement("button"); wp.type="button"; wp.className="cm-wb"; wp.textContent="+"; wp.title="Wider";
+      wp.onclick=()=>{ col.width=Math.min(6,(col.width||1)+1); refresh(); drawCols(); };
+      wseg.appendChild(wm); wseg.appendChild(wv); wseg.appendChild(wp); opts.appendChild(wseg);
+      block.appendChild(opts);
+      colsWrap.appendChild(block);
+    });
+    const add=document.createElement("button"); add.type="button"; add.className="cm-addcol";
+    add.textContent="＋ Add column"; add.disabled=state.cardCols.length>=4;
+    add.onclick=()=>{ if(state.cardCols.length<4){ state.cardCols.push({tpl:"",align:"left",width:1}); refresh(); drawCols(); } };
+    colsWrap.appendChild(add);
+  }
+  drawCols();
   const share=$("div","tpl-share");
   share.appendChild($("span","tpl-note","When you save, choose “Save for everyone” (team design, stored in the Grist doc) or “Save just for me” (this browser only)."));
   panelCard.appendChild(share);
@@ -2051,21 +2148,16 @@ function openCardEditor(){
   fr.oninput=()=>{ state.cardFontSize=Number(fr.value); fv.textContent=fr.value+"px"; applyCardFont(); savePrefs(); refresh(); };
   fsRow.appendChild(fr); fsRow.appendChild(fv); panelCard.appendChild(fsRow);
   panelCard.appendChild($("div","tpl-sec","Preview"));
-  const prev=$("div","tpl-prev"); panelCard.appendChild(prev);
-  function refresh(){
-    state.cardTemplate=ta.value; savePrefs(); renderList();
-    prev.innerHTML=""; const j=selectedJob()||state.jobs[0]; if(j) prev.appendChild(renderCardBody(j,ta.value));
-    else prev.appendChild($("div","tpl-help","No sample job to preview."));
-  }
-  ta.oninput=refresh;
-  panelCard.appendChild($("div","tpl-sec","Available fields (click to insert)"));
+  panelCard.appendChild(prev);
+  panelCard.appendChild($("div","tpl-sec","Available fields (click to insert into the selected column)"));
   const toks=$("div","tok-list");
   Object.keys(TOKENS).forEach(k=>{ const t=$("div","tok"); t.appendChild($("code",null,"{"+k+"}")); t.appendChild($("span","tokdesc",TOKENS[k].desc));
-    t.onclick=()=>{ insertAtCursor(ta,"{"+k+"}"); refresh(); ta.focus(); }; toks.appendChild(t); });
+    t.onmousedown=e=>e.preventDefault();
+    t.onclick=()=>{ if(!activeTa){ return; } insertAtCursor(activeTa,"{"+k+"}"); if(activeCol) activeCol.tpl=activeTa.value; refresh(); activeTa.focus(); }; toks.appendChild(t); });
   panelCard.appendChild(toks);
   panelCard.appendChild($("div","tpl-sec","Formatting"));
   const help=$("div","tpl-help");
-  help.innerHTML="<code>**bold**</code> bold &nbsp;·&nbsp; <code>*italic*</code> italic &nbsp;·&nbsp; <code>&gt;&gt;</code> pushes the rest of the row to the right &nbsp;·&nbsp; each new line = a new row on the card &nbsp;·&nbsp; type any literal text or separators, e.g. <code>{client} &gt;&gt; {stage}</code> or <code>Scope: {scope}</code>.";
+  help.innerHTML="Each <b>column</b> is a section laid side-by-side, with its own align &amp; width. Inside a column: <code>**bold**</code> &nbsp;·&nbsp; <code>*italic*</code> &nbsp;·&nbsp; <code>&gt;&gt;</code> pushes the rest of a row to the right &nbsp;·&nbsp; each new line = a new row &nbsp;·&nbsp; e.g. <code>{client} &gt;&gt; {stage}</code> or <code>Scope: {scope}</code>.";
   panelCard.appendChild(help);
 
   // ---- Grouping panel ----
@@ -2084,11 +2176,11 @@ function openCardEditor(){
 
   showTab(state._cardTab); refresh();
   document.getElementById("cardModal").hidden=false;
-  if(state._cardTab==="card") setTimeout(()=>ta.focus(),0);
+  if(state._cardTab==="card") setTimeout(()=>{ if(activeTa) activeTa.focus(); },0);
 }
 function resetActivePanel(){
   if(state._cardTab==="group") state.grouping={by:"",rules:[],restMode:"value"};
-  else state.cardTemplate=DEFAULT_TEMPLATE;
+  else { state.cardCols=normaliseCardCols(null,DEFAULT_TEMPLATE); state.cardTemplate=DEFAULT_TEMPLATE; }
   savePrefs(); pushSharedTemplate(); renderList(); openCardEditor();
 }
 function closeCardModal(){ document.getElementById("cardModal").hidden=true; }
@@ -2400,17 +2492,15 @@ function renderInline(str,j,wrap){
     else if(m[6]!=null){ wrap.appendChild(txt(m[6])); }
   }
 }
-function renderCardBody(j,tplOverride){
-  const body=$("div","jbody");
-  const tpl=(tplOverride!=null?tplOverride:(state.cardTemplate||DEFAULT_TEMPLATE));
-  tpl.split(/\r?\n/).forEach(line=>{
+// Render one column's template (its own lines, ">>" split, markdown) into `host`.
+function renderColLines(tpl,j,host){
+  String(tpl==null?"":tpl).split(/\r?\n/).forEach(line=>{
     if(line.trim()==="") return;
     const el=$("div","tline");
     const gt=line.indexOf(">>");
     if(gt>=0){
-      // ">>" splits the row into two columns: everything before it stays left
-      // (grows, truncates if long); everything after is pinned to the right edge
-      // on a single line - a clean split, no wrapping or floating.
+      // ">>" splits the row: everything before stays left (grows, truncates),
+      // everything after is pinned to the right edge on a single line.
       el.classList.add("split");
       const left=$("span","tside tleft"); renderInline(line.slice(0,gt),j,left);
       const right=$("span","tside tright"); renderInline(line.slice(gt+2),j,right);
@@ -2419,9 +2509,20 @@ function renderCardBody(j,tplOverride){
       renderInline(line,j,el);
     }
     if(el.textContent.trim()==="" && !el.querySelector(".pill,.avatar")) return;   // line rendered to nothing → skip
-    body.appendChild(el);
+    host.appendChild(el);
   });
-  if(!body.childNodes.length) body.appendChild($("span","jnmtext",esc(j.Client_Label)||esc(j.Job_ID)||"-"));
+}
+function renderCardBody(j,colsOverride){
+  const body=$("div","jbody");
+  const cols=(colsOverride||state.cardCols||normaliseCardCols(null,state.cardTemplate));
+  if(cols.length<=1){
+    renderColLines(cols[0]?cols[0].tpl:DEFAULT_TEMPLATE, j, body);       // single column → same look as before
+  } else {
+    body.classList.add("cols");
+    body.style.gridTemplateColumns=cols.map(c=>"minmax(0,"+(c.width||1)+"fr)").join(" ");
+    cols.forEach(c=>{ const cell=$("div","jcol al-"+(c.align||"left")); renderColLines(c.tpl,j,cell); body.appendChild(cell); });
+  }
+  if(!body.querySelector(".tline")){ body.innerHTML=""; body.className="jbody"; body.appendChild($("span","jnmtext",esc(j.Client_Label)||esc(j.Job_ID)||"-")); }
   return body;
 }
 // ---------- list grouping (CASE-style rules + "group the rest by a field") ----------
@@ -2853,7 +2954,10 @@ if(typeof grist!=="undefined"){
     const editing=!document.getElementById("cardModal").hidden;
     const J=v=>JSON.stringify(v);
     let changed=false, fontChanged=false, colorChanged=false;
-    if(!editing && shared!=null && state.cardTemplate!==shared){ state.cardTemplate=shared; changed=true; }
+    if(!editing){
+      const sharedCols=(Array.isArray(opts.cardCols)&&opts.cardCols.length)?normaliseCardCols(opts.cardCols,shared):(shared!=null?normaliseCardCols(null,shared):null);
+      if(sharedCols && J(sharedCols)!==J(state.cardCols)){ state.cardCols=sharedCols; state.cardTemplate=colsToTemplate(sharedCols); changed=true; }
+    }
     // NB: the active grouping is intentionally NOT adopted - it's personal, so the
     // widget always defaults to "No grouping" and the team's grouping is never forced.
     // (The saved-grouping LIBRARY is adopted above, before the templateShared gate.)

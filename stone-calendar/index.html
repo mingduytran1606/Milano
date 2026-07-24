@@ -199,7 +199,7 @@
   <div class="toolbar">
     <div class="searchbar">
       <svg viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-      <input id="stoneSearch" type="text" placeholder="Search stone or job - client, address, product…" autocomplete="off">
+      <input id="stoneSearch" type="text" placeholder="Search stone or job - client, address, product, status…" autocomplete="off">
       <span class="clr" id="searchClr" title="Clear" hidden>&times;</span>
       <span class="match" id="matchCount" hidden></span>
     </div>
@@ -390,11 +390,12 @@ function jobCode(j){ return j ? (j.Job_ID || ("#"+j.id)) : ""; }
 // only when there is no order date, so nothing silently vanishes).
 function calDateOf(r){ const d = toDate(r.Order_Date) || toDate(r.Delivery_Date); return d ? { date:d } : null; }
 function passAssignee(r){ return !state.assignee || assigneesOf(r).includes(state.assignee); }
-// Search matches the STONE (name/supplier/code) AND its JOB — mirroring the Inbox
-// search fields (client, address, job id, stage, payment, assignees) — so anything
-// you can find in the Inbox you can find here too, even without the client name.
+// Search matches the STONE (name/supplier/code/order status) AND its JOB — mirroring
+// the Inbox search fields (client, address, job id, stage, payment, assignees) — so
+// anything you can find in the Inbox you can find here too, even without the client name.
+// statusLabel() folds a blank Order_Status in as "To sort" so it's searchable too.
 function stoneHaystack(r){ const c=catFor(r);
-  return [stoneLabel(r), r.Product_Supplier, r.Product_Code, r.Stone, c&&c.Supplier, c&&c.Product_Full]
+  return [stoneLabel(r), r.Product_Supplier, r.Product_Code, r.Stone, c&&c.Supplier, c&&c.Product_Full, statusLabel(r.Order_Status)]
     .filter(Boolean).join(" ").toLowerCase(); }
 function jobHaystack(j){ if(!j) return "";
   return [j.Client_Label, j.Job_Address, j.Address_Formatted, j.Job_ID, j.Stage, j.Payment_Status,

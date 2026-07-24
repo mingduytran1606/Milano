@@ -326,8 +326,8 @@ const DEFAULT_EVENT_COLS=[{ tpl:'**{client}** · {product}', style:'plain', alig
 let eventCardCols=cloneCols(DEFAULT_EVENT_COLS);
 let cardScope='everyone', eventCardFont=10.5;
 const CARD_LS='milano_stonecal_cards';
-const EVENT_TOKENS={ client:'Client', job:'Job ID', address:'Address', product:'Product', supplier:'Supplier',
-  code:'Product code', status:'Status pill', ordered:'Ordered qty', delivered:'Delivered qty',
+const EVENT_TOKENS={ client:'Client', job:'Job ID', stage:'Job stage', address:'Address', product:'Product', supplier:'Supplier',
+  code:'Product code', status:'Status pill', scope:'Scope qty', ordered:'Ordered qty', delivered:'Delivered qty',
   orderdate:'Order date', deliverydate:'Delivery date', inv:'Invoice #', note:'Note', price:'$ / slab', assigned:'Assignee avatars' };
 function cloneCols(cols){ return (cols||[]).map(c=>({ tpl:String(c.tpl||""),
   style:STYLES.includes(c.style)?c.style:'plain', align:ALIGNS.includes(c.align)?c.align:'left' })); }
@@ -511,11 +511,13 @@ function eventCardTokens(e){
   return {
     client:()=>txtNode(jobClient(j)),
     job:()=>txtNode(jobCode(j)),
+    stage:()=>txtNode((j&&String(j.Stage||"").trim())||null),
     address:()=>txtNode((String((j&&(j.Address_Formatted||j.Job_Address))||"")).trim()||null),
     product:()=>txtNode(stoneLabel(r)),
     supplier:()=>txtNode(r.Product_Supplier||(catFor(r)&&catFor(r).Supplier)||null),
     code:()=>txtNode(r.Product_Code||null),
     status:()=>pillEl(r.Order_Status),
+    scope:()=>txtNode(num(r.Scope_Qty)?("Scope "+num(r.Scope_Qty)):null),
     ordered:()=>txtNode(num(r.Ordered_Qty)?("Ord "+num(r.Ordered_Qty)):null),
     delivered:()=>txtNode(num(r.Delivery_Qty)?("Deliv "+num(r.Delivery_Qty)):null),
     orderdate:()=>txtNode(toDate(r.Order_Date)?fmtDMY(r.Order_Date):null),
@@ -742,11 +744,11 @@ if(typeof grist!=="undefined"){
 //  SAMPLE DATA (standalone / preview)
 // ============================================================
 const SAMPLE_JOBS=[
-  { id:2,  Job_ID:"J0002", Client_Label:"Annie",       Job_Address:"31 Harridge St, Rosebud VIC 3939",           Assigned_To:["L","Minh"] },
-  { id:8,  Job_ID:"J0008", Client_Label:"Home owner",  Job_Address:"1/162 Kambrook Rd, Caulfield North VIC 3161", Assigned_To:["L","Bea"] },
-  { id:14, Job_ID:"J0014", Client_Label:"Harry Aboda", Job_Address:"105 Point Nepean Rd, Dromana VIC 3936",       Assigned_To:["L","Minh","Bea"] },
-  { id:19, Job_ID:"J0019", Client_Label:"Naz",         Job_Address:"19 Stephens St, Balwyn North VIC 3104",       Assigned_To:["L","Kevin"] },
-  { id:23, Job_ID:"J0023", Client_Label:"Louis",       Job_Address:"11 Banksia Ct, Croydon South VIC 3136",       Assigned_To:["L","Bea"] }
+  { id:2,  Job_ID:"J0002", Client_Label:"Annie",       Job_Address:"31 Harridge St, Rosebud VIC 3939",           Stage:"Fabrication", Assigned_To:["L","Minh"] },
+  { id:8,  Job_ID:"J0008", Client_Label:"Home owner",  Job_Address:"1/162 Kambrook Rd, Caulfield North VIC 3161", Stage:"Template",    Assigned_To:["L","Bea"] },
+  { id:14, Job_ID:"J0014", Client_Label:"Harry Aboda", Job_Address:"105 Point Nepean Rd, Dromana VIC 3936",       Stage:"Install",     Assigned_To:["L","Minh","Bea"] },
+  { id:19, Job_ID:"J0019", Client_Label:"Naz",         Job_Address:"19 Stephens St, Balwyn North VIC 3104",       Stage:"Quote",       Assigned_To:["L","Kevin"] },
+  { id:23, Job_ID:"J0023", Client_Label:"Louis",       Job_Address:"11 Banksia Ct, Croydon South VIC 3136",       Stage:"Complete",    Assigned_To:["L","Bea"] }
 ];
 const SAMPLE_CAT=[
   {id:101,Supplier:"Lavistone",  Code:"LS303", Product_Full:"Lavistone · LS303 · Cararra Lux 20mm"},
@@ -758,13 +760,13 @@ const SAMPLE_CAT=[
 // Dates chosen around July 2026 so the sample month is populated.
 const D=(y,m,d)=>Math.floor(Date.UTC(y,m-1,d)/1000);
 const SAMPLE_STONE=[
-  { id:1, Job:2,  Product:101, Product_Code:"LS303", Product_Supplier:"Lavistone",  Ordered_Qty:2, Delivery_Qty:2, Order_Status:"6. Delivered",     Order_Date:D(2026,7,5),  Delivery_Date:D(2026,7,18) },
-  { id:2, Job:8,  Product:102, Product_Code:"1888",  Product_Supplier:"YDL",        Ordered_Qty:2, Delivery_Qty:0, Order_Status:"2.  Placed Order",  Order_Date:D(2026,7,9),  Delivery_Date:null },
-  { id:3, Job:8,  Product:103, Product_Code:"CS5100",Product_Supplier:"Caesarstone",Ordered_Qty:2, Delivery_Qty:0, Order_Status:"7. Not Delivered Yet",Order_Date:D(2026,7,9), Delivery_Date:null },
-  { id:5, Job:14, Product:107, Product_Code:"3420",  Product_Supplier:"WF",         Ordered_Qty:8, Delivery_Qty:0, Order_Status:"4. Awaiting Pickup", Order_Date:D(2026,7,15), Delivery_Date:null },
-  { id:6, Job:19, Product:104, Product_Code:"LSU401",Product_Supplier:"Lavistone",  Ordered_Qty:4, Delivery_Qty:4, Order_Status:"6. Delivered",     Order_Date:D(2026,7,2),  Delivery_Date:D(2026,7,22) },
-  { id:8, Job:23, Product:101, Product_Code:"LS303", Product_Supplier:"Lavistone",  Ordered_Qty:5, Delivery_Qty:5, Order_Status:"6. Delivered",     Order_Date:D(2026,6,28), Delivery_Date:D(2026,7,10) },
-  { id:9, Job:23, Product:104, Product_Code:"LSU401",Product_Supplier:"Lavistone",  Ordered_Qty:2, Delivery_Qty:0, Order_Status:"3. Awaiting Order", Order_Date:D(2026,7,24), Delivery_Date:null }
+  { id:1, Job:2,  Product:101, Product_Code:"LS303", Product_Supplier:"Lavistone",  Scope_Qty:2, Ordered_Qty:2, Delivery_Qty:2, Order_Status:"6. Delivered",     Order_Date:D(2026,7,5),  Delivery_Date:D(2026,7,18) },
+  { id:2, Job:8,  Product:102, Product_Code:"1888",  Product_Supplier:"YDL",        Scope_Qty:2, Ordered_Qty:2, Delivery_Qty:0, Order_Status:"2.  Placed Order",  Order_Date:D(2026,7,9),  Delivery_Date:null },
+  { id:3, Job:8,  Product:103, Product_Code:"CS5100",Product_Supplier:"Caesarstone",Scope_Qty:2, Ordered_Qty:2, Delivery_Qty:0, Order_Status:"7. Not Delivered Yet",Order_Date:D(2026,7,9), Delivery_Date:null },
+  { id:5, Job:14, Product:107, Product_Code:"3420",  Product_Supplier:"WF",         Scope_Qty:8, Ordered_Qty:8, Delivery_Qty:0, Order_Status:"4. Awaiting Pickup", Order_Date:D(2026,7,15), Delivery_Date:null },
+  { id:6, Job:19, Product:104, Product_Code:"LSU401",Product_Supplier:"Lavistone",  Scope_Qty:4, Ordered_Qty:4, Delivery_Qty:4, Order_Status:"6. Delivered",     Order_Date:D(2026,7,2),  Delivery_Date:D(2026,7,22) },
+  { id:8, Job:23, Product:101, Product_Code:"LS303", Product_Supplier:"Lavistone",  Scope_Qty:5, Ordered_Qty:5, Delivery_Qty:5, Order_Status:"6. Delivered",     Order_Date:D(2026,6,28), Delivery_Date:D(2026,7,10) },
+  { id:9, Job:23, Product:104, Product_Code:"LSU401",Product_Supplier:"Lavistone",  Scope_Qty:2, Ordered_Qty:2, Delivery_Qty:0, Order_Status:"3. Awaiting Order", Order_Date:D(2026,7,24), Delivery_Date:null }
 ];
 const DEMO_REF={ product:{ targetTableId:"Catalogue", labelCol:"Product_Full" } };
 window._test=function(stone,jobs,catalogue){

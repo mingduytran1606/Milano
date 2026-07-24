@@ -57,30 +57,22 @@
   .lg.off{opacity:.5;text-decoration:line-through}
   .lg .n{font-variant-numeric:tabular-nums;color:var(--muted)}
 
-  /* ---- body: calendar + jobs sidebar ---- */
+  /* ---- top stone search bar ---- */
+  .searchbar{flex:0 0 auto;position:relative;display:flex;align-items:center}
+  .searchbar svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);width:17px;height:17px;stroke:var(--muted);fill:none;pointer-events:none}
+  .searchbar input{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--panel);
+    border:1px solid var(--line);border-radius:11px;padding:11px 96px 11px 40px;box-shadow:var(--shadow)}
+  .searchbar input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .searchbar .clr{position:absolute;right:76px;top:50%;transform:translateY(-50%);color:var(--muted);
+    cursor:pointer;font-size:17px;line-height:1;padding:2px 5px;border-radius:6px}
+  .searchbar .clr:hover{background:var(--line2);color:var(--ink)}
+  .searchbar .clr[hidden]{display:none}
+  .searchbar .match{position:absolute;right:13px;top:50%;transform:translateY(-50%);font-size:11.5px;font-weight:700;
+    color:var(--accent-ink);background:var(--accent-soft);border-radius:999px;padding:2px 9px;white-space:nowrap}
+  .searchbar .match[hidden]{display:none}
+
+  /* ---- body: calendar only ---- */
   .body{flex:1 1 auto;min-height:0;display:flex;gap:12px}
-  .body.noside .sidebar{display:none}
-  .sidebar{flex:0 0 260px;display:flex;flex-direction:column;min-height:0;
-    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
-  .side-head{flex:0 0 auto;padding:12px 12px 10px;display:flex;flex-direction:column;gap:9px;border-bottom:1px solid var(--line2)}
-  .side-title{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
-  .side-title .jc-count{background:var(--line2);color:var(--muted);border-radius:999px;font-size:11px;padding:1px 8px;font-weight:700}
-  .ssearch{position:relative}
-  .ssearch input{width:100%;font:inherit;font-size:12.5px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px 8px 30px}
-  .ssearch input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
-  .ssearch svg{position:absolute;left:9px;top:9px;width:15px;height:15px;stroke:var(--muted);fill:none}
-  .job-list{flex:1 1 auto;min-height:0;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:7px}
-  .job{border:1px solid var(--line);border-radius:11px;padding:9px 10px;cursor:pointer;display:flex;flex-direction:column;gap:5px}
-  .job:hover{border-color:var(--accent)}
-  .job.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--accent-soft)}
-  .job .jc{font-weight:700;font-size:13px;line-height:1.25}
-  .job .ja{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .job .jm{display:flex;align-items:center;gap:10px;font-size:11px;color:var(--muted)}
-  .job .jm .k{display:inline-flex;align-items:center;gap:4px}
-  .job .jm .kd{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
-  .job .avs{margin-left:auto;display:flex}
-  .job .avs .av{width:19px;height:19px;font-size:9px;margin-left:-5px;border:1.5px solid var(--panel)}
-  .side-empty{color:var(--muted);font-size:12px;text-align:center;padding:20px 8px}
 
   /* ---- calendar grid ---- */
   .cal{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;
@@ -157,8 +149,6 @@
   .pev .pname{font-weight:700;font-size:12.5px}
   .pev .pmeta{font-size:11.5px;color:var(--muted);margin-top:2px}
 
-  .job{font-size:var(--job-card-font,12.5px)}
-
   /* ---- card customisation modal ---- */
   .modal{position:fixed;inset:0;background:rgba(16,24,40,.42);z-index:80;display:none;align-items:center;justify-content:center;padding:20px}
   .modal.open{display:flex}
@@ -204,6 +194,12 @@
 </head>
 <body>
 <div class="app">
+  <div class="searchbar">
+    <svg viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+    <input id="stoneSearch" type="text" placeholder="Search stone - name, supplier, code…" autocomplete="off">
+    <span class="clr" id="searchClr" title="Clear" hidden>&times;</span>
+    <span class="match" id="matchCount" hidden></span>
+  </div>
   <div class="topbar">
     <div class="nav">
       <button class="navbtn" id="prev" title="Previous month">‹</button>
@@ -213,9 +209,9 @@
     <button class="today" id="todayBtn">Today</button>
     <div class="spacer"></div>
     <div class="seg" id="viewSeg">
-      <button data-v="month" class="on">Month</button>
+      <button data-v="month">Month</button>
       <button data-v="week">Week</button>
-      <button data-v="agenda">Agenda</button>
+      <button data-v="agenda" class="on">Agenda</button>
     </div>
     <button class="assign" id="assignBtn">All assignees ▾</button>
     <div class="legend">
@@ -223,22 +219,11 @@
       <span class="lg on" id="lgDelivered"><span class="sw" style="background:#7ad66f"></span>Delivered <span class="n" id="nDelivered">0</span></span>
     </div>
     <button class="assign" id="cardsBtn" title="Customise how cards appear">⚙ Cards</button>
-    <button class="assign" id="btnJobs" title="Show / hide the jobs panel">▦ Jobs</button>
   </div>
   <div class="body" id="body">
     <div class="cal">
       <div class="dow" id="dow"></div>
       <div class="grid" id="grid"></div>
-    </div>
-    <div class="sidebar" id="sidebar">
-      <div class="side-head">
-        <div class="side-title">Jobs <span class="jc-count" id="jobCount">0</span></div>
-        <div class="ssearch">
-          <svg viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-          <input id="jobSearch" type="text" placeholder="Search client, address, stone, status…" autocomplete="off">
-        </div>
-      </div>
-      <div class="job-list" id="jobList"></div>
     </div>
   </div>
 </div>
@@ -250,7 +235,6 @@
     <div class="modal-head">
       <div class="ce-tabs">
         <button class="ce-tab on" data-tab="event">Event card</button>
-        <button class="ce-tab" data-tab="job">Job card</button>
       </div>
       <span class="modal-close" id="cardClose">&times;</span>
     </div>
@@ -263,11 +247,15 @@
 "use strict";
 /* ============================================================
    Milano — Stone Order Calendar widget
-   Plots each Stone_Order line on a month calendar:
+   Plots each Stone_Order line on a calendar (Agenda by default,
+   also Month / Week):
      • ordered but not delivered  → placed on its ORDER date
      • delivered                  → placed on its DELIVERY date
-   Shares the Inbox / Catalogue foundation: design tokens, the
-   Order_Status model, and the Grist read plumbing.
+   A stone search bar at the top live-filters the events by
+   stone name / supplier / code — merging the old Catalogue
+   Search into the calendar. Shares the Inbox / Catalogue
+   foundation: design tokens, the Order_Status model, and the
+   Grist read plumbing.
    ============================================================ */
 
 // ---- status model ----
@@ -309,10 +297,9 @@ const state={
   stone:[], jobs:[], catalogue:[], grist:false,
   ref:{ product:null },
   cursor:new Date(),                    // any day in the viewed range
-  view:"month",                         // month | week | agenda
+  view:"agenda",                        // agenda (default) | month | week
   assignee:null,                        // null = all assignees
-  jobFilter:null,                       // null = all jobs (sidebar selection)
-  jobQ:"", sideOpen:true,
+  searchQ:"",                           // stone search — live-filters events
   show:{ ordered:true, delivered:true },
   jobById:{}, catById:{}
 };
@@ -321,27 +308,22 @@ window._stonecal=state;
 // ---- customisable card templates (mirrors the installations calendar) ----
 // Markdown-ish: **bold**, *italic*, {token}, ==coloured bar==, --- divider, \n = new line.
 const DEFAULT_EVENT_CARD='**{client}** · {product}';
-const DEFAULT_JOB_CARD='**{client}**\n{address}\n{ordered} {delivered} {assigned}';
-let eventCardTpl=DEFAULT_EVENT_CARD, jobCardTpl=DEFAULT_JOB_CARD;
-let cardScope='everyone', eventCardFont=10.5, jobCardFont=12.5;
+let eventCardTpl=DEFAULT_EVENT_CARD;
+let cardScope='everyone', eventCardFont=10.5;
 const CARD_LS='milano_stonecal_cards';
 const EVENT_TOKENS={ client:'Client', job:'Job ID', address:'Address', product:'Product', supplier:'Supplier',
   code:'Product code', status:'Status pill', kind:'Ordered / Delivered', ordered:'Ordered qty', delivered:'Delivered qty',
   orderdate:'Order date', deliverydate:'Delivery date', inv:'Invoice #', note:'Note', price:'$ / slab', assigned:'Assignee avatars' };
-const JOB_TOKENS={ client:'Client', address:'Address', job:'Job ID', orders:'Order count', ordered:'# ordered', delivered:'# delivered', assigned:'Assignee avatars' };
-function applyCardFonts(){ document.documentElement.style.setProperty("--ev-card-font",eventCardFont+"px");
-  document.documentElement.style.setProperty("--job-card-font",jobCardFont+"px"); }
+function applyCardFonts(){ document.documentElement.style.setProperty("--ev-card-font",eventCardFont+"px"); }
 function loadLocalCards(){ try{ return JSON.parse(localStorage.getItem(CARD_LS)||"{}")||{}; }catch(e){ return {}; } }
-function saveLocalCards(){ try{ localStorage.setItem(CARD_LS,JSON.stringify({event:eventCardTpl,job:jobCardTpl,scope:cardScope,ef:eventCardFont,jf:jobCardFont})); }catch(e){} }
-function publishCards(){ try{ grist.setOption("eventCardTpl",eventCardTpl); grist.setOption("jobCardTpl",jobCardTpl);
-  grist.setOption("eventCardFont",eventCardFont); grist.setOption("jobCardFont",jobCardFont); }catch(e){} }
+function saveLocalCards(){ try{ localStorage.setItem(CARD_LS,JSON.stringify({event:eventCardTpl,scope:cardScope,ef:eventCardFont})); }catch(e){} }
+function publishCards(){ try{ grist.setOption("eventCardTpl",eventCardTpl);
+  grist.setOption("eventCardFont",eventCardFont); }catch(e){} }
 function applyGristOptions(opts){ if(!opts)return;
   const mod=document.getElementById("cardModal"); const editing=mod&&mod.classList.contains("open");
   if(cardScope!=="me" && !editing){
     if(typeof opts.eventCardTpl==="string") eventCardTpl=opts.eventCardTpl;
-    if(typeof opts.jobCardTpl==="string") jobCardTpl=opts.jobCardTpl;
     if(typeof opts.eventCardFont==="number") eventCardFont=opts.eventCardFont;
-    if(typeof opts.jobCardFont==="number") jobCardFont=opts.jobCardFont;
     applyCardFonts(); render();
   }
 }
@@ -376,14 +358,20 @@ function calDateOf(r){
   return null;
 }
 function passAssignee(r){ return !state.assignee || assigneesOf(r).includes(state.assignee); }
-function passJob(r){ return !state.jobFilter || refId(r.Job)===state.jobFilter; }
-// Every event indexed by ymd (respecting assignee + job filters; show-toggle applied at render).
+// Stone search — match the query against the stone's name, supplier and code.
+function stoneHaystack(r){ const c=catFor(r);
+  return [stoneLabel(r), r.Product_Supplier, r.Product_Code, r.Stone, c&&c.Supplier, c&&c.Product_Full]
+    .filter(Boolean).join(" ").toLowerCase(); }
+function passSearch(r){ const q=(state.searchQ||"").trim().toLowerCase(); return !q || stoneHaystack(r).includes(q); }
+// Every event indexed by ymd (respecting assignee + stone search; show-toggle applied at render).
 function buildEventIndex(){
   const byYmd={};
-  (state.stone||[]).forEach(r=>{ const cd=calDateOf(r); if(!cd) return; if(!passAssignee(r)||!passJob(r)) return;
+  (state.stone||[]).forEach(r=>{ const cd=calDateOf(r); if(!cd) return; if(!passAssignee(r)||!passSearch(r)) return;
     (byYmd[ymd(cd.date)]=byYmd[ymd(cd.date)]||[]).push({r,kind:cd.kind,date:cd.date}); });
   return byYmd;
 }
+// Count all stone lines matching the current search + assignee (any date) — drives the pill in the search bar.
+function matchingCount(){ return (state.stone||[]).filter(r=>calDateOf(r)&&passAssignee(r)&&passSearch(r)).length; }
 function eventsOn(byYmd,d){
   return (byYmd[ymd(d)]||[]).filter(e=>state.show[e.kind])
     .sort((a,b)=>(a.kind===b.kind?0:a.kind==="ordered"?-1:1));
@@ -402,6 +390,13 @@ function render(){
   });
   const ab=document.getElementById("assignBtn");
   ab.textContent=(state.assignee||"All assignees")+" ▾"; ab.classList.toggle("on",!!state.assignee);
+
+  // search bar: clear button + live match count
+  const q=(state.searchQ||"").trim();
+  document.getElementById("searchClr").hidden=!q;
+  const mc=document.getElementById("matchCount");
+  if(q){ const n=matchingCount(); mc.textContent=n+" order"+(n===1?"":"s"); mc.hidden=false; }
+  else mc.hidden=true;
 
   const byYmd=buildEventIndex();
 
@@ -423,34 +418,6 @@ function render(){
 
   if(state.view==="agenda") renderAgenda(byYmd);
   else renderGrid(byYmd);
-  renderSidebar();
-}
-// Right-hand jobs search panel — mirrors the installations calendar's jobs sidebar.
-function jobStoneStats(jid){
-  let n=0,ord=0,del=0;
-  (state.stone||[]).forEach(r=>{ if(refId(r.Job)!==jid) return; n++; const cd=calDateOf(r); if(!cd) return; if(cd.kind==="delivered")del++; else ord++; });
-  return {n,ord,del};
-}
-function renderSidebar(){
-  document.getElementById("body").classList.toggle("noside",!state.sideOpen);
-  const btn=document.getElementById("btnJobs"); btn.classList.toggle("on",state.sideOpen);
-  if(!state.sideOpen) return;
-  const list=document.getElementById("jobList"); list.innerHTML="";
-  const q=(state.jobQ||"").trim().toLowerCase();
-  const jobs=(state.jobs||[]).filter(j=>(state.stone||[]).some(r=>refId(r.Job)===j.id));
-  const hay=j=>{ let s=[jobClient(j),j.Job_Address,j.Address_Formatted,j.Job_ID].filter(Boolean).join(" ");
-    (state.stone||[]).forEach(r=>{ if(refId(r.Job)===j.id) s+=" "+stoneLabel(r)+" "+(r.Product_Supplier||"")+" "+(r.Order_Status||""); });
-    return s.toLowerCase(); };
-  const shown=jobs.filter(j=>!q||hay(j).includes(q)).sort((a,b)=>jobClient(a).localeCompare(jobClient(b)));
-  document.getElementById("jobCount").textContent=shown.length;
-  if(!shown.length){ list.appendChild($("div","side-empty",q?"No jobs match “"+state.jobQ+"”.":"No jobs with stone orders.")); return; }
-  shown.forEach(j=>{
-    const card=$("div","job"+(state.jobFilter===j.id?" on":""));
-    renderCardTemplate(jobCardTpl, jobCardTokens(j), card, {});
-    card.title=jobClient(j);
-    card.onclick=()=>{ state.jobFilter=(state.jobFilter===j.id?null:j.id); render(); };
-    list.appendChild(card);
-  });
 }
 function visibleRange(){
   if(state.view==="week"){ const s=weekStart(state.cursor); return { start:s, end:addDays(s,7) }; }
@@ -501,7 +468,8 @@ function renderAgenda(byYmd){
     const box=$("div","ag-evs"); evs.forEach(e=>box.appendChild(eventChip(e))); row.appendChild(box);
     grid.appendChild(row);
   }
-  if(!any) grid.appendChild($("div","ag-empty","No stone orders "+(state.assignee?("for "+state.assignee+" "):"")+"in "+MONTHS[state.cursor.getMonth()]+" "+state.cursor.getFullYear()+"."));
+  if(!any){ const q=(state.searchQ||"").trim();
+    grid.appendChild($("div","ag-empty","No stone orders "+(q?("matching “"+q+"” "):"")+(state.assignee?("for "+state.assignee+" "):"")+"in "+MONTHS[state.cursor.getMonth()]+" "+state.cursor.getFullYear()+".")); }
 }
 // ---- template engine (markdown-ish → DOM), ported from the installations calendar ----
 function renderCardTemplate(str,tokens,host,ctx){
@@ -537,7 +505,6 @@ function pillEl(s){ const t=softTint(statusColor(s)); const p=$("span","cpill");
   const d=$("span","cpd"); d.style.background=t.dot; p.appendChild(d); p.appendChild(document.createTextNode(statusLabel(s))); return p; }
 function avatarsEl(list){ if(!list||!list.length)return null; const w=$("span","avwrap");
   list.slice(0,4).forEach(n=>{ if(!n)return; const a=$("span","av"); a.style.background=avatarColor(n); a.textContent=initials(n); a.title=n; w.appendChild(a); }); return w; }
-function countEl(text,color){ const s=$("span","jk"); const d=$("span","kd"); d.style.background=color; s.appendChild(d); s.appendChild(document.createTextNode(text)); return s; }
 function priceOf(r){ const c=catFor(r); const v=(r.Product_Price_slab!=null&&r.Product_Price_slab!=="")?r.Product_Price_slab:(c?c.Price_Slab:null);
   return (v!=null&&v!=="")?("$"+v):null; }
 function eventCardTokens(e){
@@ -561,18 +528,6 @@ function eventCardTokens(e){
     assigned:()=>avatarsEl(assigneesOf(r))
   };
 }
-function jobCardTokens(j){
-  const st=jobStoneStats(j.id);
-  return {
-    client:()=>txtNode(jobClient(j)),
-    address:()=>txtNode((String(j.Address_Formatted||j.Job_Address||"")).trim()||null),
-    job:()=>txtNode(jobCode(j)),
-    orders:()=>txtNode(st.n?(st.n+" order"+(st.n===1?"":"s")):null),
-    ordered:()=>st.ord?countEl(st.ord+" ordered","#f2df3a"):null,
-    delivered:()=>st.del?countEl(st.del+" delivered","#7ad66f"):null,
-    assigned:()=>avatarsEl(choiceList(j.Assigned_To))
-  };
-}
 function kindBar(kind){ return kind==="delivered"?{fill:"#7ad66f",text:"#0f2e18"}:{fill:"#f2df3a",text:"#4a3f00"}; }
 
 function eventChip(e){
@@ -586,21 +541,18 @@ function eventChip(e){
 }
 
 // ---- card editor modal ----
-let cardTab="event";
-function openCardEditor(tab){ if(tab)cardTab=tab; document.getElementById("cardModal").classList.add("open"); renderCardEditor(); }
+function openCardEditor(){ document.getElementById("cardModal").classList.add("open"); renderCardEditor(); }
 function closeCardEditor(){ document.getElementById("cardModal").classList.remove("open"); }
 function renderCardEditor(){
-  const isEvent=cardTab==="event";
-  [].forEach.call(document.querySelectorAll("#cardModal .ce-tab"),b=>b.classList.toggle("on",b.dataset.tab===cardTab));
   const body=document.getElementById("ceBody"); body.innerHTML="";
-  const tokens=isEvent?EVENT_TOKENS:JOB_TOKENS;
+  const tokens=EVENT_TOKENS;
   const note=$("div","ce-note");
-  note.textContent=(isEvent?"The chips on the calendar grid. ":"The cards in the right-hand jobs list. ")
-    +"Use **bold**, *italic*, {tokens}, line breaks, --- for a divider, and ==wrap== for a coloured bar. Applies to every "+(isEvent?"event.":"job.");
+  note.textContent="The chips shown for each stone order on the calendar. "
+    +"Use **bold**, *italic*, {tokens}, line breaks, --- for a divider, and ==wrap== for a coloured bar. Applies to every event.";
   body.appendChild(note);
   const ta=document.createElement("textarea"); ta.className="ce-ta"; ta.spellcheck=false;
-  ta.value=isEvent?eventCardTpl:jobCardTpl;
-  function commit(){ if(isEvent)eventCardTpl=ta.value; else jobCardTpl=ta.value; saveLocalCards(); render(); }
+  ta.value=eventCardTpl;
+  function commit(){ eventCardTpl=ta.value; saveLocalCards(); render(); }
   ta.addEventListener("input",commit); body.appendChild(ta);
   const toks=$("div","ce-tokens");
   const insert=(text,caretBack)=>{ const s=ta.selectionStart||0,en=ta.selectionEnd||0;
@@ -618,12 +570,12 @@ function renderCardEditor(){
     ta.value=ta.value.slice(0,s)+"=="+inner+"=="+ta.value.slice(en); ta.focus(); ta.selectionStart=s+2; ta.selectionEnd=s+2+inner.length; commit(); }); toks.appendChild(barChip);
   body.appendChild(toks);
   const reset=$("div","ce-reset","↩ Reset this card to default");
-  reset.addEventListener("click",()=>{ if(isEvent)eventCardTpl=DEFAULT_EVENT_CARD; else jobCardTpl=DEFAULT_JOB_CARD; saveLocalCards(); render(); renderCardEditor(); });
+  reset.addEventListener("click",()=>{ eventCardTpl=DEFAULT_EVENT_CARD; saveLocalCards(); render(); renderCardEditor(); });
   body.appendChild(reset);
   const fRow=$("div","ce-fontrow"); fRow.appendChild($("span","ce-flabel","Text size"));
-  const fVal=$("span","ce-fval"); const showF=()=>fVal.textContent=(isEvent?eventCardFont:jobCardFont)+"px";
-  const stepF=d=>{ let cur=isEvent?eventCardFont:jobCardFont; cur=Math.max(9,Math.min(20,Math.round((cur+d)*10)/10));
-    if(isEvent)eventCardFont=cur; else jobCardFont=cur; applyCardFonts(); saveLocalCards(); showF(); render(); };
+  const fVal=$("span","ce-fval"); const showF=()=>fVal.textContent=eventCardFont+"px";
+  const stepF=d=>{ let cur=Math.max(9,Math.min(20,Math.round((eventCardFont+d)*10)/10));
+    eventCardFont=cur; applyCardFonts(); saveLocalCards(); showF(); render(); };
   const fMinus=document.createElement("button"); fMinus.type="button"; fMinus.className="ce-fbtn"; fMinus.textContent="−"; fMinus.onclick=()=>stepF(-0.5);
   const fPlus=document.createElement("button"); fPlus.type="button"; fPlus.className="ce-fbtn"; fPlus.textContent="+"; fPlus.onclick=()=>stepF(0.5);
   showF(); fRow.appendChild(fMinus); fRow.appendChild(fVal); fRow.appendChild(fPlus); body.appendChild(fRow);
@@ -767,12 +719,12 @@ document.getElementById("assignBtn").onclick=e=>{ e.stopPropagation(); openAssig
 document.getElementById("assignPop").onclick=e=>e.stopPropagation();
 document.getElementById("lgOrdered").onclick=()=>{ state.show.ordered=!state.show.ordered; render(); };
 document.getElementById("lgDelivered").onclick=()=>{ state.show.delivered=!state.show.delivered; render(); };
-document.getElementById("btnJobs").onclick=()=>{ state.sideOpen=!state.sideOpen; render(); };
-document.getElementById("jobSearch").oninput=e=>{ state.jobQ=e.target.value; renderSidebar(); };
+const stoneSearch=document.getElementById("stoneSearch");
+stoneSearch.oninput=e=>{ state.searchQ=e.target.value; render(); };
+document.getElementById("searchClr").onclick=()=>{ state.searchQ=""; stoneSearch.value=""; render(); stoneSearch.focus(); };
 document.getElementById("cardsBtn").onclick=e=>{ e.stopPropagation(); openCardEditor(); };
 document.getElementById("cardClose").onclick=closeCardEditor;
 document.getElementById("cardModal").onclick=e=>{ if(e.target.id==="cardModal") closeCardEditor(); };
-[].forEach.call(document.querySelectorAll("#cardModal .ce-tab"),b=>b.onclick=()=>{ cardTab=b.dataset.tab; renderCardEditor(); });
 document.getElementById("dayPop").onclick=e=>e.stopPropagation();
 document.addEventListener("click",closePops);
 document.addEventListener("keydown",e=>{ if(e.key==="Escape") closePops(); });
@@ -780,10 +732,8 @@ document.addEventListener("keydown",e=>{ if(e.key==="Escape") closePops(); });
 // restore any personal card design
 { const lc=loadLocalCards();
   if(typeof lc.event==="string") eventCardTpl=lc.event;
-  if(typeof lc.job==="string") jobCardTpl=lc.job;
   if(lc.scope==="me"||lc.scope==="everyone") cardScope=lc.scope;
   if(typeof lc.ef==="number") eventCardFont=lc.ef;
-  if(typeof lc.jf==="number") jobCardFont=lc.jf;
   applyCardFonts(); }
 if(!state.ref.product) state.ref.product=DEMO_REF.product;
 // sample-first so the grid is never blank; live wiring above flips + replaces it.

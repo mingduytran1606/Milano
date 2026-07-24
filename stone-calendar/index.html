@@ -199,7 +199,7 @@
   <div class="toolbar">
     <div class="searchbar">
       <svg viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-      <input id="stoneSearch" type="text" placeholder="Search stone - name, supplier, code…" autocomplete="off">
+      <input id="stoneSearch" type="text" placeholder="Search stone or job - client, address, product…" autocomplete="off">
       <span class="clr" id="searchClr" title="Clear" hidden>&times;</span>
       <span class="match" id="matchCount" hidden></span>
     </div>
@@ -390,11 +390,22 @@ function jobCode(j){ return j ? (j.Job_ID || ("#"+j.id)) : ""; }
 // only when there is no order date, so nothing silently vanishes).
 function calDateOf(r){ const d = toDate(r.Order_Date) || toDate(r.Delivery_Date); return d ? { date:d } : null; }
 function passAssignee(r){ return !state.assignee || assigneesOf(r).includes(state.assignee); }
-// Stone search — match the query against the stone's name, supplier and code.
+// Search matches the STONE (name/supplier/code) AND its JOB — mirroring the Inbox
+// search fields (client, address, job id, stage, payment, assignees) — so anything
+// you can find in the Inbox you can find here too, even without the client name.
 function stoneHaystack(r){ const c=catFor(r);
   return [stoneLabel(r), r.Product_Supplier, r.Product_Code, r.Stone, c&&c.Supplier, c&&c.Product_Full]
     .filter(Boolean).join(" ").toLowerCase(); }
-function passSearch(r){ const q=(state.searchQ||"").trim().toLowerCase(); return !q || stoneHaystack(r).includes(q); }
+function jobHaystack(j){ if(!j) return "";
+  return [j.Client_Label, j.Job_Address, j.Address_Formatted, j.Job_ID, j.Stage, j.Payment_Status,
+    choiceList(j.Assigned_To).join(" ")].filter(Boolean).join(" ").toLowerCase(); }
+// Match at word starts (like the Inbox) so "live" won't hit inside "de-live-red"
+// while "deliv" still matches "Delivered"; substring fallback for non-word queries.
+function searchMatcher(q){ const esc=q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+  if(!/^\w/.test(q)) return { test:h=>h.includes(q) };
+  try{ return new RegExp("\\b"+esc); }catch(e){ return { test:h=>h.includes(q) }; } }
+function passSearch(r){ const q=(state.searchQ||"").trim().toLowerCase(); if(!q) return true;
+  return searchMatcher(q).test(stoneHaystack(r)+" "+jobHaystack(jobFor(r))); }
 function passStatus(r){ return state.statusFilter==="all" || matchGroup(findGroup(state.statusFilter),r); }
 // The set of lines the agenda draws from before the status filter — also feeds the pill job counts.
 function baseRows(){ return (state.stone||[]).filter(r=>calDateOf(r)&&passAssignee(r)&&passSearch(r)); }

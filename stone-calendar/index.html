@@ -74,27 +74,19 @@
   /* ---- body: calendar only ---- */
   .body{flex:1 1 auto;min-height:0;display:flex;gap:12px}
 
-  /* ---- calendar grid ---- */
-  .cal{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;
-    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
-  .dow{flex:0 0 auto;display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--line)}
-  .dow span{padding:8px 6px;text-align:center;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
-  .grid{flex:1 1 auto;display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:1fr;overflow-y:auto}
-  .cell{border-right:1px solid var(--line2);border-bottom:1px solid var(--line2);min-height:104px;padding:5px 6px;
-    display:flex;flex-direction:column;gap:3px;overflow:hidden}
-  .cell:nth-child(7n){border-right:0}
-  .cell.out{background:var(--bg)}
-  .cell.out .dn{opacity:.4}
-  .cell.wknd{background:color-mix(in srgb,var(--bg) 55%,var(--panel))}
-  .drow{display:flex;align-items:center;gap:4px}
-  .dn{font-size:11.5px;font-weight:700;color:var(--muted);width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center}
-  .cell.today .dn{background:var(--accent);color:#fff;border-radius:50%}
-  .dsum{margin-left:auto;font-size:9.5px;color:var(--muted);font-variant-numeric:tabular-nums}
-
-  .ev{font-size:var(--ev-card-font,10.5px);line-height:1.32;border-radius:6px;padding:2px 6px;cursor:pointer;overflow:hidden}
+  /* ---- agenda event card (chip) — a grid of customisable columns ---- */
+  .ev{font-size:var(--ev-card-font,10.5px);line-height:1.32;border-radius:6px;padding:3px 8px;cursor:pointer;overflow:hidden;
+    display:grid;gap:8px;align-items:center}
   .ev strong{font-weight:700}
   .ev em{font-style:italic;color:var(--muted)}
-  /* templated card lines (shared by event chips + job cards) */
+  .evcol{min-width:0;overflow:hidden}
+  .evcol.al-left{text-align:left}
+  .evcol.al-centre{text-align:center}
+  .evcol.al-right{text-align:right}
+  .evpill{display:inline-block;max-width:100%;background:var(--panel);border:1px solid var(--line);
+    border-radius:20px;padding:0 9px;vertical-align:middle}
+  .evpill.hl{border:0;font-weight:700}
+  /* templated card lines */
   .cline{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .cdivider{height:1px;background:var(--line2);margin:3px 0}
   .cbar{border-radius:5px;padding:0 5px;display:inline-block}
@@ -103,8 +95,6 @@
   .avwrap{display:inline-flex;vertical-align:-4px}
   .avwrap .av{width:16px;height:16px;font-size:8.5px;margin-left:-4px;border:1.5px solid var(--panel)}
   .avwrap .av:first-child{margin-left:0}
-  .jk{display:inline-flex;align-items:center;gap:4px}
-  .jk .kd{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
   .ev.ordered{background:#fdf6c8}
   .ev.delivered{background:#dcf7d6}
   @media (prefers-color-scheme:dark){ .ev.ordered{background:#3a380f} .ev.delivered{background:#173a24} }
@@ -112,13 +102,8 @@
   :root[data-theme="dark"] .ev.delivered{background:#173a24}
   :root[data-theme="light"] .ev.ordered{background:#fdf6c8}
   :root[data-theme="light"] .ev.delivered{background:#dcf7d6}
-  .more{font-size:10px;font-weight:600;color:var(--accent-ink);cursor:pointer;padding:1px 2px}
-  .more:hover{text-decoration:underline}
 
-  /* week view: single tall row, scroll within a day */
-  .grid.week{grid-auto-rows:1fr}
-  .grid.week .cell{overflow-y:auto;min-height:0}
-  /* agenda view: vertical list of days */
+  /* agenda: vertical list of days */
   .agenda{flex:1 1 auto;min-height:0;overflow-y:auto;display:block;background:var(--panel);
     border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
   .ag-day{display:flex;gap:14px;align-items:flex-start;padding:11px 14px;border-bottom:1px solid var(--line2)}
@@ -172,6 +157,33 @@
   .ce-tok:hover{border-color:var(--accent);background:var(--accent-soft)}
   .ce-tok code{font-family:ui-monospace,Menlo,monospace;font-weight:700;color:var(--accent-ink)}
   .ce-tok span{color:var(--muted)}
+  /* section (column) editor */
+  .ce-sechead{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.05em;color:var(--muted);margin:6px 0 8px}
+  .ce-sec{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:9px;background:var(--bg)}
+  .ce-sec-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .ce-sec-n{font-size:11px;font-weight:800;color:var(--muted);background:var(--line2);border-radius:6px;padding:1px 7px}
+  .ce-sec-mv{cursor:pointer;color:var(--muted);border:1px solid var(--line);background:var(--panel);border-radius:7px;
+    width:24px;height:24px;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center}
+  .ce-sec-mv:hover{border-color:var(--accent);color:var(--accent-ink)}
+  .ce-sec-mv.off{opacity:.25;pointer-events:none}
+  .ce-sec-x{cursor:pointer;color:var(--muted);border:1px solid var(--line);background:var(--panel);border-radius:7px;
+    width:24px;height:24px;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center}
+  .ce-sec-x:hover{border-color:var(--danger);color:var(--danger)}
+  .ce-sec-x.off{opacity:.25;pointer-events:none}
+  .ce-sta{width:100%;min-height:36px;font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink);
+    background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 10px;resize:vertical;outline:none}
+  .ce-sta:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+  .ce-secopts{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;align-items:center}
+  .ce-optlab{font-size:11px;font-weight:600;color:var(--muted);margin-right:-6px}
+  .ce-segm{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .ce-segm button{border:0;background:var(--panel);color:var(--muted);padding:5px 10px;font:inherit;font-size:11.5px;font-weight:600;cursor:pointer;min-width:30px}
+  .ce-segm button+button{border-left:1px solid var(--line)}
+  .ce-segm button.on{background:var(--accent-soft);color:var(--accent-ink);font-weight:700}
+  .ce-addsec{font:inherit;font-size:12.5px;font-weight:600;color:var(--accent-ink);background:var(--accent-soft);
+    border:1px dashed var(--accent);border-radius:9px;padding:9px 12px;cursor:pointer;width:100%;margin-top:2px}
+  .ce-addsec:hover{filter:brightness(1.03)}
+  .ce-addsec[disabled]{opacity:.5;cursor:not-allowed;border-style:solid}
   .ce-reset{margin-top:12px;font-size:12px;color:var(--accent-ink);cursor:pointer;display:inline-block}
   .ce-reset:hover{text-decoration:underline}
   .ce-fontrow{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12.5px}
@@ -201,18 +213,8 @@
     <span class="match" id="matchCount" hidden></span>
   </div>
   <div class="topbar">
-    <div class="nav">
-      <button class="navbtn" id="prev" title="Previous month">‹</button>
-      <button class="navbtn" id="next" title="Next month">›</button>
-    </div>
-    <div class="title" id="title">—</div>
-    <button class="today" id="todayBtn">Today</button>
+    <div class="title" id="title">Stone orders</div>
     <div class="spacer"></div>
-    <div class="seg" id="viewSeg">
-      <button data-v="month">Month</button>
-      <button data-v="week">Week</button>
-      <button data-v="agenda" class="on">Agenda</button>
-    </div>
     <button class="assign" id="assignBtn">All assignees ▾</button>
     <div class="legend">
       <span class="lg on" id="lgOrdered"><span class="sw" style="background:#f2df3a"></span>Ordered <span class="n" id="nOrdered">0</span></span>
@@ -221,10 +223,7 @@
     <button class="assign" id="cardsBtn" title="Customise how cards appear">⚙ Cards</button>
   </div>
   <div class="body" id="body">
-    <div class="cal">
-      <div class="dow" id="dow"></div>
-      <div class="grid" id="grid"></div>
-    </div>
+    <div class="agenda" id="agenda"></div>
   </div>
 </div>
 
@@ -233,9 +232,7 @@
 <div class="modal" id="cardModal">
   <div class="modal-card">
     <div class="modal-head">
-      <div class="ce-tabs">
-        <button class="ce-tab on" data-tab="event">Event card</button>
-      </div>
+      <div class="ce-tabs"><span class="ce-tab on">Event card</span></div>
       <span class="modal-close" id="cardClose">&times;</span>
     </div>
     <div class="ce-body" id="ceBody"></div>
@@ -296,8 +293,6 @@ const DOW=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const state={
   stone:[], jobs:[], catalogue:[], grist:false,
   ref:{ product:null },
-  cursor:new Date(),                    // any day in the viewed range
-  view:"agenda",                        // agenda (default) | month | week
   assignee:null,                        // null = all assignees
   searchQ:"",                           // stone search — live-filters events
   show:{ ordered:true, delivered:true },
@@ -305,24 +300,37 @@ const state={
 };
 window._stonecal=state;
 
-// ---- customisable card templates (mirrors the installations calendar) ----
-// Markdown-ish: **bold**, *italic*, {token}, ==coloured bar==, --- divider, \n = new line.
-const DEFAULT_EVENT_CARD='**{client}** · {product}';
-let eventCardTpl=DEFAULT_EVENT_CARD;
+// ---- customisable card template (mirrors the installations calendar) ----
+// The event card is a row of 1–4 SECTIONS (columns). Each section holds a bit of
+// markdown-ish template — **bold**, *italic*, {token}, ==coloured bar==, --- divider,
+// \n = new line — plus a style (plain / pill / in-highlight) and an alignment.
+const STYLES=["plain","pill","highlight"];        // highlight = pill in the ordered/delivered colour
+const ALIGNS=["left","centre","right"];
+const DEFAULT_EVENT_COLS=[{ tpl:'**{client}** · {product}', style:'plain', align:'left' }];
+let eventCardCols=cloneCols(DEFAULT_EVENT_COLS);
 let cardScope='everyone', eventCardFont=10.5;
 const CARD_LS='milano_stonecal_cards';
 const EVENT_TOKENS={ client:'Client', job:'Job ID', address:'Address', product:'Product', supplier:'Supplier',
   code:'Product code', status:'Status pill', kind:'Ordered / Delivered', ordered:'Ordered qty', delivered:'Delivered qty',
   orderdate:'Order date', deliverydate:'Delivery date', inv:'Invoice #', note:'Note', price:'$ / slab', assigned:'Assignee avatars' };
+function cloneCols(cols){ return (cols||[]).map(c=>({ tpl:String(c.tpl||""),
+  style:STYLES.includes(c.style)?c.style:'plain', align:ALIGNS.includes(c.align)?c.align:'left' })); }
+// Accept either the new columns array or an old single-string template.
+function normaliseCols(v){
+  if(Array.isArray(v) && v.length) return cloneCols(v).slice(0,4);
+  if(typeof v==="string" && v.trim()) return [{ tpl:v, style:'plain', align:'left' }];
+  return cloneCols(DEFAULT_EVENT_COLS);
+}
 function applyCardFonts(){ document.documentElement.style.setProperty("--ev-card-font",eventCardFont+"px"); }
 function loadLocalCards(){ try{ return JSON.parse(localStorage.getItem(CARD_LS)||"{}")||{}; }catch(e){ return {}; } }
-function saveLocalCards(){ try{ localStorage.setItem(CARD_LS,JSON.stringify({event:eventCardTpl,scope:cardScope,ef:eventCardFont})); }catch(e){} }
-function publishCards(){ try{ grist.setOption("eventCardTpl",eventCardTpl);
+function saveLocalCards(){ try{ localStorage.setItem(CARD_LS,JSON.stringify({cols:eventCardCols,scope:cardScope,ef:eventCardFont})); }catch(e){} }
+function publishCards(){ try{ grist.setOption("eventCardCols",eventCardCols);
   grist.setOption("eventCardFont",eventCardFont); }catch(e){} }
 function applyGristOptions(opts){ if(!opts)return;
   const mod=document.getElementById("cardModal"); const editing=mod&&mod.classList.contains("open");
   if(cardScope!=="me" && !editing){
-    if(typeof opts.eventCardTpl==="string") eventCardTpl=opts.eventCardTpl;
+    if(opts.eventCardCols!=null) eventCardCols=normaliseCols(opts.eventCardCols);
+    else if(typeof opts.eventCardTpl==="string") eventCardCols=normaliseCols(opts.eventCardTpl);
     if(typeof opts.eventCardFont==="number") eventCardFont=opts.eventCardFont;
     applyCardFonts(); render();
   }
@@ -350,12 +358,13 @@ function stoneLabel(r){ const c=catFor(r);
 function jobClient(j){ return j ? ((String(j.Client_Label||"")).trim() || (String(j.Job_Address||"")).trim() || j.Job_ID || ("#"+j.id)) : "—"; }
 function jobCode(j){ return j ? (j.Job_ID || ("#"+j.id)) : ""; }
 
-// Map a stone line to its calendar date per the rule:
-// delivered → delivery date; otherwise (ordered/pending) → order date.
+// Every stone line appears on its ORDER date (falling back to the delivery date
+// only when there is no order date, so nothing silently vanishes). The kind comes
+// from status — it drives the chip colour + the Ordered / Delivered legend toggles.
 function calDateOf(r){
-  if(isDeliveredStatus(r) && toDate(r.Delivery_Date)) return { date:toDate(r.Delivery_Date), kind:"delivered" };
-  if(toDate(r.Order_Date)) return { date:toDate(r.Order_Date), kind:"ordered" };
-  return null;
+  const kind = isDeliveredStatus(r) ? "delivered" : "ordered";
+  const d = toDate(r.Order_Date) || toDate(r.Delivery_Date);
+  return d ? { date:d, kind } : null;
 }
 function passAssignee(r){ return !state.assignee || assigneesOf(r).includes(state.assignee); }
 // Stone search — match the query against the stone's name, supplier and code.
@@ -376,8 +385,6 @@ function eventsOn(byYmd,d){
   return (byYmd[ymd(d)]||[]).filter(e=>state.show[e.kind])
     .sort((a,b)=>(a.kind===b.kind?0:a.kind==="ordered"?-1:1));
 }
-function addDays(d,n){ return new Date(d.getFullYear(),d.getMonth(),d.getDate()+n); }
-function weekStart(d){ return addDays(d,-((d.getDay()+6)%7)); }   // Monday
 
 // ============================================================
 //  RENDER
@@ -385,9 +392,6 @@ function weekStart(d){ return addDays(d,-((d.getDay()+6)%7)); }   // Monday
 function render(){
   reindex();
   document.getElementById("demoTag").hidden=state.grist;
-  ["month","week","agenda"].forEach(v=>{
-    const b=document.querySelector('#viewSeg button[data-v="'+v+'"]'); if(b) b.classList.toggle("on",state.view===v);
-  });
   const ab=document.getElementById("assignBtn");
   ab.textContent=(state.assignee||"All assignees")+" ▾"; ab.classList.toggle("on",!!state.assignee);
 
@@ -400,76 +404,45 @@ function render(){
 
   const byYmd=buildEventIndex();
 
-  // legend counts over the visible range (respecting assignee, ignoring show-toggle)
-  const range=visibleRange();
+  // legend counts over everything matching (assignee + search), ignoring show-toggle
   let nOrd=0,nDel=0;
-  for(let d=new Date(range.start);d<range.end;d=addDays(d,1)){
-    (byYmd[ymd(d)]||[]).forEach(e=>{ if(e.kind==="ordered")nOrd++; else nDel++; });
-  }
+  Object.keys(byYmd).forEach(k=>(byYmd[k]||[]).forEach(e=>{ if(e.kind==="ordered")nOrd++; else nDel++; }));
   document.getElementById("nOrdered").textContent=nOrd;
   document.getElementById("nDelivered").textContent=nDel;
   document.getElementById("lgOrdered").classList.toggle("off",!state.show.ordered);
   document.getElementById("lgDelivered").classList.toggle("off",!state.show.delivered);
 
-  document.getElementById("title").textContent=rangeTitle();
-  const dow=document.getElementById("dow");
-  dow.style.display=(state.view==="agenda")?"none":"";
-  dow.innerHTML=""; if(state.view!=="agenda") DOW.forEach(d=>dow.appendChild($("span",null,d)));
+  // every day that has a visible event, chronologically by order date
+  const dayKeys=Object.keys(byYmd).map(Number)
+    .filter(k=>(byYmd[k]||[]).some(e=>state.show[e.kind]))
+    .sort((a,b)=>a-b);
 
-  if(state.view==="agenda") renderAgenda(byYmd);
-  else renderGrid(byYmd);
+  // title: how many orders are currently listed (after the show-toggle)
+  let total=0; dayKeys.forEach(k=>{ total += (byYmd[k]||[]).filter(e=>state.show[e.kind]).length; });
+  document.getElementById("title").textContent = total+" stone order"+(total===1?"":"s");
+
+  renderAgenda(byYmd,dayKeys);
 }
-function visibleRange(){
-  if(state.view==="week"){ const s=weekStart(state.cursor); return { start:s, end:addDays(s,7) }; }
-  if(state.view==="agenda"){ const s=new Date(state.cursor.getFullYear(),state.cursor.getMonth(),1);
-    return { start:s, end:new Date(state.cursor.getFullYear(),state.cursor.getMonth()+1,1) }; }
-  const first=new Date(state.cursor.getFullYear(),state.cursor.getMonth(),1);
-  const s=addDays(first,-((first.getDay()+6)%7)); return { start:s, end:addDays(s,42) };
-}
-function rangeTitle(){
-  if(state.view==="week"){ const s=weekStart(state.cursor), e=addDays(s,6);
-    const sameM=s.getMonth()===e.getMonth();
-    return s.getDate()+(sameM?"":" "+MONTHS[s.getMonth()].slice(0,3))+" – "+e.getDate()+" "+MONTHS[e.getMonth()].slice(0,3)+" "+e.getFullYear(); }
-  return MONTHS[state.cursor.getMonth()]+" "+state.cursor.getFullYear();
-}
-function renderGrid(byYmd){
-  const grid=document.getElementById("grid"); grid.className="grid"+(state.view==="week"?" week":""); grid.innerHTML="";
-  const week=state.view==="week";
-  const start=week?weekStart(state.cursor):visibleRange().start;
-  const n=week?7:42;
-  const todayK=ymd(new Date()), curM=state.cursor.getMonth();
-  for(let i=0;i<n;i++){
-    const d=addDays(start,i);
-    const inMonth=week?true:(d.getMonth()===curM);
-    const wknd=(d.getDay()===0||d.getDay()===6);
-    const cell=$("div","cell"+(inMonth?"":" out")+(wknd?" wknd":"")+(ymd(d)===todayK?" today":""));
-    const drow=$("div","drow");
-    drow.appendChild($("span","dn",String(d.getDate())));
-    const evs=eventsOn(byYmd,d);
-    if(evs.length) drow.appendChild($("span","dsum",String(evs.length)));
-    cell.appendChild(drow);
-    const CAP=week?99:4;
-    evs.slice(0,CAP).forEach(e=>cell.appendChild(eventChip(e)));
-    if(evs.length>CAP){ const more=$("div","more","+"+(evs.length-CAP)+" more");
-      more.onclick=ev=>{ ev.stopPropagation(); openDay(d,evs,more); }; cell.appendChild(more); }
-    if(evs.length) cell.onclick=()=>openDay(d,evs,cell);
-    grid.appendChild(cell);
+// Turn a ymd integer (y*10000 + m*100 + d) back into a Date.
+function dateFromYmd(k){ return new Date(Math.floor(k/10000), Math.floor(k/100)%100 - 1, k%100); }
+function renderAgenda(byYmd,dayKeys){
+  const list=document.getElementById("agenda"); list.className="agenda"; list.innerHTML="";
+  const todayK=ymd(new Date());
+  if(!dayKeys.length){ const q=(state.searchQ||"").trim();
+    list.appendChild($("div","ag-empty","No stone orders"+(q?(" matching “"+q+"”"):"")+(state.assignee?(" for "+state.assignee):"")+"."));
+    return;
   }
-}
-function renderAgenda(byYmd){
-  const grid=document.getElementById("grid"); grid.className="agenda"; grid.innerHTML="";
-  const r=visibleRange(); const todayK=ymd(new Date()); let any=false;
-  for(let d=new Date(r.start); d<r.end; d=addDays(d,1)){
-    const evs=eventsOn(byYmd,d); if(!evs.length) continue; any=true;
+  dayKeys.forEach(k=>{
+    const d=dateFromYmd(k);
+    const evs=eventsOn(byYmd,d); if(!evs.length) return;
     const row=$("div","ag-day");
-    const dc=$("div","ag-date"); dc.appendChild(document.createTextNode(DOW[(d.getDay()+6)%7]+" "+d.getDate()+" "+MONTHS[d.getMonth()].slice(0,3)));
-    if(ymd(d)===todayK) dc.appendChild($("div","tdy","Today"));
+    const dc=$("div","ag-date");
+    dc.appendChild(document.createTextNode(DOW[(d.getDay()+6)%7]+" "+d.getDate()+" "+MONTHS[d.getMonth()].slice(0,3)+" "+d.getFullYear()));
+    if(k===todayK) dc.appendChild($("div","tdy","Today"));
     row.appendChild(dc);
     const box=$("div","ag-evs"); evs.forEach(e=>box.appendChild(eventChip(e))); row.appendChild(box);
-    grid.appendChild(row);
-  }
-  if(!any){ const q=(state.searchQ||"").trim();
-    grid.appendChild($("div","ag-empty","No stone orders "+(q?("matching “"+q+"” "):"")+(state.assignee?("for "+state.assignee+" "):"")+"in "+MONTHS[state.cursor.getMonth()]+" "+state.cursor.getFullYear()+".")); }
+    list.appendChild(row);
+  });
 }
 // ---- template engine (markdown-ish → DOM), ported from the installations calendar ----
 function renderCardTemplate(str,tokens,host,ctx){
@@ -533,7 +506,17 @@ function kindBar(kind){ return kind==="delivered"?{fill:"#7ad66f",text:"#0f2e18"
 function eventChip(e){
   const r=e.r, j=jobFor(r);
   const chip=$("div","ev "+e.kind);
-  renderCardTemplate(eventCardTpl, eventCardTokens(e), chip, { bar:kindBar(e.kind) });
+  const cols=(eventCardCols&&eventCardCols.length)?eventCardCols:DEFAULT_EVENT_COLS;
+  chip.style.gridTemplateColumns="repeat("+cols.length+",minmax(0,1fr))";
+  const tokens=eventCardTokens(e), kb=kindBar(e.kind);
+  cols.forEach(col=>{
+    const cell=$("div","evcol al-"+(col.align||"left"));
+    let host=cell;
+    if(col.style==="pill"){ const p=$("span","evpill"); cell.appendChild(p); host=p; }
+    else if(col.style==="highlight"){ const p=$("span","evpill hl"); p.style.background=kb.fill; p.style.color=kb.text; cell.appendChild(p); host=p; }
+    renderCardTemplate(col.tpl, tokens, host, { bar:kb });
+    chip.appendChild(cell);
+  });
   chip.title=(e.kind==="delivered"?"Delivered ":"Ordered ")+fmtDMY(e.date)+"\n"+jobClient(j)+" ("+jobCode(j)+")\n"+stoneLabel(r)
     +"\nStatus: "+statusLabel(r.Order_Status)+" · Ord "+num(r.Ordered_Qty)+" / Deliv "+num(r.Delivery_Qty);
   chip.onclick=ev=>{ ev.stopPropagation(); openDay(e.date,[e],chip); };
@@ -545,32 +528,79 @@ function openCardEditor(){ document.getElementById("cardModal").classList.add("o
 function closeCardEditor(){ document.getElementById("cardModal").classList.remove("open"); }
 function renderCardEditor(){
   const body=document.getElementById("ceBody"); body.innerHTML="";
-  const tokens=EVENT_TOKENS;
+  if(!eventCardCols.length) eventCardCols=cloneCols(DEFAULT_EVENT_COLS);
   const note=$("div","ce-note");
-  note.textContent="The chips shown for each stone order on the calendar. "
-    +"Use **bold**, *italic*, {tokens}, line breaks, --- for a divider, and ==wrap== for a coloured bar. Applies to every event.";
+  note.innerHTML="The chip shown for each stone order. Each <b>section</b> is a column laid side-by-side. "
+    +"Per column choose an alignment and a style — <b>plain</b>, a <b>pill</b>, or <b>in highlight</b> "
+    +"(a pill in the ordered / delivered colour). Inside a section use **bold**, *italic*, {tokens}, --- divider, ==coloured bar==.";
   body.appendChild(note);
-  const ta=document.createElement("textarea"); ta.className="ce-ta"; ta.spellcheck=false;
-  ta.value=eventCardTpl;
-  function commit(){ eventCardTpl=ta.value; saveLocalCards(); render(); }
-  ta.addEventListener("input",commit); body.appendChild(ta);
+
+  let activeTa=null;                                   // last-focused section — the token chips insert here
+  function commit(){ saveLocalCards(); render(); }
+
+  body.appendChild($("div","ce-sechead","Sections (columns)"));
+  eventCardCols.forEach((col,i)=>{
+    const sec=$("div","ce-sec");
+    const top=$("div","ce-sec-top");
+    top.appendChild($("span","ce-sec-n","Column "+(i+1)));
+    const up=$("span","ce-sec-mv"+(i===0?" off":""),"↑"); up.title="Move left";
+    up.onclick=()=>{ if(i>0){ const a=eventCardCols; [a[i-1],a[i]]=[a[i],a[i-1]]; commit(); renderCardEditor(); } };
+    const dn=$("span","ce-sec-mv"+(i===eventCardCols.length-1?" off":""),"↓"); dn.title="Move right";
+    dn.onclick=()=>{ const a=eventCardCols; if(i<a.length-1){ [a[i+1],a[i]]=[a[i],a[i+1]]; commit(); renderCardEditor(); } };
+    const rm=$("span","ce-sec-x"+(eventCardCols.length<=1?" off":""),"×"); rm.title="Remove column";
+    rm.onclick=()=>{ if(eventCardCols.length>1){ eventCardCols.splice(i,1); commit(); renderCardEditor(); } };
+    top.appendChild(up); top.appendChild(dn); top.appendChild(rm);
+    sec.appendChild(top);
+
+    const ta=document.createElement("textarea"); ta.className="ce-sta"; ta.spellcheck=false; ta.value=col.tpl;
+    ta.placeholder="e.g. **{client}**";
+    ta.addEventListener("input",()=>{ col.tpl=ta.value; commit(); });
+    ta.addEventListener("focus",()=>{ activeTa={ta,col}; });
+    if(!activeTa) activeTa={ta,col};
+    sec.appendChild(ta);
+
+    const opts=$("div","ce-secopts");
+    opts.appendChild($("span","ce-optlab","Style"));
+    const styleSeg=$("div","ce-segm");
+    [["plain","Plain"],["pill","Pill"],["highlight","Highlight"]].forEach(([v,lab])=>{
+      const b=document.createElement("button"); b.type="button"; b.textContent=lab; if(col.style===v)b.className="on";
+      b.onclick=()=>{ col.style=v; commit(); renderCardEditor(); }; styleSeg.appendChild(b); });
+    opts.appendChild(styleSeg);
+    opts.appendChild($("span","ce-optlab","Align"));
+    const alignSeg=$("div","ce-segm");
+    [["left","L","Left"],["centre","C","Centre"],["right","R","Right"]].forEach(([v,lab,title])=>{
+      const b=document.createElement("button"); b.type="button"; b.textContent=lab; b.title=title; if(col.align===v)b.className="on";
+      b.onclick=()=>{ col.align=v; commit(); renderCardEditor(); }; alignSeg.appendChild(b); });
+    opts.appendChild(alignSeg);
+    sec.appendChild(opts);
+    body.appendChild(sec);
+  });
+
+  const add=document.createElement("button"); add.type="button"; add.className="ce-addsec";
+  add.textContent="＋ Add section (column)"; add.disabled=eventCardCols.length>=4;
+  add.onclick=()=>{ if(eventCardCols.length<4){ eventCardCols.push({tpl:"",style:"plain",align:"left"}); commit(); renderCardEditor(); } };
+  body.appendChild(add);
+
+  // shared token palette — inserts into the last-focused section
   const toks=$("div","ce-tokens");
-  const insert=(text,caretBack)=>{ const s=ta.selectionStart||0,en=ta.selectionEnd||0;
-    ta.value=ta.value.slice(0,s)+text+ta.value.slice(en); ta.focus();
-    ta.selectionStart=ta.selectionEnd=s+text.length-(caretBack||0); commit(); };
-  Object.keys(tokens).forEach(k=>{ const chip=document.createElement("button"); chip.type="button"; chip.className="ce-tok";
-    chip.innerHTML="<code>{"+k+"}</code><span>"+tokens[k]+"</span>"; chip.title="Insert {"+k+"}";
+  const insert=text=>{ const a=activeTa; if(!a||!a.ta) return; const t=a.ta;
+    const s=t.selectionStart||0,en=t.selectionEnd||0;
+    t.value=t.value.slice(0,s)+text+t.value.slice(en); t.focus(); t.selectionStart=t.selectionEnd=s+text.length;
+    a.col.tpl=t.value; commit(); };
+  Object.keys(EVENT_TOKENS).forEach(k=>{ const chip=document.createElement("button"); chip.type="button"; chip.className="ce-tok";
+    chip.innerHTML="<code>{"+k+"}</code><span>"+EVENT_TOKENS[k]+"</span>"; chip.title="Insert {"+k+"} into the selected section";
+    chip.addEventListener("mousedown",e=>e.preventDefault());
     chip.addEventListener("click",()=>insert("{"+k+"}")); toks.appendChild(chip); });
   const divChip=document.createElement("button"); divChip.type="button"; divChip.className="ce-tok";
-  divChip.innerHTML="<code>---</code><span>Divider</span>"; divChip.addEventListener("click",()=>{
-    const s=ta.selectionStart||0; const pre=(s>0&&ta.value[s-1]!=="\n")?"\n":""; insert(pre+"---\n"); }); toks.appendChild(divChip);
+  divChip.innerHTML="<code>---</code><span>Divider</span>"; divChip.addEventListener("mousedown",e=>e.preventDefault());
+  divChip.addEventListener("click",()=>insert("\n---\n")); toks.appendChild(divChip);
   const barChip=document.createElement("button"); barChip.type="button"; barChip.className="ce-tok";
-  barChip.innerHTML="<code>== ==</code><span>Coloured bar</span>"; barChip.addEventListener("click",()=>{
-    const s=ta.selectionStart||0,en=ta.selectionEnd||0; const inner=ta.value.slice(s,en)||"{client}";
-    ta.value=ta.value.slice(0,s)+"=="+inner+"=="+ta.value.slice(en); ta.focus(); ta.selectionStart=s+2; ta.selectionEnd=s+2+inner.length; commit(); }); toks.appendChild(barChip);
+  barChip.innerHTML="<code>== ==</code><span>Coloured bar</span>"; barChip.addEventListener("mousedown",e=>e.preventDefault());
+  barChip.addEventListener("click",()=>insert("=={client}==")); toks.appendChild(barChip);
   body.appendChild(toks);
-  const reset=$("div","ce-reset","↩ Reset this card to default");
-  reset.addEventListener("click",()=>{ eventCardTpl=DEFAULT_EVENT_CARD; saveLocalCards(); render(); renderCardEditor(); });
+
+  const reset=$("div","ce-reset","↩ Reset card to default");
+  reset.addEventListener("click",()=>{ eventCardCols=cloneCols(DEFAULT_EVENT_COLS); commit(); renderCardEditor(); });
   body.appendChild(reset);
   const fRow=$("div","ce-fontrow"); fRow.appendChild($("span","ce-flabel","Text size"));
   const fVal=$("span","ce-fval"); const showF=()=>fVal.textContent=eventCardFont+"px";
@@ -698,23 +728,13 @@ const SAMPLE_STONE=[
   { id:9, Job:23, Product:104, Product_Code:"LSU401",Product_Supplier:"Lavistone",  Ordered_Qty:2, Delivery_Qty:0, Order_Status:"3. Awaiting Order", Order_Date:D(2026,7,24), Delivery_Date:null }
 ];
 const DEMO_REF={ product:{ targetTableId:"Catalogue", labelCol:"Product_Full" } };
-window._test=function(stone,jobs,catalogue,y,m){
-  state.stone=stone||[]; state.jobs=jobs||[]; state.catalogue=catalogue||[];
-  if(y!=null){ state.cursor=new Date(y,m,15); } reindex(); render();
+window._test=function(stone,jobs,catalogue){
+  state.stone=stone||[]; state.jobs=jobs||[]; state.catalogue=catalogue||[]; reindex(); render();
 };
 
 // ============================================================
 //  BOOT
 // ============================================================
-function go(delta){
-  if(state.view==="week") state.cursor=addDays(state.cursor,7*delta);
-  else state.cursor=new Date(state.cursor.getFullYear(),state.cursor.getMonth()+delta,1);
-  render();
-}
-document.getElementById("prev").onclick=()=>go(-1);
-document.getElementById("next").onclick=()=>go(1);
-document.getElementById("todayBtn").onclick=()=>{ state.cursor=new Date(); render(); };
-document.getElementById("viewSeg").onclick=e=>{ const b=e.target.closest("button"); if(!b)return; state.view=b.dataset.v; render(); };
 document.getElementById("assignBtn").onclick=e=>{ e.stopPropagation(); openAssignMenu(); };
 document.getElementById("assignPop").onclick=e=>e.stopPropagation();
 document.getElementById("lgOrdered").onclick=()=>{ state.show.ordered=!state.show.ordered; render(); };
@@ -731,7 +751,8 @@ document.addEventListener("keydown",e=>{ if(e.key==="Escape") closePops(); });
 
 // restore any personal card design
 { const lc=loadLocalCards();
-  if(typeof lc.event==="string") eventCardTpl=lc.event;
+  if(lc.cols!=null) eventCardCols=normaliseCols(lc.cols);
+  else if(typeof lc.event==="string") eventCardCols=normaliseCols(lc.event);
   if(lc.scope==="me"||lc.scope==="everyone") cardScope=lc.scope;
   if(typeof lc.ef==="number") eventCardFont=lc.ef;
   applyCardFonts(); }

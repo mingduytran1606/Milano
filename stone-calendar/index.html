@@ -49,13 +49,16 @@
     background:var(--panel);color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
   .assign:hover{border-color:var(--accent)}
   .assign.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink)}
-  .legend{display:flex;gap:8px}
-  .lg{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:5px 11px;border-radius:999px;
-    border:1px solid var(--line);background:var(--panel);color:var(--muted);cursor:pointer;user-select:none}
-  .lg .sw{width:11px;height:11px;border-radius:3px;flex:0 0 auto}
-  .lg.on{color:var(--ink);border-color:var(--accent)}
-  .lg.off{opacity:.5;text-decoration:line-through}
-  .lg .n{font-variant-numeric:tabular-nums;color:var(--muted)}
+  /* status filter pills (replace the old ordered/delivered legend) */
+  .statusbar{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:8px}
+  .sfp{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--panel);
+    border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:600;color:var(--ink);cursor:pointer;user-select:none}
+  .sfp:hover{border-color:var(--accent)}
+  .sfp .dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+  .sfp .cnt{font-variant-numeric:tabular-nums;font-size:11px;font-weight:700;color:var(--muted);
+    background:var(--line2);border-radius:999px;padding:0 7px;line-height:16px}
+  .sfp.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--accent-soft);color:var(--accent-ink)}
+  .sfp.on .cnt{background:rgba(22,179,120,.18);color:var(--accent-ink)}
 
   /* ---- top stone search bar ---- */
   .searchbar{flex:0 0 auto;position:relative;display:flex;align-items:center}
@@ -75,10 +78,12 @@
   .body{flex:1 1 auto;min-height:0;display:flex;gap:12px}
 
   /* ---- agenda event card (chip) — a grid of customisable columns ---- */
+  /* chip tint (background + border) is set inline from the line's Order_Status colour;
+     text is a fixed dark ink so it stays readable on the light status tints in either theme */
   .ev{font-size:var(--ev-card-font,10.5px);line-height:1.32;border-radius:6px;padding:3px 8px;cursor:pointer;overflow:hidden;
-    display:grid;gap:8px;align-items:center}
+    display:grid;gap:8px;align-items:center;color:#1d2733;border:1px solid transparent}
   .ev strong{font-weight:700}
-  .ev em{font-style:italic;color:var(--muted)}
+  .ev em{font-style:italic;color:#5b6672}
   .evcol{min-width:0;overflow:hidden}
   .evcol.al-left{text-align:left}
   .evcol.al-centre{text-align:center}
@@ -95,13 +100,6 @@
   .avwrap{display:inline-flex;vertical-align:-4px}
   .avwrap .av{width:16px;height:16px;font-size:8.5px;margin-left:-4px;border:1.5px solid var(--panel)}
   .avwrap .av:first-child{margin-left:0}
-  .ev.ordered{background:#fdf6c8}
-  .ev.delivered{background:#dcf7d6}
-  @media (prefers-color-scheme:dark){ .ev.ordered{background:#3a380f} .ev.delivered{background:#173a24} }
-  :root[data-theme="dark"] .ev.ordered{background:#3a380f}
-  :root[data-theme="dark"] .ev.delivered{background:#173a24}
-  :root[data-theme="light"] .ev.ordered{background:#fdf6c8}
-  :root[data-theme="light"] .ev.delivered{background:#dcf7d6}
 
   /* agenda: vertical list of days */
   .agenda{flex:1 1 auto;min-height:0;overflow-y:auto;display:block;background:var(--panel);
@@ -128,9 +126,6 @@
   .pev{padding:7px 0;border-top:1px solid var(--line2)}
   .pev:first-of-type{border-top:0}
   .pev .pline{display:flex;align-items:center;gap:6px}
-  .pev .kind{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;border-radius:5px;padding:1px 6px}
-  .pev .kind.ordered{background:#fdf6c8;color:#7a5c00}
-  .pev .kind.delivered{background:#dcf7d6;color:#0f7a52}
   .pev .pname{font-weight:700;font-size:12.5px}
   .pev .pmeta{font-size:11.5px;color:var(--muted);margin-top:2px}
 
@@ -215,13 +210,11 @@
   <div class="topbar">
     <div class="title" id="title">Stone orders</div>
     <div class="spacer"></div>
+    <button class="assign" id="sortBtn" title="Sort the agenda">↕ Sort ▾</button>
     <button class="assign" id="assignBtn">All assignees ▾</button>
-    <div class="legend">
-      <span class="lg on" id="lgOrdered"><span class="sw" style="background:#f2df3a"></span>Ordered <span class="n" id="nOrdered">0</span></span>
-      <span class="lg on" id="lgDelivered"><span class="sw" style="background:#7ad66f"></span>Delivered <span class="n" id="nDelivered">0</span></span>
-    </div>
     <button class="assign" id="cardsBtn" title="Customise how cards appear">⚙ Cards</button>
   </div>
+  <div class="statusbar" id="statusbar"></div>
   <div class="body" id="body">
     <div class="agenda" id="agenda"></div>
   </div>
@@ -229,6 +222,7 @@
 
 <div class="pop" id="dayPop" hidden></div>
 <div class="pop" id="assignPop" hidden></div>
+<div class="pop" id="sortPop" hidden></div>
 <div class="modal" id="cardModal">
   <div class="modal-card">
     <div class="modal-head">
@@ -244,15 +238,14 @@
 "use strict";
 /* ============================================================
    Milano — Stone Order Calendar widget
-   Plots each Stone_Order line on a calendar (Agenda by default,
-   also Month / Week):
-     • ordered but not delivered  → placed on its ORDER date
-     • delivered                  → placed on its DELIVERY date
-   A stone search bar at the top live-filters the events by
-   stone name / supplier / code — merging the old Catalogue
-   Search into the calendar. Shares the Inbox / Catalogue
-   foundation: design tokens, the Order_Status model, and the
-   Grist read plumbing.
+   A single Agenda listing every Stone_Order line on its ORDER
+   date (falling back to its delivery date only when it has no
+   order date), grouped by day. Chips are tinted by the line's
+   Order_Status. A stone search bar live-filters by stone name /
+   supplier / code, a row of status pills filters by status
+   (with a job count each), and a sort button flips the date
+   order. Shares the Inbox / Catalogue foundation: design tokens,
+   the Order_Status model, and the Grist read plumbing.
    ============================================================ */
 
 // ---- status model ----
@@ -265,7 +258,29 @@ const ORD_C = Object.assign({}, ORD_DEFAULT);
 const statusColor = s => ORD_C[s] || "#e9edf1";
 const statusLabel = s => (s==null||s==="") ? "To sort" : s;
 const SPECIAL_COL = /^(manualSort|gristHelper_|id$)/;
+// Delivered = any status meaning delivered, regardless of who delivered it.
 function isDeliveredStatus(r){ const low=String(r.Order_Status||"").toLowerCase(); return /deliver/.test(low) && !/not deliver/.test(low); }
+// Named status-filter groups — this is also the pill order. "Delivered" groups every
+// delivered status together; extra pills are added for any other status found in the data.
+const PRIMARY_GROUPS=[
+  { key:"awaiting_order",  label:"Awaiting Order",   statuses:["3. Awaiting Order"] },
+  { key:"ordered",         label:"Ordered",          statuses:["2.  Placed Order"] },
+  { key:"awaiting_pickup", label:"Awaiting Pick Up", statuses:["4. Awaiting Pickup"] },
+  { key:"delivered",       label:"Delivered",        match:isDeliveredStatus, color:"6. Delivered" }
+];
+const PRIMARY_STATUSES=new Set(["3. Awaiting Order","2.  Placed Order","4. Awaiting Pickup"]);
+function matchGroup(g,r){ if(!g||g.key==="all")return true; if(g.match)return g.match(r);
+  return (g.statuses||[]).includes(String(r.Order_Status||"")); }
+// All + primary groups + one pill per other status present in the data.
+function statusPills(){
+  const pills=[{ key:"all", label:"All", color:null }].concat(PRIMARY_GROUPS);
+  const extra=new Set();
+  (state.stone||[]).forEach(r=>{ if(!calDateOf(r))return; const s=String(r.Order_Status||"");
+    if(isDeliveredStatus(r)||PRIMARY_STATUSES.has(s))return; extra.add(s); });
+  [...extra].sort().forEach(s=>pills.push({ key:"s:"+s, label:statusLabel(s), statuses:[s], color:s }));
+  return pills;
+}
+function findGroup(key){ return statusPills().find(p=>p.key===key)||null; }
 
 // ---- generic helpers ----
 const $=(t,c,txt)=>{const e=document.createElement(t); if(c)e.className=c; if(txt!=null)e.textContent=txt; return e;};
@@ -295,7 +310,8 @@ const state={
   ref:{ product:null },
   assignee:null,                        // null = all assignees
   searchQ:"",                           // stone search — live-filters events
-  show:{ ordered:true, delivered:true },
+  statusFilter:"all",                   // status-pill filter (group/status key)
+  sortDir:"asc",                        // agenda date order: asc = oldest first
   jobById:{}, catById:{}
 };
 window._stonecal=state;
@@ -304,14 +320,14 @@ window._stonecal=state;
 // The event card is a row of 1–4 SECTIONS (columns). Each section holds a bit of
 // markdown-ish template — **bold**, *italic*, {token}, ==coloured bar==, --- divider,
 // \n = new line — plus a style (plain / pill / in-highlight) and an alignment.
-const STYLES=["plain","pill","highlight"];        // highlight = pill in the ordered/delivered colour
+const STYLES=["plain","pill","highlight"];        // highlight = pill in the line's Order_Status colour
 const ALIGNS=["left","centre","right"];
 const DEFAULT_EVENT_COLS=[{ tpl:'**{client}** · {product}', style:'plain', align:'left' }];
 let eventCardCols=cloneCols(DEFAULT_EVENT_COLS);
 let cardScope='everyone', eventCardFont=10.5;
 const CARD_LS='milano_stonecal_cards';
 const EVENT_TOKENS={ client:'Client', job:'Job ID', address:'Address', product:'Product', supplier:'Supplier',
-  code:'Product code', status:'Status pill', kind:'Ordered / Delivered', ordered:'Ordered qty', delivered:'Delivered qty',
+  code:'Product code', status:'Status pill', ordered:'Ordered qty', delivered:'Delivered qty',
   orderdate:'Order date', deliverydate:'Delivery date', inv:'Invoice #', note:'Note', price:'$ / slab', assigned:'Assignee avatars' };
 function cloneCols(cols){ return (cols||[]).map(c=>({ tpl:String(c.tpl||""),
   style:STYLES.includes(c.style)?c.style:'plain', align:ALIGNS.includes(c.align)?c.align:'left' })); }
@@ -359,31 +375,32 @@ function jobClient(j){ return j ? ((String(j.Client_Label||"")).trim() || (Strin
 function jobCode(j){ return j ? (j.Job_ID || ("#"+j.id)) : ""; }
 
 // Every stone line appears on its ORDER date (falling back to the delivery date
-// only when there is no order date, so nothing silently vanishes). The kind comes
-// from status — it drives the chip colour + the Ordered / Delivered legend toggles.
-function calDateOf(r){
-  const kind = isDeliveredStatus(r) ? "delivered" : "ordered";
-  const d = toDate(r.Order_Date) || toDate(r.Delivery_Date);
-  return d ? { date:d, kind } : null;
-}
+// only when there is no order date, so nothing silently vanishes).
+function calDateOf(r){ const d = toDate(r.Order_Date) || toDate(r.Delivery_Date); return d ? { date:d } : null; }
 function passAssignee(r){ return !state.assignee || assigneesOf(r).includes(state.assignee); }
 // Stone search — match the query against the stone's name, supplier and code.
 function stoneHaystack(r){ const c=catFor(r);
   return [stoneLabel(r), r.Product_Supplier, r.Product_Code, r.Stone, c&&c.Supplier, c&&c.Product_Full]
     .filter(Boolean).join(" ").toLowerCase(); }
 function passSearch(r){ const q=(state.searchQ||"").trim().toLowerCase(); return !q || stoneHaystack(r).includes(q); }
-// Every event indexed by ymd (respecting assignee + stone search; show-toggle applied at render).
+function passStatus(r){ return state.statusFilter==="all" || matchGroup(findGroup(state.statusFilter),r); }
+// The set of lines the agenda draws from before the status filter — also feeds the pill job counts.
+function baseRows(){ return (state.stone||[]).filter(r=>calDateOf(r)&&passAssignee(r)&&passSearch(r)); }
+// Every event indexed by ymd (respecting assignee + search + status filter).
 function buildEventIndex(){
   const byYmd={};
-  (state.stone||[]).forEach(r=>{ const cd=calDateOf(r); if(!cd) return; if(!passAssignee(r)||!passSearch(r)) return;
-    (byYmd[ymd(cd.date)]=byYmd[ymd(cd.date)]||[]).push({r,kind:cd.kind,date:cd.date}); });
+  baseRows().forEach(r=>{ if(!passStatus(r)) return; const cd=calDateOf(r);
+    (byYmd[ymd(cd.date)]=byYmd[ymd(cd.date)]||[]).push({r,date:cd.date}); });
   return byYmd;
 }
-// Count all stone lines matching the current search + assignee (any date) — drives the pill in the search bar.
-function matchingCount(){ return (state.stone||[]).filter(r=>calDateOf(r)&&passAssignee(r)&&passSearch(r)).length; }
+// Count all stone lines matching search + assignee (any date) — drives the pill in the search bar.
+function matchingCount(){ return baseRows().length; }
+// Distinct jobs among the base rows that fall in a given status group — the pill counts.
+function jobCountForGroup(g){ const jobs=new Set();
+  baseRows().forEach(r=>{ if(matchGroup(g,r)) jobs.add(refId(r.Job)); }); return jobs.size; }
 function eventsOn(byYmd,d){
-  return (byYmd[ymd(d)]||[]).filter(e=>state.show[e.kind])
-    .sort((a,b)=>(a.kind===b.kind?0:a.kind==="ordered"?-1:1));
+  return (byYmd[ymd(d)]||[]).slice()
+    .sort((a,b)=>jobClient(jobFor(a.r)).localeCompare(jobClient(jobFor(b.r))));
 }
 
 // ============================================================
@@ -402,34 +419,43 @@ function render(){
   if(q){ const n=matchingCount(); mc.textContent=n+" order"+(n===1?"":"s"); mc.hidden=false; }
   else mc.hidden=true;
 
+  // sort button label reflects the current direction
+  document.getElementById("sortBtn").textContent = "↕ "+(state.sortDir==="desc"?"Newest first":"Oldest first")+" ▾";
+
+  // status filter pills (with a job count each)
+  renderStatusbar();
+
   const byYmd=buildEventIndex();
 
-  // legend counts over everything matching (assignee + search), ignoring show-toggle
-  let nOrd=0,nDel=0;
-  Object.keys(byYmd).forEach(k=>(byYmd[k]||[]).forEach(e=>{ if(e.kind==="ordered")nOrd++; else nDel++; }));
-  document.getElementById("nOrdered").textContent=nOrd;
-  document.getElementById("nDelivered").textContent=nDel;
-  document.getElementById("lgOrdered").classList.toggle("off",!state.show.ordered);
-  document.getElementById("lgDelivered").classList.toggle("off",!state.show.delivered);
+  // every day that has an event, in the chosen date order
+  const dayKeys=Object.keys(byYmd).map(Number).sort((a,b)=> state.sortDir==="desc" ? b-a : a-b);
 
-  // every day that has a visible event, chronologically by order date
-  const dayKeys=Object.keys(byYmd).map(Number)
-    .filter(k=>(byYmd[k]||[]).some(e=>state.show[e.kind]))
-    .sort((a,b)=>a-b);
-
-  // title: how many orders are currently listed (after the show-toggle)
-  let total=0; dayKeys.forEach(k=>{ total += (byYmd[k]||[]).filter(e=>state.show[e.kind]).length; });
+  // title: how many orders are currently listed
+  let total=0; dayKeys.forEach(k=>{ total += (byYmd[k]||[]).length; });
   document.getElementById("title").textContent = total+" stone order"+(total===1?"":"s");
 
   renderAgenda(byYmd,dayKeys);
+}
+function renderStatusbar(){
+  const bar=document.getElementById("statusbar"); bar.innerHTML="";
+  statusPills().forEach(p=>{
+    const pill=$("div","sfp"+(state.statusFilter===p.key?" on":""));
+    const colStatus = p.color || (p.statuses && p.statuses[0]);   // "All" has none
+    if(colStatus){ const d=$("span","dot"); d.style.background=statusColor(colStatus); pill.appendChild(d); }
+    pill.appendChild(document.createTextNode(p.label));
+    pill.appendChild($("span","cnt",String(jobCountForGroup(p))));
+    pill.onclick=()=>{ state.statusFilter=(p.key!=="all"&&state.statusFilter===p.key)?"all":p.key; render(); };
+    bar.appendChild(pill);
+  });
 }
 // Turn a ymd integer (y*10000 + m*100 + d) back into a Date.
 function dateFromYmd(k){ return new Date(Math.floor(k/10000), Math.floor(k/100)%100 - 1, k%100); }
 function renderAgenda(byYmd,dayKeys){
   const list=document.getElementById("agenda"); list.className="agenda"; list.innerHTML="";
   const todayK=ymd(new Date());
-  if(!dayKeys.length){ const q=(state.searchQ||"").trim();
-    list.appendChild($("div","ag-empty","No stone orders"+(q?(" matching “"+q+"”"):"")+(state.assignee?(" for "+state.assignee):"")+"."));
+  if(!dayKeys.length){ const q=(state.searchQ||"").trim(); const g=findGroup(state.statusFilter);
+    list.appendChild($("div","ag-empty","No stone orders"+(q?(" matching “"+q+"”"):"")
+      +(g&&g.key!=="all"?(" · "+g.label):"")+(state.assignee?(" for "+state.assignee):"")+"."));
     return;
   }
   dayKeys.forEach(k=>{
@@ -490,7 +516,6 @@ function eventCardTokens(e){
     supplier:()=>txtNode(r.Product_Supplier||(catFor(r)&&catFor(r).Supplier)||null),
     code:()=>txtNode(r.Product_Code||null),
     status:()=>pillEl(r.Order_Status),
-    kind:()=>txtNode(e.kind==="delivered"?"Delivered":"Ordered"),
     ordered:()=>txtNode(num(r.Ordered_Qty)?("Ord "+num(r.Ordered_Qty)):null),
     delivered:()=>txtNode(num(r.Delivery_Qty)?("Deliv "+num(r.Delivery_Qty)):null),
     orderdate:()=>txtNode(toDate(r.Order_Date)?fmtDMY(r.Order_Date):null),
@@ -501,24 +526,27 @@ function eventCardTokens(e){
     assigned:()=>avatarsEl(assigneesOf(r))
   };
 }
-function kindBar(kind){ return kind==="delivered"?{fill:"#7ad66f",text:"#0f2e18"}:{fill:"#f2df3a",text:"#4a3f00"}; }
+// Highlight/coloured-bar colour = the line's Order_Status colour (raw status hue, dark text).
+function statusBar(r){ return { fill:statusColor(r.Order_Status), text:"#1d2733" }; }
 
 function eventChip(e){
   const r=e.r, j=jobFor(r);
-  const chip=$("div","ev "+e.kind);
+  const chip=$("div","ev");
   const cols=(eventCardCols&&eventCardCols.length)?eventCardCols:DEFAULT_EVENT_COLS;
   chip.style.gridTemplateColumns="repeat("+cols.length+",minmax(0,1fr))";
-  const tokens=eventCardTokens(e), kb=kindBar(e.kind);
+  const tint=softTint(statusColor(r.Order_Status));
+  chip.style.background=tint.bg; chip.style.borderColor=tint.dot;
+  const tokens=eventCardTokens(e), sb=statusBar(r);
   cols.forEach(col=>{
     const cell=$("div","evcol al-"+(col.align||"left"));
     let host=cell;
     if(col.style==="pill"){ const p=$("span","evpill"); cell.appendChild(p); host=p; }
-    else if(col.style==="highlight"){ const p=$("span","evpill hl"); p.style.background=kb.fill; p.style.color=kb.text; cell.appendChild(p); host=p; }
-    renderCardTemplate(col.tpl, tokens, host, { bar:kb });
+    else if(col.style==="highlight"){ const p=$("span","evpill hl"); p.style.background=sb.fill; p.style.color=sb.text; cell.appendChild(p); host=p; }
+    renderCardTemplate(col.tpl, tokens, host, { bar:sb });
     chip.appendChild(cell);
   });
-  chip.title=(e.kind==="delivered"?"Delivered ":"Ordered ")+fmtDMY(e.date)+"\n"+jobClient(j)+" ("+jobCode(j)+")\n"+stoneLabel(r)
-    +"\nStatus: "+statusLabel(r.Order_Status)+" · Ord "+num(r.Ordered_Qty)+" / Deliv "+num(r.Delivery_Qty);
+  chip.title=fmtDMY(e.date)+" · "+statusLabel(r.Order_Status)+"\n"+jobClient(j)+" ("+jobCode(j)+")\n"+stoneLabel(r)
+    +"\nOrd "+num(r.Ordered_Qty)+" / Deliv "+num(r.Delivery_Qty);
   chip.onclick=ev=>{ ev.stopPropagation(); openDay(e.date,[e],chip); };
   return chip;
 }
@@ -532,7 +560,7 @@ function renderCardEditor(){
   const note=$("div","ce-note");
   note.innerHTML="The chip shown for each stone order. Each <b>section</b> is a column laid side-by-side. "
     +"Per column choose an alignment and a style — <b>plain</b>, a <b>pill</b>, or <b>in highlight</b> "
-    +"(a pill in the ordered / delivered colour). Inside a section use **bold**, *italic*, {tokens}, --- divider, ==coloured bar==.";
+    +"(a pill in the order's status colour). Inside a section use **bold**, *italic*, {tokens}, --- divider, ==coloured bar==.";
   body.appendChild(note);
 
   let activeTa=null;                                   // last-focused section — the token chips insert here
@@ -626,12 +654,12 @@ function openDay(d,evs,anchor){
     const r=e.r, j=jobFor(r);
     const pev=$("div","pev");
     const line=$("div","pline");
-    const k=$("span","kind "+e.kind, e.kind==="delivered"?"Delivered":"Ordered"); line.appendChild(k);
+    line.appendChild(pillEl(r.Order_Status));
     line.appendChild($("span","pname",jobClient(j)));
     pev.appendChild(line);
     pev.appendChild($("div","pmeta",stoneLabel(r)+" · "+jobCode(j)));
-    pev.appendChild($("div","pmeta","Status "+statusLabel(r.Order_Status)+" · Ordered "+num(r.Ordered_Qty)+" · Delivered "+num(r.Delivery_Qty)
-      +(e.kind==="delivered"?(" · Delivered "+fmtDMY(r.Delivery_Date)):(" · Ordered "+fmtDMY(r.Order_Date)))));
+    pev.appendChild($("div","pmeta","Ordered "+num(r.Ordered_Qty)+" · Delivered "+num(r.Delivery_Qty)
+      +" · Order "+fmtDMY(r.Order_Date)+(toDate(r.Delivery_Date)?(" · Delivered "+fmtDMY(r.Delivery_Date)):"")));
     m.appendChild(pev);
   });
   closePops(); m.hidden=false; positionPop(m,anchor,300);
@@ -642,7 +670,18 @@ function positionPop(el,anchor,w){
   const below=rc.bottom+6, h=el.offsetHeight||280;
   el.style.top=(below+h>window.innerHeight-8 ? Math.max(8,rc.top-h-6) : below)+"px";
 }
-function closePops(){ ["dayPop","assignPop"].forEach(id=>{const e=document.getElementById(id); if(e)e.hidden=true;}); }
+function closePops(){ ["dayPop","assignPop","sortPop"].forEach(id=>{const e=document.getElementById(id); if(e)e.hidden=true;}); }
+function openSortMenu(){
+  const m=document.getElementById("sortPop"); m.innerHTML="";
+  [{v:"asc",label:"Order date — oldest first"},{v:"desc",label:"Order date — newest first"}].forEach(o=>{
+    const on=state.sortDir===o.v; const row=$("div","cprow"+(on?" on":""));
+    row.appendChild(document.createTextNode(o.label));
+    if(on) row.appendChild($("span","rtick","✓"));
+    row.onmousedown=e=>{ e.preventDefault(); state.sortDir=o.v; closePops(); render(); };
+    m.appendChild(row);
+  });
+  closePops(); m.hidden=false; positionPop(m,document.getElementById("sortBtn"),240);
+}
 function openAssignMenu(){
   const m=document.getElementById("assignPop"); m.innerHTML="";
   const mk=(name)=>{ const on=(state.assignee===name)||(name===null&&!state.assignee);
@@ -737,8 +776,8 @@ window._test=function(stone,jobs,catalogue){
 // ============================================================
 document.getElementById("assignBtn").onclick=e=>{ e.stopPropagation(); openAssignMenu(); };
 document.getElementById("assignPop").onclick=e=>e.stopPropagation();
-document.getElementById("lgOrdered").onclick=()=>{ state.show.ordered=!state.show.ordered; render(); };
-document.getElementById("lgDelivered").onclick=()=>{ state.show.delivered=!state.show.delivered; render(); };
+document.getElementById("sortBtn").onclick=e=>{ e.stopPropagation(); openSortMenu(); };
+document.getElementById("sortPop").onclick=e=>e.stopPropagation();
 const stoneSearch=document.getElementById("stoneSearch");
 stoneSearch.oninput=e=>{ state.searchQ=e.target.value; render(); };
 document.getElementById("searchClr").onclick=()=>{ state.searchQ=""; stoneSearch.value=""; render(); stoneSearch.focus(); };

@@ -103,7 +103,7 @@
   .ag-evs{flex:1 1 auto;display:flex;flex-direction:column;gap:5px;min-width:0}
   .ag-empty{color:var(--muted);text-align:center;padding:40px;font-size:13px}
   /* today's placeholder: quieter than a real card, so it reads as an anchor not an order */
-  .ag-none{color:var(--muted);font-size:11.5px;font-style:italic;padding:2px 0}
+  .ag-none{color:var(--muted);font-size:11.5px;font-style:italic;padding:2px 0;cursor:pointer}
 
   /* assignee menu rows (reuse .pop) */
   .cprow{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:12.5px}
@@ -245,6 +245,7 @@
     </div>
     <button class="assign" id="sortBtn" title="Sort the agenda">Sort: Oldest first ▾</button>
     <button class="assign" id="assignBtn">All assignees ▾</button>
+    <button class="assign" id="newBtn" title="Add a stone order (or double-click an empty day)">+ New order</button>
     <button class="assign" id="bulkBtn" title="Select several orders and set their status together">☑ Bulk edit</button>
     <button class="assign" id="cardsBtn" title="Customise how cards appear">⚙ Cards</button>
   </div>
@@ -392,6 +393,7 @@ const state={
   bulk:false,                           // bulk-edit mode: checkboxes + the bottom action bar
   sel:new Set(),                        // row ids ticked for bulk edit
   colType:{},                           // Stone_Order colId -> Grist type, for writing dates back
+  writable:null,                        // Stone_Order colId -> true for non-formula columns (null = unknown)
   jobById:{}, catById:{}
 };
 window._stonecal=state;
@@ -598,7 +600,10 @@ function renderAgenda(byYmd,dayKeys){
     row.appendChild(dc);
     const box=$("div","ag-evs");
     if(evs.length) evs.forEach(e=>box.appendChild(eventChip(e)));
-    else box.appendChild($("div","ag-none","No stone orders today"));
+    else box.appendChild($("div","ag-none","No stone orders today. Double-click to add one."));
+    // double-click the empty space of a day (not a chip) to start an order dated that day
+    box.ondblclick=ev=>{ if(ev.target!==box && !ev.target.classList.contains("ag-none")) return;
+      ev.preventDefault(); closePops(); openNew(d); };
     row.appendChild(box);
     list.appendChild(row);
   });
@@ -887,6 +892,7 @@ function renderCardEditor(){
 // live choice list from the Grist column, so it always matches the Stone Order page.
 const EDIT_FIELDS=[
   { col:"Order_Status",  label:"Status",       kind:"status" },
+  { col:"Scope_Qty",     label:"Scope qty",    kind:"num" },
   { col:"Ordered_Qty",   label:"Ordered qty",  kind:"num" },
   { col:"Delivery_Qty",  label:"Delivered qty",kind:"num" },
   { col:"Order_Date",    label:"Order date",   kind:"date" },
@@ -894,10 +900,13 @@ const EDIT_FIELDS=[
   { col:"INV",           label:"Invoice #",    kind:"text" },
   { col:"Note",          label:"Note",         kind:"note" }
 ];
-let edit={ id:null, orig:{}, cur:{} };
-function editDirty(){ return EDIT_FIELDS.some(f=>String(edit.cur[f.col]??"")!==String(edit.orig[f.col]??"")); }
+let edit={ id:null, orig:{}, cur:{}, mode:"edit", job:"", product:"" };
+function editDirty(){
+  if(edit.mode==="new") return true;                 // a new order is always "unsaved"
+  return EDIT_FIELDS.some(f=>String(edit.cur[f.col]??"")!==String(edit.orig[f.col]??""));
+}
 function openEdit(r){
-  edit={ id:r.id, orig:{}, cur:{} };
+  edit={ id:r.id, orig:{}, cur:{}, mode:"edit", job:"", product:"" };
   EDIT_FIELDS.forEach(f=>{
     const v = f.kind==="date" ? dateToInput(r[f.col],state.colType[f.col])
             : f.kind==="num"  ? (num(r[f.col])||"")
@@ -907,11 +916,63 @@ function openEdit(r){
   renderEdit(r);
   document.getElementById("editModal").classList.add("open");
 }
+// New stone order, optionally pre-dated to the day that was double-clicked. A line with no
+// order or delivery date never appears on the calendar (see calDateOf), so the order date is
+// pre-filled and one of the two is required before saving.
+function openNew(d){
+  edit={ id:null, orig:{}, cur:{}, mode:"new", job:"", product:"" };
+  EDIT_FIELDS.forEach(f=>{ edit.orig[f.col]=""; edit.cur[f.col]=""; });
+  edit.cur.Order_Date=dateToInput(dateToGrist(d||new Date(),state.colType.Order_Date),state.colType.Order_Date);
+  if(STATUS_ORDER.includes("Awaiting Order")) edit.cur.Order_Status="Awaiting Order";
+  renderEdit(null);
+  document.getElementById("editModal").classList.add("open");
+}
+// Label -> row id for a picker, with the row id appended only where a label repeats, so the
+// common case stays clean and duplicates stay distinguishable.
+function pickerIndex(rows,labelOf){
+  const seen={}, out=[];
+  rows.forEach(row=>{ const base=String(labelOf(row)||"").trim(); if(!base) return;
+    seen[base]=(seen[base]||0)+1; out.push({ id:row.id, base }); });
+  const map={}, labels=[];
+  out.forEach(o=>{ const label = seen[o.base]>1 ? (o.base+" #"+o.id) : o.base;
+    if(map[label]==null){ map[label]=o.id; labels.push(label); } });
+  labels.sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));
+  return { map, labels };
+}
+function jobPicker(){ return pickerIndex(state.jobs||[],j=>{
+  const c=jobClient(j), code=jobCode(j), addr=String(j.Job_Address||j.Address_Formatted||"").trim();
+  return c+(code?(" ("+code+")"):"")+(addr&&addr!==c?(" - "+addr):""); }); }
+function productPicker(){ const lc=(state.ref.product&&state.ref.product.labelCol)||"Product_Full";
+  return pickerIndex(state.catalogue||[],c=>c[lc]||c.Product_Full||("#"+c.id)); }
+// A datalist-backed text box: type to filter, but only a value from the list counts.
+function pickerRow(grid,label,idx,initial,onPick){
+  grid.appendChild($("div","se-lab",label));
+  const input=document.createElement("input"); input.className="se-in"; input.value=initial||"";
+  input.placeholder="Type to search…"; input.setAttribute("autocomplete","off");
+  const dl=document.createElement("datalist"); dl.id="dl-"+label.replace(/\W+/g,"");
+  idx.labels.forEach(l=>{ const o=document.createElement("option"); o.value=l; dl.appendChild(o); });
+  input.setAttribute("list",dl.id);
+  input.oninput=()=>{ const id=idx.map[input.value.trim()];
+    input.style.borderColor = (!input.value.trim()||id!=null) ? "" : "var(--danger)";
+    onPick(id!=null?id:null,input.value); updateEditFoot(); };
+  grid.appendChild(input); grid.appendChild(dl);
+}
 function renderEdit(r){
-  const j=jobFor(r), body=document.getElementById("seBody"); body.innerHTML="";
-  const head=$("div","se-head",jobClient(j)+(jobCode(j)?(" · "+jobCode(j)):""));
-  body.appendChild(head);
-  body.appendChild($("div","se-sub",stoneLabel(r)+" · Scope "+num(r.Scope_Qty)));
+  const body=document.getElementById("seBody"); body.innerHTML="";
+  const isNew=edit.mode==="new";
+  document.querySelector("#editModal .ce-tab").textContent=isNew?"New stone order":"Stone order";
+  if(isNew){
+    body.appendChild($("div","se-head","New stone order"));
+    body.appendChild($("div","se-sub","Pick the job and the stone. It appears on the calendar under its order date."));
+    const top=$("div","se-grid"); top.style.marginTop="12px";
+    pickerRow(top,"Job",jobPicker(),"",(id,txt)=>{ edit.job=id; edit.jobTxt=txt; });
+    pickerRow(top,"Stone",productPicker(),"",(id,txt)=>{ edit.product=id; edit.prodTxt=txt; });
+    body.appendChild(top);
+  } else {
+    const j=jobFor(r);
+    body.appendChild($("div","se-head",jobClient(j)+(jobCode(j)?(" · "+jobCode(j)):"")));
+    body.appendChild($("div","se-sub",stoneLabel(r)+" · Scope "+num(r.Scope_Qty)));
+  }
   const grid=$("div","se-grid"); grid.style.marginTop="12px";
   EDIT_FIELDS.forEach(f=>{
     grid.appendChild($("div","se-lab",f.label));
@@ -943,16 +1004,29 @@ function renderEdit(r){
   const flag=$("span","se-dirty"); flag.id="seDirty";
   const cancel=document.createElement("button"); cancel.type="button"; cancel.className="ce-save ghost"; cancel.textContent="Cancel";
   cancel.onclick=()=>tryCloseEdit();
-  const save=document.createElement("button"); save.type="button"; save.className="ce-save primary"; save.textContent="Save";
+  const save=document.createElement("button"); save.type="button"; save.className="ce-save primary";
+  save.textContent=(edit.mode==="new")?"Create":"Save";
   save.id="seSave"; save.onclick=()=>saveEdit();
   row.appendChild(flag); row.appendChild(cancel); row.appendChild(save);
   foot.appendChild(row); body.appendChild(foot);
   updateEditFoot();
 }
+// What still has to be filled in before a new order can be created. Both dates empty is
+// disallowed because such a line would exist in Grist but never show on the calendar.
+function newBlockers(){
+  const miss=[];
+  if(!edit.job) miss.push("a job");
+  if(!edit.product) miss.push("a stone");
+  if(!edit.cur.Order_Date && !edit.cur.Delivery_Date) miss.push("an order or delivery date");
+  return miss;
+}
 function updateEditFoot(){
-  const d=editDirty(), f=document.getElementById("seDirty"), s=document.getElementById("seSave");
-  if(f) f.textContent=d?"Unsaved changes":"";
-  if(s) s.disabled=!d, s.style.opacity=d?"":".5", s.style.cursor=d?"pointer":"default";
+  const f=document.getElementById("seDirty"), s=document.getElementById("seSave");
+  let ok, note;
+  if(edit.mode==="new"){ const miss=newBlockers(); ok=!miss.length; note=ok?"":("Needs "+miss.join(", ")); }
+  else { ok=editDirty(); note=ok?"Unsaved changes":""; }
+  if(f) f.textContent=note;
+  if(s) s.disabled=!ok, s.style.opacity=ok?"":".5", s.style.cursor=ok?"pointer":"default";
 }
 // Build only the fields that actually changed, so a save never rewrites untouched columns.
 function editUpdate(){
@@ -966,17 +1040,60 @@ function editUpdate(){
   });
   return Object.keys(fields).length?{ id:edit.id, fields }:null;
 }
+// Fields for a brand-new line: the two refs, whatever was typed in, and the supplier/code
+// copied off the catalogue row so the search and the fallback label work straight away.
+function newFields(){
+  const fields={ Job:edit.job, Product:edit.product };
+  EDIT_FIELDS.forEach(f=>{
+    const cur=edit.cur[f.col]; if(cur===""||cur==null) return;
+    fields[f.col] = f.kind==="date" ? inputToGrist(cur,state.colType[f.col])
+                  : f.kind==="num"  ? num(cur)
+                  : cur;
+  });
+  const cat=state.catById[edit.product];
+  const pick=(...ks)=>{ for(const k of ks){ const v=cat[k]; if(v!=null&&v!=="") return v; } return null; };
+  if(cat){ const code=pick("Product_Code","Code"), sup=pick("Product_Supplier","Supplier");
+           if(code!=null) fields.Product_Code=code;
+           if(sup!=null) fields.Product_Supplier=sup; }
+  // never write a formula column, and never invent one the doc doesn't have
+  if(state.writable) Object.keys(fields).forEach(k=>{ if(!state.writable[k]) delete fields[k]; });
+  return fields;
+}
+async function createRow(){
+  const fields=newFields();
+  if(!state.grist){                                  // standalone/demo
+    const id=Math.max(0,...state.stone.map(r=>r.id||0))+1;
+    state.stone.push(Object.assign({ id },fields)); reindex(); render(); return;
+  }
+  await grist.docApi.applyUserActions([["AddRecord","Stone_Order",null,fields]]);
+  await refetch();
+}
 async function saveEdit(){
-  const u=editUpdate(); if(!u){ closeEditNow(); return; }
-  const s=document.getElementById("seSave"); if(s){ s.disabled=true; s.textContent="Saving…"; }
-  try{ await writeRows([u]); closeEditNow(); }
+  const isNew=edit.mode==="new";
+  if(isNew && newBlockers().length) return;
+  const u=isNew?null:editUpdate();
+  if(!isNew && !u){ closeEditNow(); return; }
+  const s=document.getElementById("seSave"); const was=s?s.textContent:"";
+  if(s){ s.disabled=true; s.textContent=isNew?"Creating…":"Saving…"; }
+  try{ if(isNew) await createRow(); else await writeRows([u]); closeEditNow(); }
   catch(err){ console.error(err);
-    if(s){ s.disabled=false; s.textContent="Save"; }
-    await confirmBox("Couldn’t save","Grist rejected the change: "+(err&&err.message?err.message:String(err)),
+    if(s){ s.disabled=false; s.textContent=was; }
+    await confirmBox(isNew?"Couldn’t create":"Couldn’t save",
+      "Grist rejected the change: "+(err&&err.message?err.message:String(err)),
       [{v:"ok",label:"OK",kind:"primary"}]); }
 }
-function closeEditNow(){ document.getElementById("editModal").classList.remove("open"); edit={ id:null, orig:{}, cur:{} }; }
+function closeEditNow(){ document.getElementById("editModal").classList.remove("open");
+  edit={ id:null, orig:{}, cur:{}, mode:"edit", job:"", product:"" }; }
 async function tryCloseEdit(){
+  if(edit.mode==="new"){
+    // nothing typed yet: just close, no point asking
+    const touched=edit.job||edit.product||EDIT_FIELDS.some(f=>String(edit.cur[f.col]??"")!==""&&f.col!=="Order_Date"&&f.col!=="Order_Status");
+    if(!touched){ closeEditNow(); return; }
+    const c=await confirmBox("Discard this new order?","It hasn’t been created yet.",
+      [{v:"cancel",label:"Keep editing"},{v:"discard",label:"Discard",kind:"primary"}]);
+    if(c==="discard") closeEditNow();
+    return;
+  }
   if(!editDirty()){ closeEditNow(); return; }
   const c=await confirmBox("Unsaved changes","Save your changes to this stone order, or discard them?",
     [{v:"cancel",label:"Cancel"},{v:"discard",label:"Discard"},{v:"save",label:"Save",kind:"primary"}]);
@@ -1126,7 +1243,10 @@ async function loadGristSchema(){
   }
   // colId -> Grist type for one table, so date writes match the column (Date vs DateTime)
   function typeMap(parentTableId){ const m={}; colsOf(parentTableId).forEach(c=>{ if(c.colId) m[c.colId]=c.type||""; }); return m; }
-  return { refInfo, choiceModel, typeMap };
+  // Columns we must never write to: formulas, and anything the doc doesn't actually have.
+  function writableCols(parentTableId){ const s={};
+    colsOf(parentTableId).forEach(c=>{ if(isEditable(c)) s[c.colId]=true; }); return s; }
+  return { refInfo, choiceModel, typeMap, writableCols };
 }
 async function pullTables(){
   const [so,jd]=await Promise.all([grist.docApi.fetchTable("Stone_Order"), grist.docApi.fetchTable("Jobs_Detail")]);
@@ -1184,7 +1304,8 @@ if(typeof grist!=="undefined"){
   grist.docApi.fetchTable("Stone_Order").then(async ()=>{
     try{ const sc=await loadGristSchema(); state.ref.product=sc.refInfo("Stone_Order","Product");
          applyStatusModel(sc.choiceModel("Stone_Order","Order_Status"));
-         state.colType=sc.typeMap("Stone_Order"); }catch(e){ console.warn("schema failed",e); }
+         state.colType=sc.typeMap("Stone_Order");
+         state.writable=sc.writableCols("Stone_Order"); }catch(e){ console.warn("schema failed",e); }
     try{ await pullTables(); }catch(e){ console.warn("initial fetch failed",e); }
     state.grist=true; render();
   }).catch(()=>{});
@@ -1234,6 +1355,7 @@ const stoneSearch=document.getElementById("stoneSearch");
 stoneSearch.oninput=e=>{ state.searchQ=e.target.value; render(); };
 document.getElementById("searchClr").onclick=()=>{ state.searchQ=""; stoneSearch.value=""; render(); stoneSearch.focus(); };
 document.getElementById("cardsBtn").onclick=e=>{ e.stopPropagation(); openCardEditor(); };
+document.getElementById("newBtn").onclick=e=>{ e.stopPropagation(); closePops(); openNew(null); };
 document.getElementById("bulkBtn").onclick=e=>{ e.stopPropagation(); closePops(); setBulk(!state.bulk); };
 document.getElementById("bulkBar").onclick=e=>e.stopPropagation();
 document.getElementById("bulkClear").onclick=()=>{ state.sel.clear(); render(); };

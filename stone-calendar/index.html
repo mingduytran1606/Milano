@@ -12,7 +12,7 @@
     --accent:#16b378; --accent-soft:#eafaf2; --accent-ink:#0f7a52;
     --danger:#e5484d;
     --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.10);
-    --radius:14px;
+    --radius:14px; --datecol:200px;
   }
   @media (prefers-color-scheme:dark){
     :root{ --bg:#12161b; --panel:#1a1f26; --ink:#e8edf2; --muted:#9aa6b2;
@@ -92,7 +92,7 @@
   .avwrap .av:first-child{margin-left:0}
 
   /* agenda: vertical list of days */
-  .agenda{flex:1 1 auto;min-height:0;overflow-y:auto;display:block;background:var(--panel);
+  .agenda{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:auto;display:block;background:var(--panel);
     border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
   .ag-day{display:flex;gap:14px;align-items:flex-start;padding:11px 14px;border-bottom:1px solid var(--line2)}
   .ag-date{flex:0 0 130px;font-size:12.5px;font-weight:700;color:var(--muted)}
@@ -249,9 +249,15 @@
   .cf-f{display:flex;gap:8px;justify-content:flex-end}
 
   /* ---- table agenda: date + supplier box on the left, aligned rows on the right ---- */
-  .sthead{display:grid;grid-template-columns:var(--datecol,200px) 1fr;border-bottom:1px solid var(--line);
+  .ag-day.tbl{display:grid;grid-template-columns:var(--datecol) 1fr;gap:0;padding:0;align-items:stretch}
+  .ag-day.tbl>.ag-date{flex:none;padding:9px 12px 11px;background:var(--bg);
+    border-right:1px solid var(--line);font-size:12.5px;font-weight:600;color:var(--ink)}
+  .ag-day.tbl.today>.ag-date{background:var(--accent-soft)}
+  .ag-day.tbl>.ag-none{padding:14px}
+  .sthead{display:grid;grid-template-columns:var(--datecol) 1fr;border-bottom:1px solid var(--line);
     background:var(--bg);position:sticky;top:0;z-index:3}
   .stcols{display:grid}
+  .sthead>.stlab:first-child{background:var(--bg);border-right:1px solid var(--line)}
   .stlab{padding:7px 8px;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
   .stlab.ed{color:var(--accent-ink)}
   .stlab.r{text-align:right}
@@ -634,7 +640,7 @@ const mkCol=(k,over)=>Object.assign({k,w:COLDEF[k].w,align:COLDEF[k].align||"lef
 const DEFAULT_COLS=["client","jobstatus","stone","supplier","scope","ordered","delivered","status","flag"];
 let tblCols=DEFAULT_COLS.map(k=>mkCol(k,k==="client"?{b:true}:null));
 let showTotals=true;
-const colTemplate=()=>tblCols.map(c=>c.w+"px").join(" ")+" minmax(0,1fr)";
+const colTemplate=()=>tblCols.map(c=>"minmax("+c.w+"px,"+c.w+"fr)").join(" ")+" 26px";
 const alignCls=a=>a==="right"?" r":a==="centre"?" c":"";
 const wrapFmt=(h,c)=>{ let s=h; if(c.u)s="<u>"+s+"</u>"; if(c.i)s="<i>"+s+"</i>"; if(c.b)s="<b>"+s+"</b>"; return s; };
 

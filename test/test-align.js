@@ -82,11 +82,11 @@ ok('but nowhere near black', lum('#94a0ad') > 90, Math.round(lum('#94a0ad')));
 ok('dark theme goes lighter instead, since a darker rule would vanish',
    lum('#5b6878') > lum('#2a323b'), {rule:Math.round(lum('#5b6878')), line:Math.round(lum('#2a323b'))});
 ok('today keeps its accent tint',
-   /\.ag-day\.tbl\.today\s*>\s*\.ag-date\s*\{[^}]*accent-soft/.test(css));
+   /\.daychip\.today\s*\{[^}]*#fdeaea/.test(css));
 
 console.log('== nothing broke ==');
 ok('no jsdom errors', errs.length===0, errs.slice(0,2));
 ok('rows still render', $$('.strow').length>0, $$('.strow').length);
-ok('supplier box still inside the date cell', $$('.ag-date > .supbox').length>0);
+ok('date chip is inside the date cell', $$('.ag-date > .daychip').length>0);
 console.log('\n'+(F2?'FAILURES: '+F2:'ALL PASS')+'  ('+P+' passed)');
 process.exit(F2?1:0);

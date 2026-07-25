@@ -291,23 +291,33 @@
   .stsum .stcell{font-weight:700;font-size:11.5px}
   .stsum .lb{color:var(--muted);font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
   .stage-pill{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;color:#1d2733}
-  .supbox{margin-top:9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:5px}
-  .supbox .cap{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
-    color:var(--muted);padding:0 4px 4px}
-  .sups{display:flex;flex-direction:column;gap:2px}
-  .sup{display:flex;align-items:center;gap:6px;font:inherit;font-size:11px;padding:2px 5px;border-radius:6px;
-    cursor:pointer;border:1px solid transparent;color:var(--ink);background:none;text-align:left}
-  .sup:hover{background:var(--bg);border-color:var(--line)}
-  .sup.dayon{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
-  .sup.glob{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
-  .sup .nm{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .sup .q{font-weight:600;font-variant-numeric:tabular-nums}
-  .sup .sq{width:8px;height:8px;border-radius:2px;flex:0 0 auto}
-  .suptot{display:flex;align-items:baseline;gap:6px;margin-top:4px;padding:4px 5px 1px;
-    border-top:1px solid var(--line);font-size:11px;font-variant-numeric:tabular-nums}
-  .suptot .nm{flex:1 1 auto;color:var(--muted);font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
-  .suptot .q{font-weight:700}
-  .dayflt{font-size:10px;color:var(--accent-ink);font-weight:700;padding:3px 4px 0}
+  /* ---- date gutter: day-number circle + weekday; the only red is TODAY ---- */
+  .ag-day.tbl>.ag-date{padding:10px 12px;background:var(--bg)}
+  .ag-day.tbl.today>.ag-date{background:var(--bg)}
+  .daychip{display:flex;align-items:center;gap:10px;border-radius:12px;background:transparent;
+    padding:8px 14px 8px 8px;width:max-content;max-width:100%}
+  .daychip .dnum{flex:0 0 auto;width:36px;height:36px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-size:15.5px;font-weight:700;
+    letter-spacing:-.02em;font-variant-numeric:tabular-nums;background:var(--line2);color:var(--ink)}
+  .daychip .dtxt{display:flex;flex-direction:column;line-height:1.15;min-width:0}
+  .daychip .ddow{font-size:13.5px;font-weight:700;color:var(--ink)}
+  .daychip .dmon{font-size:10.5px;font-weight:600;color:var(--muted);letter-spacing:.02em}
+  .daychip.today{background:#fdeaea}
+  .daychip.today .dnum{background:#e2453f;color:#fff}
+  .daychip.today .ddow{color:#d23b35}
+  .daychip.today .dmon{color:#c8817d}
+  .ag-day.tbl>.ag-date .tdy{margin-top:6px;padding-left:4px;color:#d23b35}
+
+  /* ---- supplier group header, sitting above the rows it describes ---- */
+  .supgrp{display:flex;align-items:center;gap:9px;padding:6px 10px;cursor:pointer;
+    background:var(--bg);border-bottom:1px solid var(--line2);
+    font-size:11px;font-weight:700;letter-spacing:.03em;color:var(--ink);user-select:none}
+  .supgrp:hover{background:var(--accent-soft)}
+  .supgrp .tw{color:var(--muted);font-size:9px;width:9px}
+  .supgrp .gnm{text-transform:uppercase}
+  .supgrp .gct{color:var(--muted);font-weight:600;letter-spacing:0}
+  .supgrp .gq{margin-left:auto;color:var(--accent-ink);font-variant-numeric:tabular-nums}
+  .supgrp.shut{color:var(--muted)}
   .rowdel{justify-self:start;align-self:center;width:20px;height:20px;margin-left:6px;font:inherit;
     font-size:13px;line-height:1;color:var(--muted);background:none;border:1px solid transparent;
     border-radius:6px;cursor:pointer;opacity:0}
@@ -376,6 +386,7 @@
     <button class="assign" id="assignBtn">All assignees ▾</button>
     <button class="assign" id="newBtn" title="Add a stone order (or double-click an empty day)">+ New order</button>
     <button class="assign" id="bulkBtn" title="Select several orders and set their status together">☑ Bulk edit</button>
+    <button class="assign" id="groupBtn" title="Group each day's orders under their supplier">▤ By supplier</button>
     <button class="assign" id="colsBtn" title="Choose the table columns">⚙ Columns</button>
     <button class="assign" id="reloadBtn" title="Re-read everything from Grist (hold Shift to reload the widget itself)">↻ Refresh</button>
   </div>
@@ -522,8 +533,7 @@ const state={
   colType:{},                           // Stone_Order colId -> Grist type, for writing dates back
   writable:null,                        // Stone_Order colId -> true for non-formula columns (null = unknown)
   writableJob:null,                     // Jobs_Detail colId -> true, same idea (null = unknown)
-  supGlobal:null,                       // supplier filter across every day (double-click)
-  supDay:{},                            // ymd -> supplier, one day only (single click)
+  supShut:{},                           // "ymd|supplier" -> folded away in the grouped view
   flashId:null,                         // row id to highlight after a create, so you can see what you made
   jobById:{}, catById:{}
 };
@@ -574,14 +584,16 @@ function publishTableCols(){
        grist.setOption("tblDateCol",dateColW); grist.setOption("tblFont",tblFont); }catch(e){}
 }
 function loadPrefs(){ try{ const p=JSON.parse(localStorage.getItem(PREF_LS)||"{}")||{};
-  if(p.sort==="asc"||p.sort==="desc") state.sortDir=p.sort; }catch(e){} }
+  if(p.sort==="asc"||p.sort==="desc") state.sortDir=p.sort;
+  if(typeof p.groupsup==="boolean") groupBySup=p.groupsup; }catch(e){} }
 // The sort goes to BOTH stores on purpose. localStorage alone is not enough: the widget runs in a
 // cross-origin iframe, so a browser set to block third-party storage throws here (swallowed by the
 // catch) and the direction silently reverted on every reload. grist.setOption lives in the document,
 // so it survives that — same belt-and-braces the column prefs already had.
 function savePrefs(){
-  try{ localStorage.setItem(PREF_LS,JSON.stringify({sort:state.sortDir})); }catch(e){}
+  try{ localStorage.setItem(PREF_LS,JSON.stringify({sort:state.sortDir,groupsup:groupBySup})); }catch(e){}
   try{ grist.setOption("sort",state.sortDir); }catch(e){}
+  try{ grist.setOption("groupsup",groupBySup); }catch(e){}
 }
 function saveLocalCards(){ try{ localStorage.setItem(CARD_LS,JSON.stringify({cols:eventCardCols,scope:cardScope,ef:eventCardFont})); }catch(e){} }
 function publishCards(){ try{ grist.setOption("eventCardCols",eventCardCols);
@@ -594,6 +606,7 @@ function applyGristOptions(opts){
   if(opts.sort==="asc"||opts.sort==="desc"){
     if(state.sortDir!==opts.sort){ state.sortDir=opts.sort; sorted=true; }
   }
+  if(typeof opts.groupsup==="boolean" && opts.groupsup!==groupBySup){ groupBySup=opts.groupsup; sorted=true; }
   const editing=colPanelOpen;                      // don't reshuffle while someone is editing
   if(colScope==="me" || editing){ if(sorted) render(); return; }
   const cols=normaliseTblCols(opts.tblCols);
@@ -704,6 +717,7 @@ const mkCol=(k,over)=>Object.assign({k,w:COLDEF[k].w,align:COLDEF[k].align||"lef
 const DEFAULT_COLS=["client","jobstatus","stone","supplier","scope","ordered","delivered","status","flag"];
 let tblCols=DEFAULT_COLS.map(k=>mkCol(k,k==="client"?{b:true}:null));
 let showTotals=true;
+let groupBySup=false;   // group each day's rows under supplier headers
 // The 26px slot carries the row handle: the bulk tick box, which leads the row so a column of
 // boxes is easy to run down, or the remove "x", which stays at the end out of the way.
 // Header, data rows and the totals row all use this one template, so the slot must move in all
@@ -749,11 +763,6 @@ function passStatus(r){ return state.statusFilter==="all" || matchGroup(findGrou
 // The set of lines the agenda draws from before the status filter. Also feeds the pill job counts.
 // Rule, as agreed: a job still at Quote is never shown. Of the rest, the existing flagging rules
 // decide what needs attention; whatever is left over and undated falls into the N/A bucket.
-function passSupplier(r,key){
-  if(state.supGlobal) return supplierOf(r)===state.supGlobal;
-  if(key!=null && state.supDay[key]) return supplierOf(r)===state.supDay[key];
-  return true;
-}
 function supplierOf(r){
   const s=r.Product_Supplier||(catFor(r)&&catFor(r).Supplier)||"";
   return String(s).trim()||"(no supplier)";
@@ -775,7 +784,6 @@ function buildEventIndex(){
   const byYmd={};
   baseRows().forEach(r=>{ if(!passStatus(r)) return; const cd=calDateOf(r);
     const k=ymd(cd.date);
-    if(!passSupplier(r,k)) return;
     (byYmd[k]=byYmd[k]||[]).push({r,date:cd.date}); });
   return byYmd;
 }
@@ -810,6 +818,8 @@ function render(){
   if(q){ mc.textContent=slabSum(baseRows())+" slabs"; mc.hidden=false; }
   else mc.hidden=true;
 
+  document.getElementById("groupBtn").classList.toggle("on",groupBySup);
+
   // sort button label reflects the current direction
   document.getElementById("sortBtn").textContent = "Sort: "+(state.sortDir==="desc"?"Newest first":"Oldest first")+" ▾";
 
@@ -842,7 +852,7 @@ function render(){
   // on the next render (so Apply then did nothing).
   if(state.bulk && state.sel.size){
     const live=new Set(); dayKeys.forEach(k=>(byYmd[k]||[]).forEach(e=>live.add(e.r.id)));
-    undatedShown().filter(r=>passSupplier(r,null)).forEach(r=>live.add(r.id));
+    undatedShown().forEach(r=>live.add(r.id));
     [...state.sel].forEach(id=>{ if(!live.has(id)) state.sel.delete(id); });
   }
   renderBulkBar();
@@ -942,42 +952,26 @@ function stSumRow(rows){
 }
 // The supplier box under each date: slabs per supplier for the WHOLE day, so the rows always add
 // up to the total. Single click filters that day, double click filters every day.
-function supBox(dayAll,key){
-  const per={};
-  dayAll.forEach(r=>{ const s=supplierOf(r); per[s]=(per[s]||0)+slabsOf(r); });
-  const box=$("div","supbox");
-  box.appendChild($("div","cap","Stone by supplier"));
-  const list=$("div","sups");
-  Object.keys(per).sort((a,b)=>per[b]-per[a]).forEach(nm=>{
-    const b=document.createElement("button"); b.type="button";
-    b.className="sup"+(state.supGlobal===nm?" glob":(state.supDay[key]===nm?" dayon":""));
-    const sq=$("span","sq"); sq.style.background=avatarColor(nm);
-    const label=$("span","nm",nm);
-    const q=$("span","q",String(Math.round(per[nm]*10)/10));
-    b.appendChild(sq); b.appendChild(label); b.appendChild(q);
-    b.title="Click: only "+nm+" on this day. Double-click: only "+nm+" on every day.";
-    let timer=null;
-    b.onclick=ev=>{ ev.stopPropagation(); if(timer) return;
-      timer=setTimeout(()=>{ timer=null;
-        if(state.supDay[key]===nm) delete state.supDay[key]; else state.supDay[key]=nm;
-        state.supGlobal=null; render(); },230); };
-    b.ondblclick=ev=>{ ev.stopPropagation(); if(timer){ clearTimeout(timer); timer=null; }
-      state.supGlobal = state.supGlobal===nm ? null : nm;
-      state.supDay={}; render(); };
-    list.appendChild(b);
-  });
-  box.appendChild(list);
-  const tot=$("div","suptot");
-  tot.appendChild($("span","nm","Total"));
-  tot.appendChild($("span","q",String(slabSum(dayAll))));
-  box.appendChild(tot);
-  if(state.supDay[key] && !state.supGlobal) box.appendChild($("div","dayflt","this day only"));
-  return box;
+// Supplier group header: sits above the rows it describes, carrying the supplier and its slab
+// total. Pinned to the table width like every other rule, or its underline would stop at the edge
+// of the visible pane. Click to fold the group away.
+function supGroupHead(nm,grp,gkey,shut){
+  const h=$("div","supgrp"+(shut?" shut":""));
+  h.style.minWidth=colBodyPx()+"px";
+  h.appendChild($("span","tw",shut?"▸":"▾"));
+  h.appendChild($("span","gnm",nm||"No supplier"));
+  h.appendChild($("span","gct",grp.length+(grp.length===1?" order":" orders")));
+  h.appendChild($("span","gq",slabSum(grp)+" slabs"));
+  h.title=shut?"Show these orders":"Hide these orders";
+  h.onclick=ev=>{ ev.stopPropagation();
+    if(state.supShut[gkey]) delete state.supShut[gkey]; else state.supShut[gkey]=true;
+    render(); };
+  return h;
 }
 function renderAgenda(byYmd,dayKeys){
   const list=document.getElementById("agenda"); list.className="agenda"; list.innerHTML=""; dayToggles=[];
   const todayK=ymd(new Date());
-  const undated=undatedShown().filter(r=>passSupplier(r,null));
+  const undated=undatedShown();
 
   if(!dayKeys.length && !undated.length){
     const q=(state.searchQ||"").trim(); const g=findGroup(state.statusFilter);
@@ -1004,8 +998,15 @@ function renderAgenda(byYmd,dayKeys){
     const day=$("div","ag-day tbl"+(k===todayK?" today":""));
     day.style.minWidth=colRowPx()+"px";   // so the day-boundary rule runs the full table width
     const dc=$("div","ag-date");
-    dc.appendChild(document.createTextNode(DOW[(d.getDay()+6)%7]+" "+d.getDate()+" "+MONTHS[d.getMonth()].slice(0,3)+" "+d.getFullYear()));
-    if(k===todayK) dc.appendChild($("div","tdy","Today"));
+    // Day number in a circle + weekday. The intense red is reserved for TODAY, so it is the one
+    // thing that jumps out of the gutter; other days keep the same geometry in quiet neutrals.
+    const chip=$("div","daychip"+(k===todayK?" today":""));
+    chip.appendChild($("span","dnum",String(d.getDate())));
+    const dtxt=$("span","dtxt");
+    dtxt.appendChild($("span","ddow",DOW[(d.getDay()+6)%7]));
+    dtxt.appendChild($("span","dmon",MONTHS[d.getMonth()].slice(0,3)+" "+d.getFullYear()));
+    chip.appendChild(dtxt);
+    dc.appendChild(chip);
     if(state.bulk && rows.length){
       const ids=rows.map(r=>r.id);
       const tog=$("span","ag-all");
@@ -1015,9 +1016,9 @@ function renderAgenda(byYmd,dayKeys){
       dayToggles.push({ el:tog, ids });
       dc.appendChild(tog);
     }
-    // the box always describes the whole day, before any supplier filter
+    // Whether the day has any orders at all, regardless of the current filters - drives the
+    // empty-day copy and the double-click-to-create guard below.
     const dayAll=baseRows().filter(r=>{ const cd=calDateOf(r); return cd && ymd(cd.date)===k; });
-    if(dayAll.length) dc.appendChild(supBox(dayAll,k));
     day.appendChild(dc);
 
     if(!rows.length){
@@ -1027,7 +1028,19 @@ function renderAgenda(byYmd,dayKeys){
       day.appendChild(e);
     } else {
       const body=$("div","strows");
-      rows.forEach(r=>body.appendChild(stRow(r)));
+      if(groupBySup){
+        // Biggest supplier first, which is the order the old gutter summary used.
+        const per={};
+        rows.forEach(r=>{ const nm=supplierOf(r); (per[nm]=per[nm]||[]).push(r); });
+        Object.keys(per).sort((a,b)=>slabSum(per[b])-slabSum(per[a])||a.localeCompare(b))
+          .forEach(nm=>{
+            const gkey=k+"|"+nm, shut=!!state.supShut[gkey];
+            body.appendChild(supGroupHead(nm,per[nm],gkey,shut));
+            if(!shut) per[nm].forEach(r=>body.appendChild(stRow(r)));
+          });
+      } else {
+        rows.forEach(r=>body.appendChild(stRow(r)));
+      }
       if(showTotals) body.appendChild(stSumRow(rows));
       day.appendChild(body);
     }
@@ -1974,6 +1987,8 @@ const stoneSearch=document.getElementById("stoneSearch");
 stoneSearch.oninput=e=>{ state.searchQ=e.target.value; render(); };
 document.getElementById("searchClr").onclick=()=>{ state.searchQ=""; stoneSearch.value=""; render(); stoneSearch.focus(); };
 document.getElementById("colsBtn").onclick=e=>{ e.stopPropagation(); toggleColEditor(); };
+document.getElementById("groupBtn").onclick=e=>{ e.stopPropagation(); closePops();
+  groupBySup=!groupBySup; state.supShut={}; savePrefs(); render(); };
 document.getElementById("reloadBtn").onclick=e=>{ e.stopPropagation(); closePops(); hardRefresh(e.shiftKey); };
 document.getElementById("newBtn").onclick=e=>{ e.stopPropagation(); closePops(); openNew(null); };
 document.getElementById("bulkBtn").onclick=e=>{ e.stopPropagation(); closePops(); setBulk(!state.bulk); };

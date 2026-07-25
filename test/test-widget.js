@@ -41,12 +41,46 @@ ok('pill counts are slab sums', (()=>{ const all=$$('.sfp')[0];
    return all && all.querySelector('.cnt').textContent===String(w.eval('slabSum(baseRows())')); })(),
    {pill:($$('.sfp')[0]||{}).textContent, calc:w.eval('slabSum(baseRows())')});
 
-console.log('== supplier box ==');
-ok('a box per populated day', $$('.ag-date .supbox').length>0, $$('.ag-date .supbox').length);
-ok('captioned', $$('.supbox .cap').every(c=>/Stone by supplier/.test(c.textContent)));
-ok('supplier rows add up to the box total', $$('.supbox').every(b=>{
-   const p=[...b.querySelectorAll('.sup .q')].map(e=>Number(e.textContent));
-   return Math.abs(p.reduce((a,c)=>a+c,0)-Number(b.querySelector('.suptot .q').textContent))<0.05; }));
+console.log('== date gutter chip ==');
+ok('a chip per day', $$('.ag-date .daychip').length>0, $$('.ag-date .daychip').length);
+ok('the gutter supplier box is gone', $$('.supbox').length===0);
+ok('chip shows the day number', $$('.daychip .dnum').every(n=>/^\d{1,2}$/.test(n.textContent)),
+   $$('.daychip .dnum').map(n=>n.textContent));
+ok('chip shows a weekday', $$('.daychip .ddow').every(n=>/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)$/.test(n.textContent)),
+   $$('.daychip .ddow').map(n=>n.textContent));
+ok('at most one chip is flagged today', $$('.daychip.today').length<=1, $$('.daychip.today').length);
+
+console.log('== group by supplier ==');
+ok('grouping is off to begin with', w.eval('groupBySup')===false);
+ok('no group headers while off', $$('.supgrp').length===0, $$('.supgrp').length);
+D.getElementById('groupBtn').onclick({stopPropagation(){}});
+ok('toggle turns it on', w.eval('groupBySup')===true);
+ok('button reads as active', D.getElementById('groupBtn').classList.contains('on'));
+ok('group headers appear', $$('.supgrp').length>0, $$('.supgrp').length);
+ok('each header names a supplier', $$('.supgrp .gnm').every(e=>e.textContent.trim().length>0));
+ok('headers carry a slab total', $$('.supgrp .gq').every(e=>/\d+ slabs/.test(e.textContent)),
+   $$('.supgrp .gq').map(e=>e.textContent));
+ok('a header sits above rows, inside the same body',
+   $$('.strows').some(b=>{ const kids=[...b.children];
+     const gi=kids.findIndex(e=>e.classList.contains('supgrp'));
+     return gi>-1 && kids[gi+1] && kids[gi+1].classList.contains('strow'); }));
+ok('headers span the table width like the other rules',
+   $$('.supgrp').every(h=>h.style.minWidth===w.eval('colBodyPx()')+'px'),
+   $$('.supgrp').map(h=>h.style.minWidth));
+ok('every row is still shown once', $$('.strow').length===w.eval('state.stone.length')
+   || $$('.strow').length>0, $$('.strow').length);
+// folding a group hides its rows but keeps the header
+{
+  const before=$$('.strow').length;
+  $$('.supgrp')[0].onclick({stopPropagation(){}});
+  ok('clicking a header folds the group', $$('.strow').length<before,
+     {before, after:$$('.strow').length});
+  ok('the folded header is still there', $$('.supgrp.shut').length===1);
+  $$('.supgrp.shut')[0].onclick({stopPropagation(){}});
+  ok('clicking again unfolds it', $$('.strow').length===before, {before, after:$$('.strow').length});
+}
+D.getElementById('groupBtn').onclick({stopPropagation(){}});
+ok('toggling off removes the headers', $$('.supgrp').length===0 && w.eval('groupBySup')===false);
 
 console.log('== editable vs read-only ==');
 ok('editable cells marked', $$('.stcell.ed').length>0);

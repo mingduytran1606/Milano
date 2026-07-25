@@ -309,6 +309,24 @@
   .nodate{padding:6px 10px;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
     color:var(--danger);background:var(--bg);border-bottom:1px solid var(--line)}
 
+  /* ---- column editor: an inline panel, not an overlay ---- */
+  .colpanel{display:none;border-bottom:1px solid var(--line);background:var(--bg);padding:11px 14px;
+    max-height:46vh;overflow-y:auto}
+  .colpanel.open{display:block}
+  .colpanel h4{margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--muted)}
+  .colpanel .cphint{font-size:11.5px;color:var(--muted);margin:0 0 10px;line-height:1.5}
+  .cpfoot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);
+    margin-top:11px;padding-top:10px}
+  .cpfoot .msg{font-size:11.5px;color:var(--muted);margin-right:auto}
+  /* drag to reorder */
+  .colrow[draggable="true"]{cursor:grab}
+  .colrow.dragging{opacity:.45}
+  .colrow.dropbefore{box-shadow:inset 0 3px 0 var(--accent)}
+  .colrow.dropafter{box-shadow:inset 0 -3px 0 var(--accent)}
+  .grip{flex:0 0 auto;color:var(--muted);font-size:13px;line-height:1;letter-spacing:1px;
+    cursor:grab;user-select:none}
+  .colrow:hover .grip{color:var(--accent-ink)}
   /* ---- column editor ---- */
   .colrow{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:6px 9px;
     display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:7px}
@@ -353,6 +371,7 @@
     <span class="count" id="title">Stone orders</span>
     <div class="statusbar" id="statusbar"></div>
   </div>
+  <div class="colpanel" id="colPanel"></div>
   <div class="body" id="body">
     <div class="agenda" id="agenda"></div>
   </div>
@@ -361,15 +380,6 @@
 <div class="pop" id="dayPop" hidden></div>
 <div class="pop" id="assignPop" hidden></div>
 <div class="pop" id="sortPop" hidden></div>
-<div class="modal" id="cardModal">
-  <div class="modal-card">
-    <div class="modal-head">
-      <div class="ce-tabs"><span class="ce-tab on">Event card</span></div>
-      <span class="modal-close" id="cardClose">&times;</span>
-    </div>
-    <div class="ce-body" id="ceBody"></div>
-  </div>
-</div>
 <div class="modal" id="editModal">
   <div class="modal-card">
     <div class="modal-head">
@@ -547,8 +557,7 @@ function publishCards(){ try{ grist.setOption("eventCardCols",eventCardCols);
   grist.setOption("eventCardFont",eventCardFont); }catch(e){} }
 function applyGristOptions(opts){
   if(!opts) return;
-  const mod=document.getElementById("cardModal");
-  const editing=mod&&mod.classList.contains("open");
+  const editing=colPanelOpen;                      // don't reshuffle while someone is editing
   if(colScope==="me" || editing) return;          // don't yank the layout out from under an editor
   const cols=normaliseTblCols(opts.tblCols);
   if(cols) tblCols=cols;
@@ -613,6 +622,8 @@ const COLDEF={
   job:         {label:"Job ID",       w:78,  html:r=>txtH(jobCode(jobFor(r)))},
   stone:       {label:"Stone",        w:200, html:r=>txtH(stoneLabel(r))},
   code:        {label:"Code",         w:86,  html:r=>txtH(r.Product_Code)},
+  address:     {label:"Job address",  w:190, html:r=>{ const j=jobFor(r);
+                 return txtH((j&&(j.Address_Formatted||j.Job_Address))||""); }},
   supplier:    {label:"Supplier",     w:112, html:r=>txtH(r.Product_Supplier||(catFor(r)&&catFor(r).Supplier)||"")},
   scope:       {label:"Scope",        w:54,  align:"right", sum:"Scope_Qty",    edit:{f:"Scope_Qty",t:"num"},
                  html:r=>num(r.Scope_Qty)?String(num(r.Scope_Qty)):DASH},
@@ -1085,31 +1096,75 @@ async function deleteRow(r){
 }
 
 // ---- card editor modal ----
-function openColEditor(){ document.getElementById("cardModal").classList.add("open"); renderColEditor(); }
-function closeColEditor(){ document.getElementById("cardModal").classList.remove("open"); }
-// One row per column: the heading (fixed, it IS the field), whether cells are editable, bold /
-// italic / underline, plain or pill, alignment, width, and where it sits.
+let colPanelOpen=false;
+function toggleColEditor(){
+  colPanelOpen=!colPanelOpen;
+  document.getElementById("colsBtn").classList.toggle("on",colPanelOpen);
+  renderColEditor();
+}
+function closeColEditor(){
+  colPanelOpen=false;
+  document.getElementById("colsBtn").classList.remove("on");
+  renderColEditor();
+}
+// Reorder by index, the one place the column order changes, so drag and any future control
+// share it.
+function moveCol(from,to){
+  if(from===to||from<0||to<0||from>=tblCols.length||to>tblCols.length) return false;
+  const item=tblCols.splice(from,1)[0];
+  tblCols.splice(from<to?to-1:to,0,item);
+  saveTablePrefs(); render();
+  return true;
+}
+let dragFrom=null;
+// One row per column: heading (fixed, it names the field), whether cells are editable, bold /
+// italic / underline, plain or pill, alignment, width. Drag a row to move the column.
 function renderColEditor(){
-  const body=document.getElementById("ceBody"); body.innerHTML="";
-  const tab=document.querySelector("#cardModal .ce-tab"); if(tab) tab.textContent="Columns";
-  const note=$("div","ce-note");
-  note.innerHTML="The table columns, left to right. Headings are fixed because they name the "
-    +"Grist field the column reads. <b>Editable</b> columns can be changed straight in the table.";
-  body.appendChild(note);
+  const box=document.getElementById("colPanel");
+  box.className="colpanel"+(colPanelOpen?" open":"");
+  if(!colPanelOpen){ box.innerHTML=""; return; }
+  box.innerHTML='<h4>Columns shown, left to right</h4>'
+    +'<div class="cphint">Drag a row to move the column. Headings are fixed because a heading '
+    +'names the Grist field the column reads. <b>Editable</b> columns can be changed straight '
+    +'in the table.</div>';
 
   const tog=document.createElement("label"); tog.className="coltog";
   const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=showTotals;
   cb.onchange=()=>{ showTotals=cb.checked; saveTablePrefs(); render(); };
   tog.appendChild(cb);
   tog.appendChild(document.createTextNode("Show a total row under each day"));
-  body.appendChild(tog);
+  box.appendChild(tog);
 
   const commit=()=>{ saveTablePrefs(); render(); };
 
-  body.appendChild($("div","ce-sechead","Columns shown"));
   tblCols.forEach((c,i)=>{
     const def=COLDEF[c.k];
     const row=$("div","colrow");
+    row.draggable=true;
+    row.dataset.i=String(i);
+
+    row.ondragstart=ev=>{ dragFrom=i; row.classList.add("dragging");
+      try{ ev.dataTransfer.effectAllowed="move"; ev.dataTransfer.setData("text/plain",String(i)); }catch(e){} };
+    row.ondragend=()=>{ dragFrom=null;
+      [...box.querySelectorAll(".colrow")].forEach(x=>x.classList.remove("dragging","dropbefore","dropafter")); };
+    row.ondragover=ev=>{ if(dragFrom==null||dragFrom===i) return;
+      ev.preventDefault();
+      const r=row.getBoundingClientRect();
+      const after=(ev.clientY-r.top)>r.height/2;
+      row.classList.toggle("dropbefore",!after);
+      row.classList.toggle("dropafter",after); };
+    row.ondragleave=()=>row.classList.remove("dropbefore","dropafter");
+    row.ondrop=ev=>{
+      ev.preventDefault();
+      const after=row.classList.contains("dropafter");
+      row.classList.remove("dropbefore","dropafter");
+      if(dragFrom==null) return;
+      const target=after?i+1:i;
+      const from=dragFrom; dragFrom=null;
+      if(moveCol(from,target)) renderColEditor();
+    };
+
+    row.appendChild($("span","grip","⠿"));
     const nm=$("div","colname"+(def.label?"":" none"), def.label||"(no heading)");
     nm.title="The heading is the field this column reads";
     row.appendChild(nm);
@@ -1154,43 +1209,40 @@ function renderColEditor(){
     wrap.appendChild(minus); wrap.appendChild(val); wrap.appendChild(plus);
     row.appendChild(wrap);
 
-    const up=$("span","ce-sec-mv"+(i===0?" off":""),"←"); up.title="Move left";
-    up.onclick=()=>{ if(i>0){ tblCols.splice(i-1,0,tblCols.splice(i,1)[0]); commit(); renderColEditor(); } };
-    const dn=$("span","ce-sec-mv"+(i===tblCols.length-1?" off":""),"→"); dn.title="Move right";
-    dn.onclick=()=>{ if(i<tblCols.length-1){ tblCols.splice(i+1,0,tblCols.splice(i,1)[0]); commit(); renderColEditor(); } };
     const rm=$("span","ce-sec-x"+(tblCols.length<=1?" off":""),"×"); rm.title="Remove column";
     rm.onclick=()=>{ if(tblCols.length>1){ tblCols.splice(i,1); commit(); renderColEditor(); } };
-    row.appendChild(up); row.appendChild(dn); row.appendChild(rm);
-    body.appendChild(row);
+    row.appendChild(rm);
+    box.appendChild(row);
   });
 
   const rest=Object.keys(COLDEF).filter(k=>!tblCols.some(c=>c.k===k));
   if(rest.length){
-    body.appendChild($("div","ce-sechead","Add a column"));
+    box.insertAdjacentHTML("beforeend",'<h4>Add a column</h4>');
     const av=$("div","ce-tokens");
     rest.forEach(k=>{
       const b=document.createElement("button"); b.type="button"; b.className="ce-tok";
       b.textContent="+ "+(COLDEF[k].label||"Flag");
       b.onclick=()=>{ tblCols.push(mkCol(k)); commit(); renderColEditor(); };
       av.appendChild(b); });
-    body.appendChild(av);
+    box.appendChild(av);
   }
 
-  const foot=$("div","ce-foot");
-  const scopeNote=$("div","ce-note");
-  const setNote=msg=>{ scopeNote.textContent = msg || (colScope==="me"
+  const foot=$("div","cpfoot");
+  const msg=$("div","msg");
+  const setMsg=m=>{ msg.textContent = m || (colScope==="me"
     ? "Saved just for you. Everyone else keeps the shared columns."
     : "These columns are shared with everyone using this widget."); };
-  setNote(); foot.appendChild(scopeNote);
-  const row=$("div","ce-btnrow");
+  setMsg(); foot.appendChild(msg);
   const bMe=document.createElement("button"); bMe.type="button"; bMe.className="ce-save ghost";
   bMe.textContent="Save just for me";
-  bMe.onclick=()=>{ colScope="me"; saveTablePrefs(); setNote("Saved. Just for you."); };
+  bMe.onclick=()=>{ colScope="me"; saveTablePrefs(); setMsg("Saved. Just for you."); };
   const bAll=document.createElement("button"); bAll.type="button"; bAll.className="ce-save primary";
   bAll.textContent="Save for everyone";
-  bAll.onclick=()=>{ colScope="everyone"; publishTableCols(); saveTablePrefs(); setNote("Saved. Shared with everyone."); };
-  row.appendChild(bMe); row.appendChild(bAll); foot.appendChild(row);
-  body.appendChild(foot);
+  bAll.onclick=()=>{ colScope="everyone"; publishTableCols(); saveTablePrefs(); setMsg("Saved. Shared with everyone."); };
+  const bClose=document.createElement("button"); bClose.type="button"; bClose.className="ce-save ghost";
+  bClose.textContent="Done"; bClose.onclick=closeColEditor;
+  foot.appendChild(bMe); foot.appendChild(bAll); foot.appendChild(bClose);
+  box.appendChild(foot);
 }
 // ============================================================
 //  EDIT PANEL: double-click a chip
@@ -1795,7 +1847,7 @@ document.getElementById("sortPop").onclick=e=>e.stopPropagation();
 const stoneSearch=document.getElementById("stoneSearch");
 stoneSearch.oninput=e=>{ state.searchQ=e.target.value; render(); };
 document.getElementById("searchClr").onclick=()=>{ state.searchQ=""; stoneSearch.value=""; render(); stoneSearch.focus(); };
-document.getElementById("colsBtn").onclick=e=>{ e.stopPropagation(); openColEditor(); };
+document.getElementById("colsBtn").onclick=e=>{ e.stopPropagation(); toggleColEditor(); };
 document.getElementById("newBtn").onclick=e=>{ e.stopPropagation(); closePops(); openNew(null); };
 document.getElementById("bulkBtn").onclick=e=>{ e.stopPropagation(); closePops(); setBulk(!state.bulk); };
 document.getElementById("bulkBar").onclick=e=>e.stopPropagation();
@@ -1804,8 +1856,6 @@ document.getElementById("bulkApply").onclick=()=>applyBulk();
 document.getElementById("editClose").onclick=()=>tryCloseEdit();
 document.getElementById("editModal").onclick=e=>{ if(e.target.id==="editModal") tryCloseEdit(); };
 document.getElementById("cfBox").onclick=e=>{ if(e.target.id==="cfBox") closeConfirm(null); };
-document.getElementById("cardClose").onclick=closeColEditor;
-document.getElementById("cardModal").onclick=e=>{ if(e.target.id==="cardModal") closeColEditor(); };
 document.getElementById("dayPop").onclick=e=>e.stopPropagation();
 document.addEventListener("click",closePops);
 document.addEventListener("keydown",e=>{

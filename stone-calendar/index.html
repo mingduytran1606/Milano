@@ -406,7 +406,7 @@ const DEFAULT_EVENT_COLS=[{ tpl:'**{client}** · {product}', style:'plain', alig
 let eventCardCols=cloneCols(DEFAULT_EVENT_COLS);
 let cardScope='everyone', eventCardFont=10.5;
 const CARD_LS='milano_stonecal_cards';
-const EVENT_TOKENS={ client:'Client', job:'Job ID', stage:'Job stage', address:'Address', product:'Product', supplier:'Supplier',
+const EVENT_TOKENS={ client:'Client', job:'Job ID', stage:'Job stage', payment:'Payment status', address:'Address', product:'Product', supplier:'Supplier',
   code:'Product code', status:'Status pill', scope:'Scope qty', ordered:'Ordered qty', delivered:'Delivered qty', action:'What’s happening',
   orderdate:'Order date', deliverydate:'Delivery date', inv:'Invoice #', note:'Note', price:'$ / slab', assigned:'Assignee avatars' };
 function cloneCols(cols){ return (cols||[]).map(c=>({ tpl:String(c.tpl||""),
@@ -711,6 +711,8 @@ function eventCardTokens(e){
     client:()=>txtNode(jobClient(j)),
     job:()=>txtNode(jobCode(j)),
     stage:()=>txtNode((j&&String(j.Stage||"").trim())||null),
+    // From the job, like {stage}: plain text, so a column styled pill/highlight wraps it.
+    payment:()=>txtNode((j&&String(j.Payment_Status||"").trim())||null),
     address:()=>txtNode((String((j&&(j.Address_Formatted||j.Job_Address))||"")).trim()||null),
     product:()=>txtNode(stoneLabel(r)),
     supplier:()=>txtNode(r.Product_Supplier||(catFor(r)&&catFor(r).Supplier)||null),
@@ -1192,11 +1194,11 @@ if(typeof grist!=="undefined"){
 //  SAMPLE DATA (standalone / preview)
 // ============================================================
 const SAMPLE_JOBS=[
-  { id:2,  Job_ID:"J0002", Client_Label:"Annie",       Job_Address:"31 Harridge St, Rosebud VIC 3939",           Stage:"Fabrication", Assigned_To:["L","Minh"] },
-  { id:8,  Job_ID:"J0008", Client_Label:"Home owner",  Job_Address:"1/162 Kambrook Rd, Caulfield North VIC 3161", Stage:"Template",    Assigned_To:["L","Bea"] },
-  { id:14, Job_ID:"J0014", Client_Label:"Harry Aboda", Job_Address:"105 Point Nepean Rd, Dromana VIC 3936",       Stage:"Install",     Assigned_To:["L","Minh","Bea"] },
-  { id:19, Job_ID:"J0019", Client_Label:"Naz",         Job_Address:"19 Stephens St, Balwyn North VIC 3104",       Stage:"Quote",       Assigned_To:["L","Kevin"] },
-  { id:23, Job_ID:"J0023", Client_Label:"Louis",       Job_Address:"11 Banksia Ct, Croydon South VIC 3136",       Stage:"Complete",    Assigned_To:["L","Bea"] }
+  { id:2,  Job_ID:"J0002", Client_Label:"Annie",       Job_Address:"31 Harridge St, Rosebud VIC 3939",           Stage:"Fabrication", Payment_Status:"Deposit Paid",    Assigned_To:["L","Minh"] },
+  { id:8,  Job_ID:"J0008", Client_Label:"Home owner",  Job_Address:"1/162 Kambrook Rd, Caulfield North VIC 3161", Stage:"Template",    Payment_Status:"Not Invoiced",    Assigned_To:["L","Bea"] },
+  { id:14, Job_ID:"J0014", Client_Label:"Harry Aboda", Job_Address:"105 Point Nepean Rd, Dromana VIC 3936",       Stage:"Install",     Payment_Status:"Outstanding Bal", Assigned_To:["L","Minh","Bea"] },
+  { id:19, Job_ID:"J0019", Client_Label:"Naz",         Job_Address:"19 Stephens St, Balwyn North VIC 3104",       Stage:"Quote",       Payment_Status:"Not Paid Yet",    Assigned_To:["L","Kevin"] },
+  { id:23, Job_ID:"J0023", Client_Label:"Louis",       Job_Address:"11 Banksia Ct, Croydon South VIC 3136",       Stage:"Complete",    Payment_Status:"Fully Paid",      Assigned_To:["L","Bea"] }
 ];
 const SAMPLE_CAT=[
   {id:101,Supplier:"Lavistone",  Code:"LS303", Product_Full:"Lavistone · LS303 · Cararra Lux 20mm"},

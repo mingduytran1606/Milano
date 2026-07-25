@@ -94,6 +94,7 @@
   .sbtn.open .fc { transform:rotate(90deg); }
   .sbtn .flabel { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   #fsrow2 { display:flex; gap:4px; }
+  #fsrow3 { display:flex; gap:4px; }
   .fnum2 { flex:0 0 auto; font-size:10px; font-weight:600; background:var(--accent); color:#fff; border-radius:9px; padding:0 6px; line-height:15px; display:none; }
   .fnum2.show { display:inline-block; }
   .fmenu { display:none; position:absolute; top:100%; left:8px; right:8px; margin-top:4px; z-index:11;
@@ -319,6 +320,7 @@
   .je-add:hover { text-decoration:underline; }
   .je-inst { display:flex; align-items:center; gap:7px; margin-bottom:6px; }
   .je-inst .je-date { flex:0 0 auto; }
+  .je-inst .je-pill { flex:0 0 auto; font-size:11px; padding:3px 10px; }
   .je-inst-note { flex:1; min-width:0; font:inherit; font-size:12px; color:var(--ink); background:var(--bg); border:1px solid var(--line2); border-radius:6px; padding:5px 8px; }
   .je-inst-note:focus { outline:none; border-color:var(--accent); background:var(--panel); }
   .je-del { flex:0 0 auto; color:var(--muted); font-size:16px; line-height:1; cursor:pointer; padding:0 3px; }
@@ -420,17 +422,21 @@
   <div id="sidebar">
     <div id="sideHead">
       <div id="sideTitle">Jobs</div>
-      <input id="jobSearch" type="text" placeholder="Search address, client, stone, stage, payment, staff…" autocomplete="off">
+      <input id="jobSearch" type="text" placeholder="Search address, client, stone, stage, payment, staff, installer…" autocomplete="off">
       <div id="fsrow">
         <button id="stageBtn" class="sbtn" type="button"><span class="flabel">Stage</span><span id="stageNum" class="fnum2"></span><span class="fc">&#8250;</span></button>
         <button id="paymentBtn" class="sbtn" type="button"><span class="flabel">Payment</span><span id="paymentNum" class="fnum2"></span><span class="fc">&#8250;</span></button>
       </div>
       <div id="fsrow2">
+        <button id="installerBtn" class="sbtn" type="button"><span class="flabel">Installer</span><span id="installerNum" class="fnum2"></span><span class="fc">&#8250;</span></button>
         <button id="visitsBtn" class="sbtn" type="button"><span class="flabel">Installs</span><span id="visitsNum" class="fnum2"></span><span class="fc">&#8250;</span></button>
+      </div>
+      <div id="fsrow3">
         <button id="sortBtn" class="sbtn" type="button"><span class="flabel">&#8645; Sort</span><span class="fc" id="sortCaret">&#8250;</span></button>
       </div>
       <div id="stageMenu" class="fmenu"></div>
       <div id="paymentMenu" class="fmenu"></div>
+      <div id="installerMenu" class="fmenu"></div>
       <div id="visitsMenu" class="fmenu"></div>
       <div id="sortMenu"></div>
     </div>
@@ -569,7 +575,11 @@
   var isolatedJobKey = null;   // when set, only this job's visits stay lit
   var seqById = {};            // rec.id -> {n, total, key}
   var jobQuery = '';
-  var filters = { stage: {}, assignee: {}, payment: {}, visits: {} };   // visits keys: '0' | '1' | '2+'
+  // Filter buckets. 'visits' keys are '0' | '1' | '2+'; the rest are the choice values themselves.
+  // stage/payment/assignee resolve off the JOB; installer is per-install, read off the record.
+  var FILTER_KEYS = ['stage', 'assignee', 'payment', 'installer', 'visits'];
+  function emptyFilters() { var f = {}; FILTER_KEYS.forEach(function (k) { f[k] = {}; }); return f; }
+  var filters = emptyFilters();
   var jobTab = 'all';          // assignee pill bar: 'all' | <person> | '__none' (unassigned)
   var filterView = null;       // (legacy) drill state for the retired combined Filter panel
   var sortBy = { key: 'client', dir: 1 };   // dir 1 = A-Z / soonest / fewest; -1 reversed
@@ -739,7 +749,8 @@
   function stageOf(rec) { return mappingsCache.type ? fmtVal(rec[mappingsCache.type]) : ''; }
   function activeKeys(obj) { return Object.keys(obj).filter(function (k) { return obj[k]; }); }
   function filterCount() {
-    return activeKeys(filters.stage).length + activeKeys(filters.payment).length + activeKeys(filters.visits).length;
+    return activeKeys(filters.stage).length + activeKeys(filters.payment).length
+         + activeKeys(filters.installer).length + activeKeys(filters.visits).length;
   }
   // Payment_Status choiceOptions, from whichever table exposes them.
   function paymentOpts() {
@@ -751,6 +762,23 @@
     var set = {}, jobs = (jobsCache && jobsCache.length) ? jobsCache : jobsFromRecords();
     jobs.forEach(function (j) { (j.assigned || []).forEach(function (a) { if (a) set[a] = true; }); });
     return Object.keys(set).sort();
+  }
+  var NO_INSTALLER = '__none';   // pseudo filter value for installs with no fitter set yet
+  // Who is fitting THIS install. Lives on the mapped table (Inst_), so unlike stage/payment
+  // it is read straight off the record - one install of a job can have a different fitter
+  // from the next. '' when unmapped or blank.
+  function installerOf(rec) {
+    return (mappingsCache && mappingsCache.installer != null) ? fmtVal(rec[mappingsCache.installer]) : '';
+  }
+  // Every installer choice the column offers, plus any value in use that is no longer a choice
+  // (so a renamed/retired fitter still filters instead of vanishing).
+  function installerValues() {
+    if (!mappingsCache || mappingsCache.installer == null) return [];
+    var out = choiceKeys(colMeta(mappingsCache.installer)) || [];
+    var seen = {};
+    out.forEach(function (v) { seen[v] = 1; });
+    recordsCache.forEach(function (r) { var v = installerOf(r); if (v && !seen[v]) { seen[v] = 1; out.push(v); } });
+    return out;
   }
   function assigneeColId() {
     var d = (mappingsCache && mappingsCache.details) || [];
@@ -780,6 +808,11 @@
       if (jobTab === '__none') { if (have.length) return false; }
       else if (have.indexOf(jobTab) === -1) return false;
     }
+    var inst = activeKeys(filters.installer);
+    if (inst.length) {
+      var who = installerOf(rec);
+      if (inst.indexOf(who || NO_INSTALLER) === -1) return false;
+    }
     var vs = activeKeys(filters.visits);
     if (vs.length) {
       var info = seqById[rec.id];
@@ -798,6 +831,10 @@
       if (jobTab === '__none') { if (have.length) return false; }
       else if (have.indexOf(jobTab) === -1) return false;
     }
+    // Installer is per-install, so a job stays in the list when ANY of its installs matches -
+    // otherwise the sidebar would hide jobs whose cards are still on the calendar.
+    var inst = activeKeys(filters.installer);
+    if (inst.length && !jobInstallers(j).some(function (v) { return inst.indexOf(v) !== -1; })) return false;
     var vs = activeKeys(filters.visits);
     if (vs.length) {
       var n = 0;
@@ -805,6 +842,18 @@
       if (!matchVisitBucket(n, vs)) return false;
     }
     return true;
+  }
+  // Distinct installers across a job's installs; a blank fitter counts as NO_INSTALLER so the
+  // "Unassigned" filter reaches the sidebar too. A job with no installs at all has none.
+  function jobInstallers(j) {
+    var aliases = j.id ? jobAliases(j) : [j.key];
+    var seen = {}, out = [];
+    recordsCache.forEach(function (r) {
+      if (aliases.indexOf(jobKey(r)) === -1) return;
+      var v = installerOf(r) || NO_INSTALLER;
+      if (!seen[v]) { seen[v] = 1; out.push(v); }
+    });
+    return out;
   }
 
   // ---- manual per-day ordering ----
@@ -872,7 +921,9 @@
   // ================= Customisable card templates =================
   // Two independent templates (the calendar event blocks and the sidebar job cards),
   // edited via the ⋯ menu on an event. Markdown-ish: **bold**, *italic*, {token}, \n = new line.
-  var DEFAULT_EVENT_CARD = '{title}\n{assigned} {seq}\n---\n{note}';
+  // {installer} renders nothing until the Installer column is mapped and set, and the
+  // empty-token trim drops the leftover space - so this default is unchanged for existing docs.
+  var DEFAULT_EVENT_CARD = '{title}\n{assigned} {installer} {seq}\n---\n{note}';
   var DEFAULT_JOB_CARD = '**{client}**\n{address}\n{stage} {visits}';
   var eventCardTpl = DEFAULT_EVENT_CARD;
   var jobCardTpl = DEFAULT_JOB_CARD;
@@ -899,7 +950,7 @@
     applyCardFonts();
   })();
   // tokens shown in the editor (label per token)
-  var EVENT_TOKENS = { title:'Title (stage-coloured)', client:'Client', stage:'Stage pill', payment:'Payment pill', assigned:'Assignee avatars', date:'Install date', seq:'Install n/N', note:'Note', address:'Address' };
+  var EVENT_TOKENS = { title:'Title (stage-coloured)', client:'Client', stage:'Stage pill', payment:'Payment pill', assigned:'Assignee avatars', installer:'Installer pill', date:'Install date', seq:'Install n/N', note:'Note', address:'Address' };
   var JOB_TOKENS = { client:'Client', address:'Address', jobid:'Job ID', stage:'Stage pill', payment:'Payment pill', assigned:'Assignee avatars', visits:'Install count', nextvisit:'Next install date' };
 
   function renderCardTemplate(str, tokens, host, ctx) {
@@ -990,6 +1041,7 @@
       stage: function () { var sv = fmtVal(rec[mappingsCache.type]); return (sv && mappingsCache.type) ? pillSpan(sv, mappingsCache.type) : null; },
       payment: function () { return (j && j.payment) ? pillSpan(j.payment, JOB_COLS.payment) : null; },
       assigned: function () { return avatarsEl((j && j.assigned) || []); },
+      installer: function () { var v = installerOf(rec); return v ? pillSpan(v, mappingsCache.installer) : null; },
       date: function () { var d = gristToLocalDate(rec[mappingsCache.startDate]); return d ? txtNode(fmtShort(d)) : null; },
       seq: function () { return (info && info.total > 1) ? txtNode(info.n + '/' + info.total) : null; },
       note: function () { return (mappingsCache.seqNote != null) ? txtNode(fmtVal(rec[mappingsCache.seqNote])) : null; },
@@ -1001,7 +1053,7 @@
   // ---- Duplicate an installation: copy this visit's row (job + date + mapped fields) ----
   function duplicateInstall(rec) {
     var fields = {};
-    var copyCols = [mappingsCache.startDate, mappingsCache.title, mappingsCache.type, mappingsCache.groupBy, mappingsCache.seqNote]
+    var copyCols = [mappingsCache.startDate, mappingsCache.title, mappingsCache.type, mappingsCache.groupBy, mappingsCache.seqNote, mappingsCache.installer]
       .concat(mappingsCache.details || []);
     // Never copy Grist formula columns (e.g. a computed "n/total" seq label) - creating a row with a
     // value for a formula column raises a ValueError and the whole duplicate fails.
@@ -1291,7 +1343,8 @@
     return counts;
   }
   function jobHaystack(j) {
-    return [j.addr, j.client, j.stage, j.payment, j.jid, (j.assigned || []).join(' ')].join(' ').toLowerCase();
+    var fitters = jobInstallers(j).filter(function (v) { return v !== NO_INSTALLER; }).join(' ');
+    return [j.addr, j.client, j.stage, j.payment, j.jid, (j.assigned || []).join(' '), fitters].join(' ').toLowerCase();
   }
   function renderSidebar() {
     var list = document.getElementById('jobList');
@@ -1462,7 +1515,7 @@
     row.className = 'fclearall';
     row.textContent = 'Clear all filters';
     row.addEventListener('click', function () {
-      filters = { stage: {}, assignee: {}, payment: {}, visits: {} };
+      filters = emptyFilters();
       render();
     });
     host.appendChild(row);
@@ -1514,6 +1567,15 @@
     var pOpts = paymentOpts();
     renderChoiceFilter('paymentMenu', 'payment', Object.keys(pOpts), function (v) { return (pOpts[v] || {}).fillColor; }, null);
   }
+  function renderInstallerMenu() {
+    var meta = (mappingsCache && mappingsCache.installer != null) ? colMeta(mappingsCache.installer) : null;
+    var opts = (meta && meta.choiceOptions) || {};
+    var values = installerValues();
+    if (values.length) values = values.concat([NO_INSTALLER]);   // ...plus "not set yet"
+    renderChoiceFilter('installerMenu', 'installer', values,
+      function (v) { return v === NO_INSTALLER ? null : (opts[v] || {}).fillColor; },
+      function (v) { return v === NO_INSTALLER ? 'No installer' : v; });
+  }
   function renderVisitsMenu() {
     var vnames = { '0': 'No installs', '1': '1 install', '2+': '2+ installs' };
     renderChoiceFilter('visitsMenu', 'visits', ['0', '1', '2+'], null, function (v) { return vnames[v]; });
@@ -1548,7 +1610,8 @@
     });
   }
   function updateFilterBadges() {
-    [['stage', 'stageBtn', 'stageNum'], ['payment', 'paymentBtn', 'paymentNum'], ['visits', 'visitsBtn', 'visitsNum']].forEach(function (t) {
+    [['stage', 'stageBtn', 'stageNum'], ['payment', 'paymentBtn', 'paymentNum'],
+     ['installer', 'installerBtn', 'installerNum'], ['visits', 'visitsBtn', 'visitsNum']].forEach(function (t) {
       var n = activeKeys(filters[t[0]]).length;
       var badge = document.getElementById(t[2]), btn = document.getElementById(t[1]);
       if (badge) { badge.textContent = n; badge.classList.toggle('show', n > 0); }
@@ -1643,8 +1706,8 @@
   }
   // snapshot of everything a view remembers, with only the active filter keys kept
   function currentSnapshot() {
-    var f = { stage: {}, assignee: {}, payment: {}, visits: {} };
-    ['stage', 'assignee', 'payment', 'visits'].forEach(function (b) {
+    var f = emptyFilters();
+    FILTER_KEYS.forEach(function (b) {
       Object.keys(filters[b] || {}).forEach(function (k) { if (filters[b][k]) f[b][k] = true; });
     });
     return { filters: f, sortBy: { key: sortBy.key, dir: sortBy.dir }, view: view };
@@ -1652,7 +1715,7 @@
   // stable signature so we can tell whether the live state still matches a saved view
   function snapSig(s) {
     var f = {};
-    ['stage', 'assignee', 'payment', 'visits'].forEach(function (b) {
+    FILTER_KEYS.forEach(function (b) {
       var ks = Object.keys(s.filters[b] || {}).filter(function (k) { return s.filters[b][k]; }).sort();
       if (ks.length) f[b] = ks;
     });
@@ -1668,8 +1731,8 @@
     grist.setOption('activeView', activeViewName || '');
   }
   function applyView(v, silent) {
-    filters = { stage: {}, assignee: {}, payment: {}, visits: {} };
-    ['stage', 'assignee', 'payment', 'visits'].forEach(function (b) {
+    filters = emptyFilters();
+    FILTER_KEYS.forEach(function (b) {
       var src = (v.filters && v.filters[b]) || {};
       Object.keys(src).forEach(function (k) { if (src[k]) filters[b][k] = true; });
     });
@@ -1716,7 +1779,7 @@
     render();
   }
   function clearActiveView() {
-    filters = { stage: {}, assignee: {}, payment: {}, visits: {} };
+    filters = emptyFilters();
     activeViewName = null;
     filterView = null;
     persistViews();
@@ -2132,11 +2195,18 @@
     body.appendChild(ih);
     var visits = mappingsCache ? jobVisitsAll(job) : [];
     if (!visits.length) body.appendChild(elx('div', 'jm-empty', 'No installs scheduled.'));
+    var instChoices = (mappingsCache && mappingsCache.installer != null)
+      ? (choiceKeys(colMeta(mappingsCache.installer)) || []) : null;
     visits.forEach(function (v) {
       var row = elx('div', 'je-inst');
       var di = document.createElement('input'); di.type = 'date'; di.className = 'je-date'; di.value = toDateInputVal(v[mappingsCache.startDate]);
       di.addEventListener('change', function () { setVisitField(v, mappingsCache.startDate, dateInputToGrist(di.value)); });
       row.appendChild(di);
+      // who is fitting this one - only when the Installer column is mapped
+      if (instChoices) {
+        row.appendChild(pillDropdown(installerOf(v), instChoices, colMeta(mappingsCache.installer),
+          function (val) { setVisitField(v, mappingsCache.installer, val); }, 'Installer -'));
+      }
       if (mappingsCache.seqNote != null) {
         var ni = document.createElement('input'); ni.className = 'je-inst-note'; ni.placeholder = 'Note…'; ni.value = fmtVal(v[mappingsCache.seqNote]);
         ni.addEventListener('blur', function () { if (ni.value !== fmtVal(v[mappingsCache.seqNote])) setVisitField(v, mappingsCache.seqNote, ni.value); });
@@ -2507,6 +2577,7 @@
   var MENUS = [
     ['stageBtn', 'stageMenu', renderStageMenu],
     ['paymentBtn', 'paymentMenu', renderPaymentMenu],
+    ['installerBtn', 'installerMenu', renderInstallerMenu],
     ['visitsBtn', 'visitsMenu', renderVisitsMenu],
     ['sortBtn', 'sortMenu', renderSortMenu]
   ];
@@ -2589,6 +2660,7 @@
       { name: 'title', title: 'Title', type: 'Text', description: 'Bold text shown on the card' },
       { name: 'type', title: 'Colour by', optional: true, description: 'Choice column used for the title colour + stage filter (e.g. Stage)' },
       { name: 'details', title: 'Detail lines', optional: true, allowMultiple: true, description: 'Extra fields shown under the title' },
+      { name: 'installer', title: 'Installer', type: 'Choice', optional: true, description: 'Who is fitting this install (a Choice column on the installs table) - powers the {installer} card token and the Installer filter' },
       { name: 'seqNote', title: 'Install note', optional: true, description: 'Per-install note shown in the bottom "Installation n/N: note" line' },
       { name: 'groupBy', title: 'Group by (job)', optional: true, description: 'Reference to the job - links installs together and powers the jobs sidebar' },
       { name: 'orderBy', title: 'Manual order', type: 'Numeric', optional: true, description: 'Numeric column that stores the hand-arranged order of cards within a day' }

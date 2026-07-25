@@ -315,7 +315,6 @@
   .supgrp:hover{background:var(--accent-soft)}
   .supgrp .tw{color:var(--muted);font-size:9px;width:9px}
   .supgrp .gnm{text-transform:uppercase}
-  .supgrp .gct{color:var(--muted);font-weight:600;letter-spacing:0}
   .supgrp .gq{margin-left:auto;color:var(--accent-ink);font-variant-numeric:tabular-nums}
   .supgrp.shut{color:var(--muted)}
   .rowdel{justify-self:start;align-self:center;width:20px;height:20px;margin-left:6px;font:inherit;
@@ -960,7 +959,6 @@ function supGroupHead(nm,grp,gkey,shut){
   h.style.minWidth=colBodyPx()+"px";
   h.appendChild($("span","tw",shut?"▸":"▾"));
   h.appendChild($("span","gnm",nm||"No supplier"));
-  h.appendChild($("span","gct",grp.length+(grp.length===1?" order":" orders")));
   h.appendChild($("span","gq",slabSum(grp)+" slabs"));
   h.title=shut?"Show these orders":"Hide these orders";
   h.onclick=ev=>{ ev.stopPropagation();

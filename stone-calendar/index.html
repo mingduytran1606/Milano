@@ -202,6 +202,20 @@
   .se-head{font-size:12.5px;font-weight:700;color:var(--ink)}
   .se-sub{font-size:11.5px;color:var(--muted);margin-top:2px}
   .se-full{grid-column:1 / -1}
+  /* existing job / new job switch */
+  .se-seg{display:inline-flex;margin-top:12px;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .se-seg button{font:inherit;font-size:12px;font-weight:600;padding:6px 12px;border:0;cursor:pointer;
+    background:var(--bg);color:var(--muted)}
+  .se-seg button+button{border-left:1px solid var(--line)}
+  .se-seg button.on{background:var(--accent);color:#fff}
+  /* assignee chips on a new job */
+  .se-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .se-chip{display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:11.5px;cursor:pointer;
+    background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:20px;padding:3px 9px 3px 4px}
+  .se-chip.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+  /* the chip you just created, so a create is visibly confirmed */
+  @keyframes evnew{0%,100%{box-shadow:0 0 0 0 var(--accent-soft)}45%{box-shadow:0 0 0 3px var(--accent)}}
+  .ev.ev-new{animation:evnew 1.1s ease-in-out 2}
   .se-dirty{font-size:11.5px;color:var(--accent-ink);font-weight:600;margin-right:auto}
   /* status <select> gets a dot of the chosen colour in front of it */
   .se-statwrap{display:flex;align-items:center;gap:8px}
@@ -391,8 +405,8 @@ const DOW=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
 // ---- state ----
 const state={
-  stone:[], jobs:[], catalogue:[], grist:false,
-  ref:{ product:null },
+  stone:[], jobs:[], catalogue:[], clients:[], grist:false,
+  ref:{ product:null, client:null },
   assignee:null,                        // null = all assignees
   searchQ:"",                           // stone search, live-filters events
   statusFilter:"all",                   // status-pill filter (group/status key)
@@ -401,6 +415,8 @@ const state={
   sel:new Set(),                        // row ids ticked for bulk edit
   colType:{},                           // Stone_Order colId -> Grist type, for writing dates back
   writable:null,                        // Stone_Order colId -> true for non-formula columns (null = unknown)
+  writableJob:null,                     // Jobs_Detail colId -> true, same idea (null = unknown)
+  flashId:null,                         // row id to highlight after a create, so you can see what you made
   jobById:{}, catById:{}
 };
 window._stonecal=state;
@@ -454,6 +470,17 @@ function reindex(){ state.jobById={}; state.jobs.forEach(j=>state.jobById[j.id]=
   state.catById={}; state.catalogue.forEach(c=>state.catById[c.id]=c); }
 function jobFor(r){ return state.jobById[refId(r.Job)]||null; }
 function catFor(r){ return state.catById[refId(r.Product)]||null; }
+// Client display name, via whichever column the Client ref actually points at.
+function clientLabel(c){ const R=state.ref.client;
+  return (R&&R.labelCol&&c[R.labelCol]) || c.Client_Name || c.Name || c.Client || ("#"+c.id); }
+// {id,name} for the customer autocomplete. Falls back to the distinct client names already
+// on the jobs when the Client table can't be resolved, so the picker is never empty.
+function distinctClients(){
+  if(state.ref.client && (state.clients||[]).length)
+    return state.clients.map(c=>({ id:c.id, name:String(clientLabel(c)) }));
+  const seen={}; (state.jobs||[]).forEach(j=>{ const n=String(j.Client_Label||"").trim(); if(n) seen[n]=1; });
+  return Object.keys(seen).map(n=>({ id:null, name:n }));
+}
 // Assignees live on the job as a Grist ChoiceList (["L", ...names]).
 function choiceList(v){ if(Array.isArray(v)) return (v[0]==="L"?v.slice(1):v.filter(x=>typeof x==="string"));
   return (typeof v==="string"&&v)?[v]:[]; }
@@ -784,6 +811,8 @@ function eventChip(e){
     renderCardTemplate(col.tpl, tokens, host, { bar:sb });
     chip.appendChild(cell);
   });
+  chip.setAttribute("data-rid",String(r.id));
+  if(state.flashId!=null && r.id===state.flashId) chip.classList.add("ev-new");
   const flags=dataFlags(r);
   chip.title=fmtDMY(e.date)+" · "+statusLabel(r.Order_Status)+"\n"+jobClient(j)+" ("+jobCode(j)+")\n"+stoneLabel(r)
     +"\nOrd "+num(r.Ordered_Qty)+" / Deliv "+num(r.Delivery_Qty)
@@ -936,13 +965,19 @@ const EDIT_FIELDS=[
   { col:"INV",           label:"Invoice #",    kind:"text" },
   { col:"Note",          label:"Note",         kind:"note" }
 ];
-let edit={ id:null, orig:{}, cur:{}, mode:"edit", job:"", product:"" };
+// jobMode "existing" picks a job from the list; "new" creates the client + job on the way in,
+// which is what the retired Catalogue Search wizard did (every order must tie to a job).
+function blankEdit(over){
+  return Object.assign({ id:null, orig:{}, cur:{}, mode:"edit", job:"", product:"",
+    jobMode:"existing", clientName:"", clientId:null, address:"", assignees:[] }, over||{});
+}
+let edit=blankEdit();
 function editDirty(){
   if(edit.mode==="new") return true;                 // a new order is always "unsaved"
   return EDIT_FIELDS.some(f=>String(edit.cur[f.col]??"")!==String(edit.orig[f.col]??""));
 }
 function openEdit(r){
-  edit={ id:r.id, orig:{}, cur:{}, mode:"edit", job:"", product:"" };
+  edit=blankEdit({ id:r.id, mode:"edit" });
   EDIT_FIELDS.forEach(f=>{
     const v = f.kind==="date" ? dateToInput(r[f.col],state.colType[f.col])
             : f.kind==="num"  ? (num(r[f.col])||"")
@@ -956,7 +991,7 @@ function openEdit(r){
 // order or delivery date never appears on the calendar (see calDateOf), so the order date is
 // pre-filled and one of the two is required before saving.
 function openNew(d){
-  edit={ id:null, orig:{}, cur:{}, mode:"new", job:"", product:"" };
+  edit=blankEdit({ mode:"new" });
   EDIT_FIELDS.forEach(f=>{ edit.orig[f.col]=""; edit.cur[f.col]=""; });
   edit.cur.Order_Date=dateToInput(dateToGrist(d||new Date(),state.colType.Order_Date),state.colType.Order_Date);
   if(STATUS_ORDER.includes("Awaiting Order")) edit.cur.Order_Status="Awaiting Order";
@@ -993,17 +1028,70 @@ function pickerRow(grid,label,idx,initial,onPick){
     onPick(id!=null?id:null,input.value); updateEditFoot(); };
   grid.appendChild(input); grid.appendChild(dl);
 }
+// Like pickerRow but the typed value stands on its own: suggestions only assist, anything
+// goes. Used for the customer (an unknown name means "create it") and the address.
+function freeRow(grid,label,suggestions,initial,placeholder,onType){
+  grid.appendChild($("div","se-lab",label));
+  const input=document.createElement("input"); input.className="se-in"; input.value=initial||"";
+  input.placeholder=placeholder||""; input.setAttribute("autocomplete","off");
+  if((suggestions||[]).length){
+    const dl=document.createElement("datalist"); dl.id="dl-"+label.replace(/\W+/g,"");
+    suggestions.forEach(s=>{ const o=document.createElement("option"); o.value=s; dl.appendChild(o); });
+    input.setAttribute("list",dl.id); grid.appendChild(input); grid.appendChild(dl);
+  } else grid.appendChild(input);
+  input.oninput=()=>{ onType(input.value); updateEditFoot(); };
+}
+// Assignees for a new job, as toggleable chips drawn from the names already on other jobs.
+function assigneeRow(grid){
+  const names=allAssignees(); if(!names.length) return;
+  grid.appendChild($("div","se-lab","Assigned to"));
+  const wrap=$("div","se-chips");
+  names.forEach(n=>{
+    const b=document.createElement("button"); b.type="button"; b.className="se-chip";
+    const a=$("span","av"); a.style.background=avatarColor(n); a.textContent=initials(n);
+    b.appendChild(a); b.appendChild(document.createTextNode(n));
+    const paint=()=>b.classList.toggle("on",edit.assignees.includes(n));
+    paint();
+    b.onclick=()=>{ const i=edit.assignees.indexOf(n);
+      if(i<0) edit.assignees.push(n); else edit.assignees.splice(i,1); paint(); };
+    wrap.appendChild(b); });
+  grid.appendChild(wrap);
+}
 function renderEdit(r){
   const body=document.getElementById("seBody"); body.innerHTML="";
   const isNew=edit.mode==="new";
   document.querySelector("#editModal .ce-tab").textContent=isNew?"New stone order":"Stone order";
   if(isNew){
     body.appendChild($("div","se-head","New stone order"));
-    body.appendChild($("div","se-sub","Pick the job and the stone. It appears on the calendar under its order date."));
-    const top=$("div","se-grid"); top.style.marginTop="12px";
-    pickerRow(top,"Job",jobPicker(),"",(id,txt)=>{ edit.job=id; edit.jobTxt=txt; });
+    body.appendChild($("div","se-sub","Every order ties to a job. Pick one, or start a new job here. "
+      +"The order appears on the calendar under its order date."));
+    // existing job / new job, mirroring the retired wizard's step 1
+    const seg=$("div","se-seg");
+    [["existing","Existing job"],["new","New job"]].forEach(([v,lab])=>{
+      const b=document.createElement("button"); b.type="button"; b.textContent=lab;
+      if(edit.jobMode===v) b.className="on";
+      b.onclick=()=>{ if(edit.jobMode===v) return; edit.jobMode=v;
+        edit.job=""; edit.clientId=null; edit.clientName=""; edit.address=""; edit.assignees=[];
+        renderEdit(r); };
+      seg.appendChild(b); });
+    body.appendChild(seg);
+    const top=$("div","se-grid"); top.style.marginTop="10px";
+    if(edit.jobMode==="new"){
+      // Customer is free text on purpose: an unknown name creates the client.
+      const ci=distinctClients();
+      freeRow(top,"Customer",ci.map(c=>c.name),edit.clientName,"Name of the client this is for",v=>{
+        edit.clientName=v; const hit=ci.find(c=>c.name.toLowerCase()===v.trim().toLowerCase());
+        edit.clientId=hit?hit.id:null; });
+      freeRow(top,"Job address",[],edit.address,"Site address (optional)",v=>{ edit.address=v; });
+      assigneeRow(top);
+    } else {
+      pickerRow(top,"Job",jobPicker(),"",(id,txt)=>{ edit.job=id; edit.jobTxt=txt; });
+    }
     pickerRow(top,"Stone",productPicker(),"",(id,txt)=>{ edit.product=id; edit.prodTxt=txt; });
     body.appendChild(top);
+    if(edit.jobMode==="new")
+      body.appendChild($("div","se-sub","The job is created at whatever stage the doc defaults to."
+        +(state.ref.client?" An unknown customer name is added to the Client list.":"")));
   } else {
     const j=jobFor(r);
     body.appendChild($("div","se-head",jobClient(j)+(jobCode(j)?(" · "+jobCode(j)):"")));
@@ -1051,7 +1139,11 @@ function renderEdit(r){
 // disallowed because such a line would exist in Grist but never show on the calendar.
 function newBlockers(){
   const miss=[];
-  if(!edit.job) miss.push("a job");
+  if(edit.jobMode==="new"){
+    // A job needs something to identify it by. The old Catalogue Search wizard took either,
+    // so a walk-in with only an address still gets a job.
+    if(!String(edit.clientName||"").trim() && !String(edit.address||"").trim()) miss.push("a customer or an address");
+  } else if(!edit.job) miss.push("a job");
   if(!edit.product) miss.push("a stone");
   if(!edit.cur.Order_Date && !edit.cur.Delivery_Date) miss.push("an order or delivery date");
   return miss;
@@ -1076,33 +1168,91 @@ function editUpdate(){
   });
   return Object.keys(fields).length?{ id:edit.id, fields }:null;
 }
-// Fields for a brand-new line: the two refs, whatever was typed in, and the supplier/code
-// copied off the catalogue row so the search and the fallback label work straight away.
-function newFields(){
-  const fields={ Job:edit.job, Product:edit.product };
+// Fields for a brand-new line: the two refs, the stone's name as free text, and whatever
+// was typed in. Product_Code / Product_Supplier are deliberately NOT written: they are
+// formula columns off Product, and Grist rejects the whole action if you try.
+function newFields(jobId){
+  const fields={ Job:jobId, Product:edit.product };
   EDIT_FIELDS.forEach(f=>{
     const cur=edit.cur[f.col]; if(cur===""||cur==null) return;
     fields[f.col] = f.kind==="date" ? inputToGrist(cur,state.colType[f.col])
                   : f.kind==="num"  ? num(cur)
                   : cur;
   });
-  const cat=state.catById[edit.product];
-  const pick=(...ks)=>{ for(const k of ks){ const v=cat[k]; if(v!=null&&v!=="") return v; } return null; };
-  if(cat){ const code=pick("Product_Code","Code"), sup=pick("Product_Supplier","Supplier");
-           if(code!=null) fields.Product_Code=code;
-           if(sup!=null) fields.Product_Supplier=sup; }
+  // Stone is the FALLBACK name for a line with no Product, nothing more. The only formula in
+  // the doc that reads it is Jobs_Detail.Stones, and only as "r.Product.Product_Full if
+  // r.Product else r.Stone" - so with a Product set, writing Stone would just freeze a stale
+  // copy of the catalogue name that stoneHaystack() then searches. Left blank on purpose,
+  // which is what 229 of the 399 existing rows already do.
+  if(!edit.product){ const nm=catStoneName(state.catById[edit.product]); if(nm) fields.Stone=nm; }
   // never write a formula column, and never invent one the doc doesn't have
   if(state.writable) Object.keys(fields).forEach(k=>{ if(!state.writable[k]) delete fields[k]; });
   return fields;
 }
-async function createRow(){
-  const fields=newFields();
-  if(!state.grist){                                  // standalone/demo
-    const id=Math.max(0,...state.stone.map(r=>r.id||0))+1;
-    state.stone.push(Object.assign({ id },fields)); reindex(); render(); return;
+// The stone's own name, preferring the column the Product ref displays.
+function catStoneName(cat){ if(!cat) return null;
+  const lc=(state.ref.product&&state.ref.product.labelCol)||"Product_Full";
+  for(const k of [lc,"Product_Full","Name","Stone","Product"]){
+    const v=cat[k]; if(v!=null&&String(v).trim()) return String(v).trim(); }
+  return null; }
+// Create a record and resolve to its new rowId (Grist hands it back in retValues[0]).
+async function addRecord(table,fields){
+  if(!state.grist){
+    const bag={ Stone_Order:state.stone, Jobs_Detail:state.jobs, Catalogue:state.catalogue }[table]
+      || (state.ref.client&&table===state.ref.client.targetTableId&&state.clients)
+      || (state.ref.product&&table===state.ref.product.targetTableId&&state.catalogue) || [];
+    const id=bag.reduce((m,r)=>Math.max(m,typeof r.id==="number"?r.id:0),0)+1;
+    bag.push(Object.assign({ id },fields)); reindex();
+    return id;
   }
-  await grist.docApi.applyUserActions([["AddRecord","Stone_Order",null,fields]]);
-  await refetch();
+  const res=await grist.docApi.applyUserActions([["AddRecord",table,null,fields]]);
+  return ((res&&res.retValues)||[])[0];
+}
+// Reuse an existing client by name (case-insensitive) or add one. Resolves to its rowId,
+// or null when the doc has no Client ref to hang it off.
+async function ensureClient(name){
+  const R=state.ref.client, nm=String(name||"").trim();
+  if(!nm||!R) return null;
+  const hit=(state.clients||[]).find(c=>String(clientLabel(c)).toLowerCase()===nm.toLowerCase());
+  if(hit) return hit.id;
+  const f={}; f[R.labelCol]=nm;
+  return addRecord(R.targetTableId,f);
+}
+// A new job from the panel's step-1 fields. Stage is deliberately NOT set: Jobs_Detail.Stage
+// is a trigger formula ("Quote", on new records), so the doc already owns that default and
+// hardcoding it here would fight any later change to it.
+async function createJob(){
+  const clientId=await ensureClient(edit.clientName);
+  const nm=String(edit.clientName||"").trim(), addr=String(edit.address||"").trim();
+  const f={};
+  if(clientId!=null) f.Client_Name=clientId;
+  if(addr) f.Job_Address=addr;
+  else if(clientId==null && nm) f.Job_Address=nm;      // no Client table: keep the name somewhere
+  if((edit.assignees||[]).length) f.Assigned_To=["L",...edit.assignees];
+  if(!state.grist && nm) f.Client_Label=nm;            // mirror the formula so the demo reads right
+  if(state.writableJob) Object.keys(f).forEach(k=>{ if(!state.writableJob[k]) delete f[k]; });
+  const id=await addRecord("Jobs_Detail",f);
+  if(id==null) throw new Error("the job could not be created");
+  return id;
+}
+async function createRow(){
+  const jobId = edit.jobMode==="new" ? await createJob() : edit.job;
+  if(jobId==null) throw new Error("no job to attach the order to");
+  const newId=await addRecord("Stone_Order",newFields(jobId));
+  state.flashId=newId!=null?newId:null;
+  if(state.grist) await refetch(); else render();
+  flashNewRow();
+}
+// Scroll the freshly created chip into view and pulse it, so a create is visibly confirmed
+// rather than silently folding into a long agenda.
+function flashNewRow(){
+  const id=state.flashId; if(id==null) return;
+  setTimeout(()=>{
+    const el=document.querySelector('.ev[data-rid="'+id+'"]');
+    if(el&&el.scrollIntoView) el.scrollIntoView({block:"center",behavior:"smooth"});
+    setTimeout(()=>{ state.flashId=null; const e2=document.querySelector('.ev[data-rid="'+id+'"]');
+      if(e2) e2.classList.remove("ev-new"); },2600);
+  },0);
 }
 async function saveEdit(){
   const isNew=edit.mode==="new";
@@ -1119,11 +1269,13 @@ async function saveEdit(){
       [{v:"ok",label:"OK",kind:"primary"}]); }
 }
 function closeEditNow(){ document.getElementById("editModal").classList.remove("open");
-  edit={ id:null, orig:{}, cur:{}, mode:"edit", job:"", product:"" }; }
+  edit=blankEdit(); }
 async function tryCloseEdit(){
   if(edit.mode==="new"){
     // nothing typed yet: just close, no point asking
-    const touched=edit.job||edit.product||EDIT_FIELDS.some(f=>String(edit.cur[f.col]??"")!==""&&f.col!=="Order_Date"&&f.col!=="Order_Status");
+    const touched=edit.job||edit.product||String(edit.clientName||"").trim()||String(edit.address||"").trim()
+      ||(edit.assignees||[]).length
+      ||EDIT_FIELDS.some(f=>String(edit.cur[f.col]??"")!==""&&f.col!=="Order_Date"&&f.col!=="Order_Status");
     if(!touched){ closeEditNow(); return; }
     const c=await confirmBox("Discard this new order?","It hasn’t been created yet.",
       [{v:"cancel",label:"Keep editing"},{v:"discard",label:"Discard",kind:"primary"}]);
@@ -1288,6 +1440,8 @@ async function pullTables(){
   const [so,jd]=await Promise.all([grist.docApi.fetchTable("Stone_Order"), grist.docApi.fetchTable("Jobs_Detail")]);
   state.stone=columnarToRows(so); state.jobs=columnarToRows(jd);
   if(state.ref.product){ try{ const cat=await grist.docApi.fetchTable(state.ref.product.targetTableId); state.catalogue=columnarToRows(cat); }catch(e){} }
+  // Clients only feed the "new job" customer picker, so a failure here is not fatal.
+  if(state.ref.client){ try{ const cl=await grist.docApi.fetchTable(state.ref.client.targetTableId); state.clients=columnarToRows(cl); }catch(e){} }
   reindex();
 }
 async function refetch(){ if(!state.grist)return; try{ await pullTables(); }catch(e){ console.warn("fetch failed",e); } render(); }
@@ -1339,9 +1493,11 @@ if(typeof grist!=="undefined"){
   try{ grist.onOptions(applyGristOptions); }catch(e){}   // adopt the shared card design
   grist.docApi.fetchTable("Stone_Order").then(async ()=>{
     try{ const sc=await loadGristSchema(); state.ref.product=sc.refInfo("Stone_Order","Product");
+         state.ref.client=sc.refInfo("Jobs_Detail","Client_Name");
          applyStatusModel(sc.choiceModel("Stone_Order","Order_Status"));
          state.colType=sc.typeMap("Stone_Order");
-         state.writable=sc.writableCols("Stone_Order"); }catch(e){ console.warn("schema failed",e); }
+         state.writable=sc.writableCols("Stone_Order");
+         state.writableJob=sc.writableCols("Jobs_Detail"); }catch(e){ console.warn("schema failed",e); }
     try{ await pullTables(); }catch(e){ console.warn("initial fetch failed",e); }
     state.grist=true; render();
   }).catch(()=>{});
@@ -1375,9 +1531,15 @@ const SAMPLE_STONE=[
   { id:8, Job:23, Product:101, Product_Code:"LS303", Product_Supplier:"Lavistone",  Scope_Qty:5, Ordered_Qty:5, Delivery_Qty:5, Order_Status:"Delivered",        Order_Date:D(2026,6,28), Delivery_Date:D(2026,7,10) },
   { id:9, Job:23, Product:104, Product_Code:"LSU401",Product_Supplier:"Lavistone",  Scope_Qty:2, Ordered_Qty:2, Delivery_Qty:0, Order_Status:"Awaiting Order",    Order_Date:D(2026,7,24), Delivery_Date:null }
 ];
-const DEMO_REF={ product:{ targetTableId:"Catalogue", labelCol:"Product_Full" } };
-window._test=function(stone,jobs,catalogue){
-  state.stone=stone||[]; state.jobs=jobs||[]; state.catalogue=catalogue||[]; reindex(); render();
+const SAMPLE_CLIENTS=[
+  {id:51,Client_Name:"Annie"},{id:52,Client_Name:"Home owner"},{id:53,Client_Name:"Harry Aboda"},
+  {id:54,Client_Name:"Naz"},{id:55,Client_Name:"Louis"}
+];
+const DEMO_REF={ product:{ targetTableId:"Catalogue", labelCol:"Product_Full" },
+                 client:{ targetTableId:"Client", labelCol:"Client_Name" } };
+window._test=function(stone,jobs,catalogue,clients){
+  state.stone=stone||[]; state.jobs=jobs||[]; state.catalogue=catalogue||[];
+  state.clients=clients||[]; reindex(); render();
 };
 
 // ============================================================
@@ -1421,8 +1583,9 @@ document.addEventListener("keydown",e=>{
   applyCardFonts(); }
 loadPrefs();                                   // restore the saved agenda direction
 if(!state.ref.product) state.ref.product=DEMO_REF.product;
+if(!state.ref.client)  state.ref.client=DEMO_REF.client;
 // sample-first so the grid is never blank; live wiring above flips + replaces it.
-window._test(SAMPLE_STONE,SAMPLE_JOBS,SAMPLE_CAT);
+window._test(SAMPLE_STONE,SAMPLE_JOBS,SAMPLE_CAT,SAMPLE_CLIENTS);
 </script>
 </body>
 </html>

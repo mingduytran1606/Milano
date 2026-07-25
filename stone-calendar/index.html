@@ -233,7 +233,8 @@
   .evgut{flex:0 0 14px;display:flex;justify-content:center;align-items:center}
   .evflag{width:14px;height:14px;border-radius:50%;background:var(--danger);color:#fff;cursor:help;
     font-size:10px;font-weight:800;line-height:14px;text-align:center;flex:0 0 auto}
-  .evsel{flex:0 0 auto;width:15px;height:15px;cursor:pointer;accent-color:var(--accent);margin:0}
+  .evsel{flex:0 0 auto;width:15px;height:15px;cursor:pointer;accent-color:var(--accent);margin:0;
+         justify-self:center;align-self:center}
   .ag-all{display:block;margin-top:5px;font-size:10.5px;font-weight:600;color:var(--accent-ink);cursor:pointer}
   .ag-all:hover{text-decoration:underline}
   .bulkbar{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:70;display:none;
@@ -689,7 +690,14 @@ const mkCol=(k,over)=>Object.assign({k,w:COLDEF[k].w,align:COLDEF[k].align||"lef
 const DEFAULT_COLS=["client","jobstatus","stone","supplier","scope","ordered","delivered","status","flag"];
 let tblCols=DEFAULT_COLS.map(k=>mkCol(k,k==="client"?{b:true}:null));
 let showTotals=true;
-const colTemplate=()=>tblCols.map(c=>"minmax("+c.w+"px,"+c.w+"fr)").join(" ")+" 26px";
+// The 26px slot carries the row handle: the bulk tick box, which leads the row so a column of
+// boxes is easy to run down, or the remove "x", which stays at the end out of the way.
+// Header, data rows and the totals row all use this one template, so the slot must move in all
+// three together (see the leading spacer in stColHead / the totals row).
+const colTemplate=()=>{
+  const cols=tblCols.map(c=>"minmax("+c.w+"px,"+c.w+"fr)").join(" ");
+  return state.bulk ? "26px "+cols : cols+" 26px";
+};
 const alignCls=a=>a==="right"?" r":a==="centre"?" c":"";
 const wrapFmt=(h,c)=>{ let s=h; if(c.u)s="<u>"+s+"</u>"; if(c.i)s="<i>"+s+"</i>"; if(c.b)s="<b>"+s+"</b>"; return s; };
 
@@ -842,6 +850,7 @@ function stColHead(){
   const h=$("div","sthead");
   h.appendChild($("div","stlab","Date · supplier"));
   const cols=$("div","stcols"); cols.style.gridTemplateColumns=colTemplate();
+  if(state.bulk) cols.appendChild($("div","stlab"));   // spacer over the leading tick-box column
   tblCols.forEach(c=>{
     const def=COLDEF[c.k];
     const l=$("div","stlab"+alignCls(c.align)+(def.edit?" ed":""));
@@ -853,6 +862,14 @@ function stColHead(){
 function stRow(r){
   const row=$("div","strow");
   row.style.gridTemplateColumns=colTemplate();
+  if(state.bulk){                        // leads the row, so the boxes form one column down the left
+    const box=document.createElement("input"); box.type="checkbox"; box.className="evsel";
+    box.checked=state.sel.has(r.id); box.title="Select for bulk edit";
+    box.setAttribute("aria-label","Select the order for "+jobClient(jobFor(r))+" for bulk edit");
+    box.onclick=ev=>ev.stopPropagation();
+    box.onchange=()=>{ if(box.checked) state.sel.add(r.id); else state.sel.delete(r.id); renderBulkBar(); };
+    row.appendChild(box);
+  }
   tblCols.forEach(c=>{
     const def=COLDEF[c.k];
     const cell=$("div","stcell"+alignCls(c.align)+(def.edit?" ed":" roc"));
@@ -863,13 +880,7 @@ function stRow(r){
     if(def.edit){ cell.title="Click to edit"; cell.onclick=ev=>{ ev.stopPropagation(); startCellEdit(cell,r,c); }; }
     row.appendChild(cell);
   });
-  if(state.bulk){
-    const box=document.createElement("input"); box.type="checkbox"; box.className="evsel";
-    box.checked=state.sel.has(r.id); box.title="Select for bulk edit";
-    box.onclick=ev=>ev.stopPropagation();
-    box.onchange=()=>{ if(box.checked) state.sel.add(r.id); else state.sel.delete(r.id); renderBulkBar(); };
-    row.appendChild(box);
-  } else {
+  if(!state.bulk){
     const del=document.createElement("button"); del.className="rowdel"; del.type="button";
     del.textContent="×"; del.title="Remove this order";
     del.setAttribute("aria-label","Remove the order for "+jobClient(jobFor(r)));
@@ -884,6 +895,7 @@ function stRow(r){
 function stSumRow(rows){
   const row=$("div","stsum");
   row.style.gridTemplateColumns=colTemplate();
+  if(state.bulk) row.appendChild($("div","stcell"));   // spacer under the leading tick-box column
   const labelAt=tblCols.length>1?1:0;
   tblCols.forEach((c,i)=>{
     const def=COLDEF[c.k];

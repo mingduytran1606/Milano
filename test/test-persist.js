@@ -37,6 +37,58 @@ w.eval('render();');   // the bug: pruning ran against dated events only
 ok('selection SURVIVES a re-render', s.sel.has(9001), [...s.sel]);
 ok('apply stays enabled after the re-render', D.getElementById('bulkApply').disabled===false);
 
+console.log('== the tick box leads the row, and the grid stays aligned ==');
+{
+  const row=$$('.strow')[0];
+  ok('tick box is the FIRST child of the row', row.firstChild && row.firstChild.classList.contains('evsel'),
+     row.firstChild && row.firstChild.className);
+  ok('exactly one tick box per row', $$('.strow').every(r=>r.querySelectorAll('.evsel').length===1),
+     [...new Set($$('.strow').map(r=>r.querySelectorAll('.evsel').length))]);
+  ok('remove handle steps aside in bulk', $$('.rowdel').length===0, $$('.rowdel').length);
+  ok('template puts the 26px slot first', /^26px /.test(row.style.gridTemplateColumns),
+     row.style.gridTemplateColumns);
+  const hcols=D.querySelector('.sthead .stcols');
+  ok('header uses the same template', hcols.style.gridTemplateColumns===row.style.gridTemplateColumns,
+     {head:hcols.style.gridTemplateColumns, row:row.style.gridTemplateColumns});
+  ok('header gained a leading spacer so labels still line up',
+     hcols.children.length===w.eval('tblCols.length')+1, hcols.children.length);
+  // Same template + same child count already proves the columns line up. What is worth pinning
+  // is that the leading spacer did not shift the per-column ALIGNMENT by one slot: compare just
+  // the r/c modifiers, since row cells also carry "roc" (read-only) which headers never do.
+  const alignOf=e=>(e.className.match(/\b[rc]\b/)||[""])[0];
+  ok('column alignment is not shifted by the leading spacer',
+     [...hcols.children].slice(1).map(alignOf).join("|")
+       ===[...row.children].slice(1).map(alignOf).join("|"),
+     {head:[...hcols.children].slice(1).map(alignOf),
+      row:[...row.children].slice(1).map(alignOf)});
+  const sum=$$('.stsum')[0];
+  if(sum){
+    ok('totals row uses the same template', sum.style.gridTemplateColumns===row.style.gridTemplateColumns,
+       {sum:sum.style.gridTemplateColumns, row:row.style.gridTemplateColumns});
+    ok('totals row gained the spacer too', sum.children.length===w.eval('tblCols.length')+1,
+       sum.children.length);
+  }
+  ok('row child count is still columns + 1',
+     $$('.strow').every(r=>r.children.length===w.eval('tblCols.length')+1),
+     [...new Set($$('.strow').map(r=>r.children.length))]);
+}
+
+console.log('== leaving bulk puts the slot back at the end ==');
+w.eval('setBulk(false); render();');
+{
+  const row=$$('.strow')[0];
+  ok('slot returns to the end', /\s26px$/.test(row.style.gridTemplateColumns),
+     row.style.gridTemplateColumns);
+  ok('remove handle is back', $$('.rowdel').length>0);
+  ok('no tick boxes outside bulk', $$('.evsel').length===0);
+  const hcols=D.querySelector('.sthead .stcols');
+  ok('header spacer removed again', hcols.children.length===w.eval('tblCols.length'), hcols.children.length);
+  ok('header still matches the rows', hcols.style.gridTemplateColumns===row.style.gridTemplateColumns,
+     {head:hcols.style.gridTemplateColumns, row:row.style.gridTemplateColumns});
+}
+w.eval('setBulk(true); state.sel.clear(); state.sel.add(9001); render();');
+ok('back in bulk, the selection round-trips', s.sel.has(9001), [...s.sel]);
+
 console.log('== a genuinely gone row is still pruned ==');
 w.eval('state.sel.add(999999); render();');
 ok('an id that is not on screen is dropped', !s.sel.has(999999), [...s.sel]);

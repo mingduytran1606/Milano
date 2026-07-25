@@ -377,6 +377,7 @@
     <button class="assign" id="newBtn" title="Add a stone order (or double-click an empty day)">+ New order</button>
     <button class="assign" id="bulkBtn" title="Select several orders and set their status together">☑ Bulk edit</button>
     <button class="assign" id="colsBtn" title="Choose the table columns">⚙ Columns</button>
+    <button class="assign" id="reloadBtn" title="Re-read everything from Grist (hold Shift to reload the widget itself)">↻ Refresh</button>
   </div>
   <div class="filterbar">
     <span class="count" id="title">Stone orders</span>
@@ -647,6 +648,16 @@ const isQuote=r=>/quote/i.test(stageOf(r));
 const escH=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
 const DASH='<span class="stzero">-</span>';
 const txtH=s=>(s==null||s==="")?DASH:escH(s);
+// Price per slab. Stone_Order.Product_Price_slab is a formula column ($Product.Price_Slab), so it
+// is normally already on the row; fall back to the linked catalogue row for the cases where the
+// widget has the catalogue loaded but the formula value has not come through yet. Unpriced products
+// read 0 in Grist (Numeric empty is 0, not null), which we show as "-" rather than "$0".
+function priceOf(r){
+  let v=num(r.Product_Price_slab);
+  if(!v){ const c=catFor(r); if(c) v=num(c.Price_Slab); }
+  if(!v) return "";
+  return "$"+(Math.round(v*100)/100).toLocaleString();
+}
 const STAGE_C={"Quote":"#FEF47A","Live":"#98FD90","WIP":"#CCFEFE","Completed":"#FECC81",
   "Cancelled":"#FFFFFF","Others":"#DCDCDC","Closed !":"#f0d1ed","On hold":"#FECBCC","Fix Job":"#e9edf1"};
 const stageColor=s=>STAGE_C[s]||"#e9edf1";
@@ -680,6 +691,9 @@ const COLDEF={
   inv:         {label:"Invoice",      w:100, edit:{f:"INV",t:"text"},  html:r=>txtH(r.INV)},
   note:        {label:"Note",         w:160, edit:{f:"Note",t:"text"}, html:r=>txtH(r.Note)},
   price:       {label:"$ / slab",     w:84,  align:"right",            html:r=>txtH(priceOf(r))},
+  // NOTE: priceOf() is defined below with the other row helpers. It was once referenced here
+  // without existing anywhere, which threw inside render() and blanked the whole widget the
+  // moment someone added this column. test-allcols.js now renders every column to catch that.
   assigned:    {label:"Assignees",    w:110, html:r=>{ const a=assigneesOf(r); return a.length?escH(a.join(", ")):DASH; }},
   flag:        {label:"",             w:34,  align:"centre",
                  html:r=>{ const f=dataFlags(r); return f.length
@@ -698,6 +712,15 @@ const colTemplate=()=>{
   const cols=tblCols.map(c=>"minmax("+c.w+"px,"+c.w+"fr)").join(" ");
   return state.bulk ? "26px "+cols : cols+" 26px";
 };
+// .agenda scrolls sideways, and a block/grid child of a scroll container is only as wide as the
+// VISIBLE area — so every horizontal rule (day boundary, row line, header underline) stopped dead
+// at the right edge of the pane instead of running the width of the table. Pinning an explicit
+// min-width equal to the column widths makes each of those boxes span the real table width.
+// Done in px rather than max-content deliberately: max-content would let cells size to their text
+// and blow out the fixed column widths, losing the ellipsis truncation.
+const HANDLE_PX=26;
+const colBodyPx=()=>tblCols.reduce((s,c)=>s+c.w,0)+HANDLE_PX;   // the columns grid
+const colRowPx =()=>dateColW+colBodyPx();                        // date gutter + columns
 const alignCls=a=>a==="right"?" r":a==="centre"?" c":"";
 const wrapFmt=(h,c)=>{ let s=h; if(c.u)s="<u>"+s+"</u>"; if(c.i)s="<i>"+s+"</i>"; if(c.b)s="<b>"+s+"</b>"; return s; };
 
@@ -847,9 +870,10 @@ function refreshDayToggles(){
   dayToggles.forEach(t=>{ t.el.textContent = t.ids.every(id=>state.sel.has(id)) ? "Clear day" : "Select day"; });
 }
 function stColHead(){
-  const h=$("div","sthead");
+  const h=$("div","sthead"); h.style.minWidth=colRowPx()+"px";
   h.appendChild($("div","stlab","Date · supplier"));
   const cols=$("div","stcols"); cols.style.gridTemplateColumns=colTemplate();
+  cols.style.minWidth=colBodyPx()+"px";
   if(state.bulk) cols.appendChild($("div","stlab"));   // spacer over the leading tick-box column
   tblCols.forEach(c=>{
     const def=COLDEF[c.k];
@@ -862,6 +886,7 @@ function stColHead(){
 function stRow(r){
   const row=$("div","strow");
   row.style.gridTemplateColumns=colTemplate();
+  row.style.minWidth=colBodyPx()+"px";
   if(state.bulk){                        // leads the row, so the boxes form one column down the left
     const box=document.createElement("input"); box.type="checkbox"; box.className="evsel";
     box.checked=state.sel.has(r.id); box.title="Select for bulk edit";
@@ -895,6 +920,7 @@ function stRow(r){
 function stSumRow(rows){
   const row=$("div","stsum");
   row.style.gridTemplateColumns=colTemplate();
+  row.style.minWidth=colBodyPx()+"px";
   if(state.bulk) row.appendChild($("div","stcell"));   // spacer under the leading tick-box column
   const labelAt=tblCols.length>1?1:0;
   tblCols.forEach((c,i)=>{
@@ -976,6 +1002,7 @@ function renderAgenda(byYmd,dayKeys){
     if(!evs.length && k!==todayK) return;                 // today stays as an anchor
     const rows=evs.map(e=>e.r);
     const day=$("div","ag-day tbl"+(k===todayK?" today":""));
+    day.style.minWidth=colRowPx()+"px";   // so the day-boundary rule runs the full table width
     const dc=$("div","ag-date");
     dc.appendChild(document.createTextNode(DOW[(d.getDay()+6)%7]+" "+d.getDate()+" "+MONTHS[d.getMonth()].slice(0,3)+" "+d.getFullYear()));
     if(k===todayK) dc.appendChild($("div","tdy","Today"));
@@ -1815,6 +1842,31 @@ async function pullTables(){
 }
 async function refetch(){ if(!state.grist)return; try{ await pullTables(); }catch(e){ console.warn("fetch failed",e); } render(); }
 
+// Manual refresh. Plain click re-reads every table from the doc, which covers the usual case of
+// someone else having edited rows in Grist. Shift-click reloads the widget FILE itself with a
+// cache-busting query, which is what is actually needed after a redeploy — the Grist iframe caches
+// the HTML hard enough that a normal browser refresh often keeps serving the old build.
+async function hardRefresh(reloadFile){
+  const btn=document.getElementById("reloadBtn");
+  if(reloadFile){
+    const u=location.pathname+"?r="+Date.now();
+    location.replace(u);
+    return;
+  }
+  const label=btn.textContent;
+  btn.disabled=true; btn.textContent="↻ Refreshing…";
+  try{
+    if(state.grist) await pullTables();
+    render();
+    btn.textContent="✓ Up to date";
+  }catch(e){
+    console.warn("refresh failed",e);
+    btn.textContent="Refresh failed";
+  }finally{
+    setTimeout(()=>{ btn.disabled=false; btn.textContent=label; },1400);
+  }
+}
+
 // ---- writing back to Grist ----
 // Grist stores a Date as epoch seconds at UTC midnight; a DateTime as a real instant, so for
 // those we send local midnight instead. Read back with the matching UTC/local parts.
@@ -1883,11 +1935,11 @@ const SAMPLE_JOBS=[
   { id:23, Job_ID:"J0023", Client_Label:"Louis",       Job_Address:"11 Banksia Ct, Croydon South VIC 3136",       Stage:"Complete",    Payment_Status:"Fully Paid",      Assigned_To:["L","Bea"] }
 ];
 const SAMPLE_CAT=[
-  {id:101,Supplier:"Lavistone",  Code:"LS303", Product_Full:"Lavistone · LS303 · Cararra Lux 20mm"},
-  {id:102,Supplier:"YDL",        Code:"1888",  Product_Full:"YDL · 1888 · Kalala Bianco 20mm"},
-  {id:103,Supplier:"Caesarstone",Code:"CS5100",Product_Full:"Caesarstone · CS5100 · Vanilla Noir 20mm"},
-  {id:104,Supplier:"Lavistone",  Code:"LSU401",Product_Full:"Lavistone · LSU401 · Taj Classico 20mm"},
-  {id:107,Supplier:"WF",         Code:"3420",  Product_Full:"WF · Marble · Biancatto 20mm"}
+  {id:101,Supplier:"Lavistone",  Code:"LS303", Price_Slab:630, Product_Full:"Lavistone · LS303 · Cararra Lux 20mm"},
+  {id:102,Supplier:"YDL",        Code:"1888",  Price_Slab:720, Product_Full:"YDL · 1888 · Kalala Bianco 20mm"},
+  {id:103,Supplier:"Caesarstone",Code:"CS5100",Price_Slab:1180,Product_Full:"Caesarstone · CS5100 · Vanilla Noir 20mm"},
+  {id:104,Supplier:"Lavistone",  Code:"LSU401",Price_Slab:950, Product_Full:"Lavistone · LSU401 · Taj Classico 20mm"},
+  {id:107,Supplier:"WF",         Code:"3420",  Price_Slab:0,   Product_Full:"WF · Marble · Biancatto 20mm"}
 ];
 // Dates chosen around July 2026 so the sample month is populated.
 const D=(y,m,d)=>Math.floor(Date.UTC(y,m-1,d)/1000);
@@ -1922,6 +1974,7 @@ const stoneSearch=document.getElementById("stoneSearch");
 stoneSearch.oninput=e=>{ state.searchQ=e.target.value; render(); };
 document.getElementById("searchClr").onclick=()=>{ state.searchQ=""; stoneSearch.value=""; render(); stoneSearch.focus(); };
 document.getElementById("colsBtn").onclick=e=>{ e.stopPropagation(); toggleColEditor(); };
+document.getElementById("reloadBtn").onclick=e=>{ e.stopPropagation(); closePops(); hardRefresh(e.shiftKey); };
 document.getElementById("newBtn").onclick=e=>{ e.stopPropagation(); closePops(); openNew(null); };
 document.getElementById("bulkBtn").onclick=e=>{ e.stopPropagation(); closePops(); setBulk(!state.bulk); };
 document.getElementById("bulkBar").onclick=e=>e.stopPropagation();

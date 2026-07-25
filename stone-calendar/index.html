@@ -303,6 +303,27 @@
   .nodate{padding:6px 10px;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
     color:var(--danger);background:var(--bg);border-bottom:1px solid var(--line)}
 
+  /* ---- column editor ---- */
+  .colrow{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:6px 9px;
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:7px}
+  .colname{font-size:12px;font-weight:600;color:var(--ink);width:118px;flex:0 0 118px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .colname.none{color:var(--muted);font-weight:500;font-style:italic}
+  .rotag{font-size:10px;font-weight:700;color:var(--muted);background:var(--panel);
+    border:1px solid var(--line);border-radius:4px;padding:1px 5px;white-space:nowrap}
+  .rotag.can{color:var(--accent-ink);border-color:var(--accent);background:var(--accent-soft)}
+  .fmtseg,.miniseg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .fmtseg button,.miniseg button{font:inherit;font-size:11px;font-weight:600;border:0;padding:3px 8px;
+    cursor:pointer;background:var(--panel);color:var(--muted)}
+  .fmtseg button{width:26px;padding:3px 0}
+  .fmtseg button+button,.miniseg button+button{border-left:1px solid var(--line)}
+  .fmtseg button.on,.miniseg button.on{background:var(--accent);color:#fff}
+  .fmtseg .fb{font-weight:700} .fmtseg .fi{font-style:italic} .fmtseg .fu{text-decoration:underline}
+  .coltog{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--ink);
+    background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:6px 10px;
+    cursor:pointer;margin-bottom:11px;width:fit-content}
+  .coltog input{width:15px;height:15px;accent-color:var(--accent);margin:0;cursor:pointer}
+
   .demo-tag{position:fixed;bottom:9px;left:11px;font-size:10px;color:var(--muted);background:var(--panel);
     border:1px solid var(--line);border-radius:20px;padding:2px 9px;opacity:.75;z-index:40}
 </style>
@@ -320,7 +341,7 @@
     <button class="assign" id="assignBtn">All assignees ▾</button>
     <button class="assign" id="newBtn" title="Add a stone order (or double-click an empty day)">+ New order</button>
     <button class="assign" id="bulkBtn" title="Select several orders and set their status together">☑ Bulk edit</button>
-    <button class="assign" id="cardsBtn" title="Customise how cards appear">⚙ Cards</button>
+    <button class="assign" id="colsBtn" title="Choose the table columns">⚙ Columns</button>
   </div>
   <div class="filterbar">
     <span class="count" id="title">Stone orders</span>
@@ -480,48 +501,53 @@ const state={
 };
 window._stonecal=state;
 
-// ---- customisable card template (mirrors the installations calendar) ----
-// The event card is a row of 1–4 SECTIONS (columns). Each section holds a bit of
-// markdown-ish template: **bold**, *italic*, {token}, ==coloured bar==, --- divider,
-// \n = new line, plus a style (plain / pill / in-highlight) and an alignment.
-const STYLES=["plain","pill","highlight"];        // highlight = pill in the line's Order_Status colour
-const ALIGNS=["left","centre","right"];
-const DEFAULT_EVENT_COLS=[{ tpl:'**{client}** · {product}', style:'plain', align:'left', width:1 }];
-let eventCardCols=cloneCols(DEFAULT_EVENT_COLS);
-let cardScope='everyone', eventCardFont=10.5;
-const CARD_LS='milano_stonecal_cards';
-const EVENT_TOKENS={ client:'Client', job:'Job ID', stage:'Job stage', payment:'Payment status', address:'Address', product:'Product', supplier:'Supplier',
-  code:'Product code', status:'Status pill', scope:'Scope qty', ordered:'Ordered qty', delivered:'Delivered qty', action:'What’s happening',
-  orderdate:'Order date', deliverydate:'Delivery date', inv:'Invoice #', note:'Note', price:'$ / slab', assigned:'Assignee avatars' };
-function cloneCols(cols){ return (cols||[]).map(c=>({ tpl:String(c.tpl||""),
-  style:STYLES.includes(c.style)?c.style:'plain', align:ALIGNS.includes(c.align)?c.align:'left',
-  width:Math.max(1,Math.min(6,Math.round(Number(c.width)||1))) })); }
-// Accept either the new columns array or an old single-string template.
-function normaliseCols(v){
-  if(Array.isArray(v) && v.length) return cloneCols(v).slice(0,4);
-  if(typeof v==="string" && v.trim()) return [{ tpl:v, style:'plain', align:'left' }];
-  return cloneCols(DEFAULT_EVENT_COLS);
-}
-function applyCardFonts(){ document.documentElement.style.setProperty("--ev-card-font",eventCardFont+"px"); }
-function loadLocalCards(){ try{ return JSON.parse(localStorage.getItem(CARD_LS)||"{}")||{}; }catch(e){ return {}; } }
-// View preferences that stick between sessions, per person (like the card design above).
-// Kept out of grist.setOption on purpose: the agenda direction is a personal habit, not
-// something one operator should change for everyone.
 const PREF_LS='milano_stonecal_prefs';
+// Table columns persist the same way the card design did: kept locally per person, and publishable
+// to everyone through grist.setOption so one operator can set the shared default.
+const TBL_LS='milano_stonecal_table';
+let colScope='everyone';
+// Only accept known column keys and sane values, so a stale or hand-edited option can't break the grid.
+function normaliseTblCols(v){
+  if(!Array.isArray(v)) return null;
+  const out=[];
+  v.forEach(c=>{
+    const k=c&&c.k; if(!k||!COLDEF[k]||out.some(o=>o.k===k)) return;
+    out.push({ k, w:Math.max(30,Math.min(320,Math.round(Number(c.w)||COLDEF[k].w))),
+      align:["left","centre","right"].includes(c.align)?c.align:(COLDEF[k].align||"left"),
+      style:c.style==="pill"?"pill":"plain",
+      b:!!c.b, i:!!c.i, u:!!c.u });
+  });
+  return out.length?out:null;
+}
+function loadTablePrefs(){
+  try{
+    const p=JSON.parse(localStorage.getItem(TBL_LS)||"{}")||{};
+    const cols=normaliseTblCols(p.cols); if(cols) tblCols=cols;
+    if(typeof p.totals==="boolean") showTotals=p.totals;
+    if(p.scope==="me"||p.scope==="everyone") colScope=p.scope;
+  }catch(e){}
+}
+function saveTablePrefs(){
+  try{ localStorage.setItem(TBL_LS,JSON.stringify({cols:tblCols,totals:showTotals,scope:colScope})); }catch(e){}
+}
+function publishTableCols(){
+  try{ grist.setOption("tblCols",tblCols); grist.setOption("tblTotals",showTotals); }catch(e){}
+}
 function loadPrefs(){ try{ const p=JSON.parse(localStorage.getItem(PREF_LS)||"{}")||{};
   if(p.sort==="asc"||p.sort==="desc") state.sortDir=p.sort; }catch(e){} }
 function savePrefs(){ try{ localStorage.setItem(PREF_LS,JSON.stringify({sort:state.sortDir})); }catch(e){} }
 function saveLocalCards(){ try{ localStorage.setItem(CARD_LS,JSON.stringify({cols:eventCardCols,scope:cardScope,ef:eventCardFont})); }catch(e){} }
 function publishCards(){ try{ grist.setOption("eventCardCols",eventCardCols);
   grist.setOption("eventCardFont",eventCardFont); }catch(e){} }
-function applyGristOptions(opts){ if(!opts)return;
-  const mod=document.getElementById("cardModal"); const editing=mod&&mod.classList.contains("open");
-  if(cardScope!=="me" && !editing){
-    if(opts.eventCardCols!=null) eventCardCols=normaliseCols(opts.eventCardCols);
-    else if(typeof opts.eventCardTpl==="string") eventCardCols=normaliseCols(opts.eventCardTpl);
-    if(typeof opts.eventCardFont==="number") eventCardFont=opts.eventCardFont;
-    applyCardFonts(); render();
-  }
+function applyGristOptions(opts){
+  if(!opts) return;
+  const mod=document.getElementById("cardModal");
+  const editing=mod&&mod.classList.contains("open");
+  if(colScope==="me" || editing) return;          // don't yank the layout out from under an editor
+  const cols=normaliseTblCols(opts.tblCols);
+  if(cols) tblCols=cols;
+  if(typeof opts.tblTotals==="boolean") showTotals=opts.tblTotals;
+  render();
 }
 
 // ---- lookups ----
@@ -910,134 +936,6 @@ function renderAgenda(byYmd,dayKeys){
   });
 }
 
-// ---- template engine (markdown-ish → DOM), ported from the installations calendar ----
-// Connector = whitespace / punctuation that only makes sense *between* two values.
-// The bare multiplier "x" / "×" counts too, so "{ordered} x {product}" collapses to just the
-// product when nothing was ordered (WF/Aboda etc. deliver without us placing an order).
-const CARD_CONNECTOR=/^[\s·•|/\\,;:–—()\[\].-]*[x×]?[\s·•|/\\,;:–—()\[\].-]*$/;
-// Parse a line into ordered parts: {text} literals and {node,empty} rendered tokens/format.
-function inlineParts(str,tokens,ctx){
-  const re=/\*\*([^*]+)\*\*|\*([^*]+)\*|==([^=]+)==|\{([a-z_]+)\}|([^{*=]+)|([\s\S])/g;
-  const has=el=>!!(el.textContent.trim()||el.children.length);
-  const parts=[]; let m;
-  while((m=re.exec(str))){
-    if(m[1]!=null){ const b=document.createElement("strong"); renderCardInline(m[1],tokens,b,ctx); parts.push({node:b,empty:!has(b)}); }
-    else if(m[2]!=null){ const it=document.createElement("em"); renderCardInline(m[2],tokens,it,ctx); parts.push({node:it,empty:!has(it)}); }
-    else if(m[3]!=null){ const bar=$("span","cbar"); if(ctx&&ctx.bar){ bar.style.background=ctx.bar.fill||"var(--line)"; bar.style.color=ctx.bar.text||"var(--ink)"; }
-      renderCardInline(m[3],tokens,bar,ctx); parts.push({node:bar,empty:!has(bar)}); }
-    else if(m[4]!=null){ const fn=tokens[m[4]];
-      if(fn){ const el=fn();
-        if(el==null) parts.push({empty:true});
-        else parts.push({node: typeof el==="string"?document.createTextNode(el):el, empty: typeof el==="string" && !el.trim()}); }
-      else parts.push({text:"{"+m[4]+"}"}); }
-    else parts.push({text: m[5]!=null?m[5]:m[6]});
-  }
-  return parts;
-}
-// Drop empty token parts, then any connector text left dangling at the ends or next to a
-// removed token, so an absent {scope}/{ordered}/… takes its surrounding "·", ":" etc. with it.
-function keepParts(parts){
-  const seq=parts.filter(p=>!p.empty).map(p=>{
-    if(p.text!=null) return { kind: CARD_CONNECTOR.test(p.text) ? "conn" : "text", text:p.text };
-    return { kind:"node", node:p.node };
-  });
-  const out=[];
-  for(const x of seq){ if(x.kind==="conn" && (!out.length || out[out.length-1].kind==="conn")) continue; out.push(x); }
-  while(out.length && out[out.length-1].kind==="conn") out.pop();
-  return out;
-}
-function renderCardTemplate(str,tokens,host,ctx){
-  const added=[];
-  String(str==null?"":str).split("\n").forEach(lineStr=>{
-    if(/^\s*(-{3,}|—+|\*{3,})\s*$/.test(lineStr)){ const hr=$("div","cdivider"); host.appendChild(hr); added.push(hr); return; }
-    const kept=keepParts(inlineParts(lineStr,tokens,ctx));
-    if(!kept.length) return;                                   // nothing left to show → drop line
-    const line=$("div","cline");
-    kept.forEach(pt=>line.appendChild(pt.node!==undefined?pt.node:document.createTextNode(pt.text)));
-    host.appendChild(line); added.push(line);
-  });
-  added.forEach((el,i)=>{ if(!el.classList.contains("cdivider"))return; let after=false;
-    for(let k=i+1;k<added.length;k++){ const n=added[k]; if(n.classList.contains("cdivider"))break; if(n.textContent.trim()||n.children.length){after=true;break;} }
-    if(!after&&el.parentNode) el.parentNode.removeChild(el); });
-}
-function renderCardInline(str,tokens,host,ctx,stats){
-  const re=/\*\*([^*]+)\*\*|\*([^*]+)\*|==([^=]+)==|\{([a-z_]+)\}|([^{*=]+)|([\s\S])/g; let m;
-  const has=el=>el.textContent.trim()||el.children.length;
-  while((m=re.exec(str))){
-    if(m[1]!=null){ const b=document.createElement("strong"); renderCardInline(m[1],tokens,b,ctx,stats); if(has(b))host.appendChild(b); }
-    else if(m[2]!=null){ const it=document.createElement("em"); renderCardInline(m[2],tokens,it,ctx,stats); if(has(it))host.appendChild(it); }
-    else if(m[3]!=null){ const bar=$("span","cbar"); if(ctx&&ctx.bar){ bar.style.background=ctx.bar.fill||"var(--line)"; bar.style.color=ctx.bar.text||"var(--ink)"; }
-      renderCardInline(m[3],tokens,bar,ctx,stats); if(has(bar))host.appendChild(bar); }
-    else if(m[4]!=null){ const fn=tokens[m[4]];
-      if(fn){ if(stats)stats.tokens++; const el=fn(); if(el!=null){ if(stats)stats.filled++; host.appendChild(typeof el==="string"?document.createTextNode(el):el); } }
-      else host.appendChild(document.createTextNode("{"+m[4]+"}")); }
-    else host.appendChild(document.createTextNode(m[5]!=null?m[5]:m[6]));
-  }
-}
-function pillEl(s){ const t=softTint(statusColor(s)); const p=$("span","cpill"); p.style.background=t.bg;
-  const d=$("span","cpd"); d.style.background=t.dot; p.appendChild(d); p.appendChild(document.createTextNode(statusLabel(s))); return p; }
-function avatarsEl(list){ if(!list||!list.length)return null; const w=$("span","avwrap");
-  list.slice(0,4).forEach(n=>{ if(!n)return; const a=$("span","av"); a.style.background=avatarColor(n); a.textContent=initials(n); a.title=n; w.appendChild(a); }); return w; }
-function priceOf(r){ const c=catFor(r); const v=(r.Product_Price_slab!=null&&r.Product_Price_slab!=="")?r.Product_Price_slab:(c?c.Price_Slab:null);
-  return (v!=null&&v!=="")?("$"+v):null; }
-// ---- "what's happening" phrase ----
-// Some suppliers (WF, Aboda, client-supplied) are never *ordered* by us, we just wait for the
-// stone to turn up, so those rows carry no Ordered_Qty and the card has nothing to say. This
-// turns Order_Status + the quantities into a plain-English line for exactly those rows.
-// Matched on keywords, not exact choice values, so renaming/adding a Grist choice degrades to
-// "<Status>: 2 slabs" rather than going blank.
-function slabs(n){ return n+" slab"+(n===1?"":"s"); }
-function actionText(r){
-  const s=String(r.Order_Status||"").trim();
-  const scope=num(r.Scope_Qty), del=num(r.Delivery_Qty), ord=num(r.Ordered_Qty);
-  const out=Math.max(0,(scope||ord)-del);                  // still to come
-  const qty=n=>n?(": "+slabs(n)):"";                       // ": 2 slabs", or nothing when unknown
-  const of=(verb,n)=>n?(verb+" "+slabs(n)):verb;           // "Return 2 slabs" / "Return"
-  if(!s) return "To sort";
-  if(/n\/a/i.test(s)) return null;
-  if(/cancel/i.test(s)) return "Cancelled";
-  if(/await/i.test(s)&&/pick/i.test(s)) return "Pick up to be booked"+qty(out);
-  if(/milano/i.test(s)&&/pick/i.test(s)) return of("Milano to pick up",out);
-  if(/await/i.test(s)&&/order/i.test(s)) return of("To order",out);
-  if(/placed/i.test(s)||/not deliver/i.test(s)) return out?("Awaiting "+slabs(out)+" to deliver"):"Awaiting delivery";
-  if(isDeliveredStatus(r)){
-    const by=(s.match(/deliver(?:ed)?\s+by\s+(.+)$/i)||[])[1];
-    const who=by?(" by "+by.trim()):"";
-    if(del&&scope&&del<scope) return "Delivered "+del+" of "+slabs(scope)+who;
-    if(del) return "Delivered "+slabs(del)+who;
-    return "Delivered"+who;
-  }
-  if(/return/i.test(s)) return of("Return",del||out);
-  if(/hold/i.test(s)) return "On hold"+qty(out);
-  if(/no stock/i.test(s)) return "No stock"+qty(out);
-  return s+qty(out);
-}
-function eventCardTokens(e){
-  const r=e.r, j=jobFor(r);
-  return {
-    client:()=>txtNode(jobClient(j)),
-    job:()=>txtNode(jobCode(j)),
-    stage:()=>txtNode((j&&String(j.Stage||"").trim())||null),
-    // From the job, like {stage}: plain text, so a column styled pill/highlight wraps it.
-    payment:()=>txtNode((j&&String(j.Payment_Status||"").trim())||null),
-    address:()=>txtNode((String((j&&(j.Address_Formatted||j.Job_Address))||"")).trim()||null),
-    product:()=>txtNode(stoneLabel(r)),
-    supplier:()=>txtNode(r.Product_Supplier||(catFor(r)&&catFor(r).Supplier)||null),
-    code:()=>txtNode(r.Product_Code||null),
-    status:()=>pillEl(r.Order_Status),
-    scope:()=>txtNode(num(r.Scope_Qty)?("Scope "+num(r.Scope_Qty)):null),
-    ordered:()=>txtNode(num(r.Ordered_Qty)?("Ord "+num(r.Ordered_Qty)):null),
-    delivered:()=>txtNode(num(r.Delivery_Qty)?("Deliv "+num(r.Delivery_Qty)):null),
-    // Only fills the gap left by a missing order number. Ordered rows already read fine.
-    action:()=>num(r.Ordered_Qty)?null:txtNode(actionText(r)),
-    orderdate:()=>txtNode(toDate(r.Order_Date)?fmtDMY(r.Order_Date):null),
-    deliverydate:()=>txtNode(toDate(r.Delivery_Date)?fmtDMY(r.Delivery_Date):null),
-    inv:()=>txtNode(r.INV||null),
-    note:()=>txtNode(r.Note||null),
-    price:()=>txtNode(priceOf(r)),
-    assigned:()=>avatarsEl(assigneesOf(r))
-  };
-}
 // ---- data-cleanliness flags ----
 // Half-filled delivery information is the thing that quietly rots this table, so each line is
 // checked and the ones that don't add up get an exclamation mark on the calendar. Cancelled and
@@ -1180,110 +1078,112 @@ async function deleteRow(r){
 }
 
 // ---- card editor modal ----
-function openCardEditor(){ document.getElementById("cardModal").classList.add("open"); renderCardEditor(); }
-function closeCardEditor(){ document.getElementById("cardModal").classList.remove("open"); }
-function renderCardEditor(){
+function openColEditor(){ document.getElementById("cardModal").classList.add("open"); renderColEditor(); }
+function closeColEditor(){ document.getElementById("cardModal").classList.remove("open"); }
+// One row per column: the heading (fixed, it IS the field), whether cells are editable, bold /
+// italic / underline, plain or pill, alignment, width, and where it sits.
+function renderColEditor(){
   const body=document.getElementById("ceBody"); body.innerHTML="";
-  if(!eventCardCols.length) eventCardCols=cloneCols(DEFAULT_EVENT_COLS);
+  const tab=document.querySelector("#cardModal .ce-tab"); if(tab) tab.textContent="Columns";
   const note=$("div","ce-note");
-  note.innerHTML="The chip shown for each stone order. Each <b>section</b> is a column laid side-by-side. "
-    +"Per column choose an alignment and a style: <b>plain</b>, a <b>pill</b>, or <b>in highlight</b> "
-    +"(a pill in the order's status colour). Inside a section use **bold**, *italic*, {tokens}, --- divider, ==coloured bar==.";
+  note.innerHTML="The table columns, left to right. Headings are fixed because they name the "
+    +"Grist field the column reads. <b>Editable</b> columns can be changed straight in the table.";
   body.appendChild(note);
 
-  let activeTa=null;                                   // last-focused section: the token chips insert here
-  function commit(){ saveLocalCards(); render(); }
+  const tog=document.createElement("label"); tog.className="coltog";
+  const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=showTotals;
+  cb.onchange=()=>{ showTotals=cb.checked; saveTablePrefs(); render(); };
+  tog.appendChild(cb);
+  tog.appendChild(document.createTextNode("Show a total row under each day"));
+  body.appendChild(tog);
 
-  body.appendChild($("div","ce-sechead","Sections (columns)"));
-  eventCardCols.forEach((col,i)=>{
-    const sec=$("div","ce-sec");
-    const top=$("div","ce-sec-top");
-    top.appendChild($("span","ce-sec-n","Column "+(i+1)));
-    const up=$("span","ce-sec-mv"+(i===0?" off":""),"↑"); up.title="Move left";
-    up.onclick=()=>{ if(i>0){ const a=eventCardCols; [a[i-1],a[i]]=[a[i],a[i-1]]; commit(); renderCardEditor(); } };
-    const dn=$("span","ce-sec-mv"+(i===eventCardCols.length-1?" off":""),"↓"); dn.title="Move right";
-    dn.onclick=()=>{ const a=eventCardCols; if(i<a.length-1){ [a[i+1],a[i]]=[a[i],a[i+1]]; commit(); renderCardEditor(); } };
-    const rm=$("span","ce-sec-x"+(eventCardCols.length<=1?" off":""),"×"); rm.title="Remove column";
-    rm.onclick=()=>{ if(eventCardCols.length>1){ eventCardCols.splice(i,1); commit(); renderCardEditor(); } };
-    top.appendChild(up); top.appendChild(dn); top.appendChild(rm);
-    sec.appendChild(top);
+  const commit=()=>{ saveTablePrefs(); render(); };
 
-    const ta=document.createElement("textarea"); ta.className="ce-sta"; ta.spellcheck=false; ta.value=col.tpl;
-    ta.placeholder="e.g. **{client}**";
-    ta.addEventListener("input",()=>{ col.tpl=ta.value; commit(); });
-    ta.addEventListener("focus",()=>{ activeTa={ta,col}; });
-    if(!activeTa) activeTa={ta,col};
-    sec.appendChild(ta);
+  body.appendChild($("div","ce-sechead","Columns shown"));
+  tblCols.forEach((c,i)=>{
+    const def=COLDEF[c.k];
+    const row=$("div","colrow");
+    const nm=$("div","colname"+(def.label?"":" none"), def.label||"(no heading)");
+    nm.title="The heading is the field this column reads";
+    row.appendChild(nm);
+    const tag=$("span","rotag"+(def.edit?" can":""), def.edit?"editable":"read-only");
+    tag.title=def.edit?"Cells can be edited in the table":"Comes from the job or the catalogue";
+    row.appendChild(tag);
 
-    const opts=$("div","ce-secopts");
-    opts.appendChild($("span","ce-optlab","Style"));
-    const styleSeg=$("div","ce-segm");
-    [["plain","Plain"],["pill","Pill"],["highlight","Highlight"]].forEach(([v,lab])=>{
-      const b=document.createElement("button"); b.type="button"; b.textContent=lab; if(col.style===v)b.className="on";
-      b.onclick=()=>{ col.style=v; commit(); renderCardEditor(); }; styleSeg.appendChild(b); });
-    opts.appendChild(styleSeg);
-    opts.appendChild($("span","ce-optlab","Align"));
-    const alignSeg=$("div","ce-segm");
-    [["left","L","Left"],["centre","C","Centre"],["right","R","Right"]].forEach(([v,lab,title])=>{
-      const b=document.createElement("button"); b.type="button"; b.textContent=lab; b.title=title; if(col.align===v)b.className="on";
-      b.onclick=()=>{ col.align=v; commit(); renderCardEditor(); }; alignSeg.appendChild(b); });
-    opts.appendChild(alignSeg);
-    // per-column width (relative: how much of the card this column takes)
-    opts.appendChild($("span","ce-optlab","Width"));
-    const wStep=$("div","ce-wstep");
-    const wMinus=document.createElement("button"); wMinus.type="button"; wMinus.className="ce-fbtn"; wMinus.textContent="−";
-    wMinus.title="Narrower"; wMinus.onclick=()=>{ col.width=Math.max(1,(col.width||1)-1); commit(); renderCardEditor(); };
-    const wVal=$("span","ce-fval",(col.width||1)+"×");
-    const wPlus=document.createElement("button"); wPlus.type="button"; wPlus.className="ce-fbtn"; wPlus.textContent="+";
-    wPlus.title="Wider"; wPlus.onclick=()=>{ col.width=Math.min(6,(col.width||1)+1); commit(); renderCardEditor(); };
-    wStep.appendChild(wMinus); wStep.appendChild(wVal); wStep.appendChild(wPlus);
-    opts.appendChild(wStep);
-    sec.appendChild(opts);
-    body.appendChild(sec);
+    const fmt=$("div","fmtseg");
+    [["b","B","fb","Bold"],["i","I","fi","Italic"],["u","U","fu","Underline"]].forEach(spec=>{
+      const b=document.createElement("button"); b.type="button"; b.textContent=spec[1];
+      b.className=spec[2]+(c[spec[0]]?" on":""); b.title=spec[3];
+      b.onclick=()=>{ c[spec[0]]=!c[spec[0]]; commit(); renderColEditor(); };
+      fmt.appendChild(b); });
+    row.appendChild(fmt);
+
+    const st=$("div","miniseg");
+    [["plain","Plain"],["pill","Pill"]].forEach(spec=>{
+      const b=document.createElement("button"); b.type="button"; b.textContent=spec[1];
+      if(c.style===spec[0]) b.className="on";
+      b.onclick=()=>{ c.style=spec[0]; commit(); renderColEditor(); };
+      st.appendChild(b); });
+    row.appendChild(st);
+
+    const al=$("div","miniseg");
+    [["left","L","Left"],["centre","C","Centre"],["right","R","Right"]].forEach(spec=>{
+      const b=document.createElement("button"); b.type="button"; b.textContent=spec[1]; b.title=spec[2];
+      if(c.align===spec[0]) b.className="on";
+      b.onclick=()=>{ c.align=spec[0]; commit(); renderColEditor(); };
+      al.appendChild(b); });
+    row.appendChild(al);
+
+    const sp=document.createElement("span"); sp.style.flex="1 1 auto"; row.appendChild(sp);
+
+    const wrap=$("div","ce-wstep");
+    const minus=document.createElement("button"); minus.type="button"; minus.className="ce-fbtn";
+    minus.textContent="−"; minus.title="Narrower";
+    minus.onclick=()=>{ c.w=Math.max(30,c.w-14); commit(); renderColEditor(); };
+    const val=$("span","ce-fval",c.w+"px");
+    const plus=document.createElement("button"); plus.type="button"; plus.className="ce-fbtn";
+    plus.textContent="+"; plus.title="Wider";
+    plus.onclick=()=>{ c.w=Math.min(320,c.w+14); commit(); renderColEditor(); };
+    wrap.appendChild(minus); wrap.appendChild(val); wrap.appendChild(plus);
+    row.appendChild(wrap);
+
+    const up=$("span","ce-sec-mv"+(i===0?" off":""),"←"); up.title="Move left";
+    up.onclick=()=>{ if(i>0){ tblCols.splice(i-1,0,tblCols.splice(i,1)[0]); commit(); renderColEditor(); } };
+    const dn=$("span","ce-sec-mv"+(i===tblCols.length-1?" off":""),"→"); dn.title="Move right";
+    dn.onclick=()=>{ if(i<tblCols.length-1){ tblCols.splice(i+1,0,tblCols.splice(i,1)[0]); commit(); renderColEditor(); } };
+    const rm=$("span","ce-sec-x"+(tblCols.length<=1?" off":""),"×"); rm.title="Remove column";
+    rm.onclick=()=>{ if(tblCols.length>1){ tblCols.splice(i,1); commit(); renderColEditor(); } };
+    row.appendChild(up); row.appendChild(dn); row.appendChild(rm);
+    body.appendChild(row);
   });
 
-  const add=document.createElement("button"); add.type="button"; add.className="ce-addsec";
-  add.textContent="＋ Add section (column)"; add.disabled=eventCardCols.length>=4;
-  add.onclick=()=>{ if(eventCardCols.length<4){ eventCardCols.push({tpl:"",style:"plain",align:"left",width:1}); commit(); renderCardEditor(); } };
-  body.appendChild(add);
+  const rest=Object.keys(COLDEF).filter(k=>!tblCols.some(c=>c.k===k));
+  if(rest.length){
+    body.appendChild($("div","ce-sechead","Add a column"));
+    const av=$("div","ce-tokens");
+    rest.forEach(k=>{
+      const b=document.createElement("button"); b.type="button"; b.className="ce-tok";
+      b.textContent="+ "+(COLDEF[k].label||"Flag");
+      b.onclick=()=>{ tblCols.push(mkCol(k)); commit(); renderColEditor(); };
+      av.appendChild(b); });
+    body.appendChild(av);
+  }
 
-  // shared token palette: inserts into the last-focused section
-  const toks=$("div","ce-tokens");
-  const insert=text=>{ const a=activeTa; if(!a||!a.ta) return; const t=a.ta;
-    const s=t.selectionStart||0,en=t.selectionEnd||0;
-    t.value=t.value.slice(0,s)+text+t.value.slice(en); t.focus(); t.selectionStart=t.selectionEnd=s+text.length;
-    a.col.tpl=t.value; commit(); };
-  Object.keys(EVENT_TOKENS).forEach(k=>{ const chip=document.createElement("button"); chip.type="button"; chip.className="ce-tok";
-    chip.innerHTML="<code>{"+k+"}</code><span>"+EVENT_TOKENS[k]+"</span>"; chip.title="Insert {"+k+"} into the selected section";
-    chip.addEventListener("mousedown",e=>e.preventDefault());
-    chip.addEventListener("click",()=>insert("{"+k+"}")); toks.appendChild(chip); });
-  const divChip=document.createElement("button"); divChip.type="button"; divChip.className="ce-tok";
-  divChip.innerHTML="<code>---</code><span>Divider</span>"; divChip.addEventListener("mousedown",e=>e.preventDefault());
-  divChip.addEventListener("click",()=>insert("\n---\n")); toks.appendChild(divChip);
-  const barChip=document.createElement("button"); barChip.type="button"; barChip.className="ce-tok";
-  barChip.innerHTML="<code>== ==</code><span>Coloured bar</span>"; barChip.addEventListener("mousedown",e=>e.preventDefault());
-  barChip.addEventListener("click",()=>insert("=={client}==")); toks.appendChild(barChip);
-  body.appendChild(toks);
-
-  const reset=$("div","ce-reset","↩ Reset card to default");
-  reset.addEventListener("click",()=>{ eventCardCols=cloneCols(DEFAULT_EVENT_COLS); commit(); renderCardEditor(); });
-  body.appendChild(reset);
-  const fRow=$("div","ce-fontrow"); fRow.appendChild($("span","ce-flabel","Text size"));
-  const fVal=$("span","ce-fval"); const showF=()=>fVal.textContent=eventCardFont+"px";
-  const stepF=d=>{ let cur=Math.max(9,Math.min(20,Math.round((eventCardFont+d)*10)/10));
-    eventCardFont=cur; applyCardFonts(); saveLocalCards(); showF(); render(); };
-  const fMinus=document.createElement("button"); fMinus.type="button"; fMinus.className="ce-fbtn"; fMinus.textContent="−"; fMinus.onclick=()=>stepF(-0.5);
-  const fPlus=document.createElement("button"); fPlus.type="button"; fPlus.className="ce-fbtn"; fPlus.textContent="+"; fPlus.onclick=()=>stepF(0.5);
-  showF(); fRow.appendChild(fMinus); fRow.appendChild(fVal); fRow.appendChild(fPlus); body.appendChild(fRow);
-  const foot=$("div","ce-foot"); const scopeNote=$("div","ce-scope");
-  const setNote=msg=>scopeNote.textContent=msg||(cardScope==="me"?"Using your own design (just for you).":"Following the shared design (everyone sees it).");
+  const foot=$("div","ce-foot");
+  const scopeNote=$("div","ce-note");
+  const setNote=msg=>{ scopeNote.textContent = msg || (colScope==="me"
+    ? "Saved just for you. Everyone else keeps the shared columns."
+    : "These columns are shared with everyone using this widget."); };
   setNote(); foot.appendChild(scopeNote);
   const row=$("div","ce-btnrow");
-  const bMe=document.createElement("button"); bMe.type="button"; bMe.className="ce-save ghost"; bMe.textContent="Save just for me";
-  bMe.onclick=()=>{ cardScope="me"; saveLocalCards(); setNote("Saved. Just for you."); };
-  const bAll=document.createElement("button"); bAll.type="button"; bAll.className="ce-save primary"; bAll.textContent="Save for everyone";
-  bAll.onclick=()=>{ cardScope="everyone"; publishCards(); saveLocalCards(); setNote("Saved. Shared with everyone."); };
-  row.appendChild(bMe); row.appendChild(bAll); foot.appendChild(row); body.appendChild(foot);
+  const bMe=document.createElement("button"); bMe.type="button"; bMe.className="ce-save ghost";
+  bMe.textContent="Save just for me";
+  bMe.onclick=()=>{ colScope="me"; saveTablePrefs(); setNote("Saved. Just for you."); };
+  const bAll=document.createElement("button"); bAll.type="button"; bAll.className="ce-save primary";
+  bAll.textContent="Save for everyone";
+  bAll.onclick=()=>{ colScope="everyone"; publishTableCols(); saveTablePrefs(); setNote("Saved. Shared with everyone."); };
+  row.appendChild(bMe); row.appendChild(bAll); foot.appendChild(row);
+  body.appendChild(foot);
 }
 // ============================================================
 //  EDIT PANEL: double-click a chip
@@ -1887,7 +1787,7 @@ document.getElementById("sortPop").onclick=e=>e.stopPropagation();
 const stoneSearch=document.getElementById("stoneSearch");
 stoneSearch.oninput=e=>{ state.searchQ=e.target.value; render(); };
 document.getElementById("searchClr").onclick=()=>{ state.searchQ=""; stoneSearch.value=""; render(); stoneSearch.focus(); };
-document.getElementById("cardsBtn").onclick=e=>{ e.stopPropagation(); openCardEditor(); };
+document.getElementById("colsBtn").onclick=e=>{ e.stopPropagation(); openColEditor(); };
 document.getElementById("newBtn").onclick=e=>{ e.stopPropagation(); closePops(); openNew(null); };
 document.getElementById("bulkBtn").onclick=e=>{ e.stopPropagation(); closePops(); setBulk(!state.bulk); };
 document.getElementById("bulkBar").onclick=e=>e.stopPropagation();
@@ -1896,8 +1796,8 @@ document.getElementById("bulkApply").onclick=()=>applyBulk();
 document.getElementById("editClose").onclick=()=>tryCloseEdit();
 document.getElementById("editModal").onclick=e=>{ if(e.target.id==="editModal") tryCloseEdit(); };
 document.getElementById("cfBox").onclick=e=>{ if(e.target.id==="cfBox") closeConfirm(null); };
-document.getElementById("cardClose").onclick=closeCardEditor;
-document.getElementById("cardModal").onclick=e=>{ if(e.target.id==="cardModal") closeCardEditor(); };
+document.getElementById("cardClose").onclick=closeColEditor;
+document.getElementById("cardModal").onclick=e=>{ if(e.target.id==="cardModal") closeColEditor(); };
 document.getElementById("dayPop").onclick=e=>e.stopPropagation();
 document.addEventListener("click",closePops);
 document.addEventListener("keydown",e=>{
@@ -1909,13 +1809,8 @@ document.addEventListener("keydown",e=>{
   closePops();
 });
 
-// restore any personal card design
-{ const lc=loadLocalCards();
-  if(lc.cols!=null) eventCardCols=normaliseCols(lc.cols);
-  else if(typeof lc.event==="string") eventCardCols=normaliseCols(lc.event);
-  if(lc.scope==="me"||lc.scope==="everyone") cardScope=lc.scope;
-  if(typeof lc.ef==="number") eventCardFont=lc.ef;
-  applyCardFonts(); }
+// restore this person's table columns and their totals preference
+loadTablePrefs();
 loadPrefs();                                   // restore the saved agenda direction
 if(!state.ref.product) state.ref.product=DEMO_REF.product;
 if(!state.ref.client)  state.ref.client=DEMO_REF.client;

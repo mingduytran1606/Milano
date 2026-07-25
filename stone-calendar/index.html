@@ -768,7 +768,7 @@ function eventChip(e){
   box.checked=state.sel.has(r.id); box.title="Select for bulk edit";
   box.onclick=ev=>ev.stopPropagation();
   box.onchange=()=>{ if(box.checked) state.sel.add(r.id); else state.sel.delete(r.id); renderBulkBar(); };
-  row.appendChild(box); row.appendChild(chip);
+  row.appendChild(chip); row.appendChild(box);        // tick box sits to the right of the chip
   return row;
 }
 

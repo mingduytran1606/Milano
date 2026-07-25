@@ -211,6 +211,10 @@
   .assign.on{background:var(--accent-soft);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
   .evrow{display:flex;align-items:center;gap:8px;min-width:0}
   .evrow .ev{flex:1 1 auto;min-width:0}
+  /* fixed slot after the chip so chips align whether or not the line is flagged */
+  .evgut{flex:0 0 14px;display:flex;justify-content:center;align-items:center}
+  .evflag{width:14px;height:14px;border-radius:50%;background:var(--danger);color:#fff;cursor:help;
+    font-size:10px;font-weight:800;line-height:14px;text-align:center;flex:0 0 auto}
   .evsel{flex:0 0 auto;width:15px;height:15px;cursor:pointer;accent-color:var(--accent);margin:0}
   .ag-all{display:block;margin-top:5px;font-size:10.5px;font-weight:600;color:var(--accent-ink);cursor:pointer}
   .ag-all:hover{text-decoration:underline}
@@ -356,6 +360,9 @@ function statusPills(){
   const ord=s=>{ const i=STATUS_ORDER.indexOf(s); return i<0?999:i; };   // follow the live Grist choice order
   [...extra].sort((a,b)=>(ord(a)-ord(b))||String(a).localeCompare(String(b)))
     .forEach(s=>pills.push({ key:"s:"+s, label:statusLabel(s), statuses:[s], color:s }));
+  // last pill, and only when there is something to fix
+  if((state.stone||[]).some(r=>calDateOf(r)&&dataFlags(r).length))
+    pills.push({ key:"flagged", label:"Needs attention", match:r=>dataFlags(r).length>0, flag:true });
   return pills;
 }
 function findGroup(key){ return statusPills().find(p=>p.key===key)||null; }
@@ -558,7 +565,9 @@ function renderStatusbar(){
   statusPills().forEach(p=>{
     const pill=$("div","sfp"+(state.statusFilter===p.key?" on":""));
     const colStatus = p.color || (p.statuses && p.statuses[0]);   // "All" has none
-    if(colStatus){ const d=$("span","dot"); d.style.background=statusColor(colStatus); pill.appendChild(d); }
+    if(p.flag){ const f=$("span","evflag","!");
+      f.title="Lines whose delivery date, delivered qty and status don't agree"; pill.appendChild(f); }
+    else if(colStatus){ const d=$("span","dot"); d.style.background=statusColor(colStatus); pill.appendChild(d); }
     pill.appendChild(document.createTextNode(p.label));
     pill.appendChild($("span","cnt",String(jobCountForGroup(p))));
     pill.onclick=()=>{ state.statusFilter=(p.key!=="all"&&state.statusFilter===p.key)?"all":p.key; render(); };
@@ -736,6 +745,26 @@ function eventCardTokens(e){
     assigned:()=>avatarsEl(assigneesOf(r))
   };
 }
+// ---- data-cleanliness flags ----
+// Half-filled delivery information is the thing that quietly rots this table, so each line is
+// checked and the ones that don't add up get an exclamation mark on the calendar. Cancelled and
+// N/A lines are exempt: a cancelled order legitimately has gaps.
+function dataFlags(r){
+  const s=String(r.Order_Status||"").trim();
+  if(/cancel/i.test(s)||/^n\/a$/i.test(s)) return [];
+  const out=[], hasDate=!!toDate(r.Delivery_Date), hasQty=!!num(r.Delivery_Qty);
+  if(isDeliveredStatus(r)){                    // the more specific complaint wins
+    if(!hasDate) out.push("Marked delivered but no delivery date");
+    if(!hasQty)  out.push("Marked delivered but no delivered qty");
+  } else if(hasDate&&!hasQty) out.push("Delivery date is set but no delivered qty");
+  return out;
+}
+function flagEl(list){
+  const b=$("span","evflag","!");
+  b.title=list.join("\n");
+  b.onclick=ev=>ev.stopPropagation();
+  return b;
+}
 // Highlight/coloured-bar colour = the line's Order_Status colour (raw status hue, dark text).
 function statusBar(r){ return { fill:statusColor(r.Order_Status), text:"#1d2733" }; }
 
@@ -755,8 +784,10 @@ function eventChip(e){
     renderCardTemplate(col.tpl, tokens, host, { bar:sb });
     chip.appendChild(cell);
   });
+  const flags=dataFlags(r);
   chip.title=fmtDMY(e.date)+" · "+statusLabel(r.Order_Status)+"\n"+jobClient(j)+" ("+jobCode(j)+")\n"+stoneLabel(r)
-    +"\nOrd "+num(r.Ordered_Qty)+" / Deliv "+num(r.Delivery_Qty);
+    +"\nOrd "+num(r.Ordered_Qty)+" / Deliv "+num(r.Delivery_Qty)
+    +(flags.length?("\n\n! "+flags.join("\n! ")):"");
   // Single click peeks at the line, double click edits it. The peek is held back briefly so a
   // double click doesn't flash the popup open behind the edit panel.
   let clickT=null;
@@ -768,14 +799,19 @@ function eventChip(e){
     if(clickT){ clearTimeout(clickT); clickT=null; }
     closePops(); openEdit(r);
   };
-  if(!state.bulk) return chip;
-  // bulk mode: a tick box beside each chip
+  // Every chip sits in a row with a fixed-width slot after it for the warning mark, so the chips
+  // line up whether or not anything is flagged. In bulk mode the tick box goes on the very end.
   const row=$("div","evrow");
-  const box=document.createElement("input"); box.type="checkbox"; box.className="evsel";
-  box.checked=state.sel.has(r.id); box.title="Select for bulk edit";
-  box.onclick=ev=>ev.stopPropagation();
-  box.onchange=()=>{ if(box.checked) state.sel.add(r.id); else state.sel.delete(r.id); renderBulkBar(); };
-  row.appendChild(chip); row.appendChild(box);        // tick box sits to the right of the chip
+  const gut=$("div","evgut");
+  if(flags.length) gut.appendChild(flagEl(flags));
+  row.appendChild(chip); row.appendChild(gut);
+  if(state.bulk){
+    const box=document.createElement("input"); box.type="checkbox"; box.className="evsel";
+    box.checked=state.sel.has(r.id); box.title="Select for bulk edit";
+    box.onclick=ev=>ev.stopPropagation();
+    box.onchange=()=>{ if(box.checked) state.sel.add(r.id); else state.sel.delete(r.id); renderBulkBar(); };
+    row.appendChild(box);                              // tick box sits to the right of the chip
+  }
   return row;
 }
 

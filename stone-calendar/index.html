@@ -429,8 +429,10 @@ function statusPills(){
   const ord=s=>{ const i=STATUS_ORDER.indexOf(s); return i<0?999:i; };   // follow the live Grist choice order
   [...extra].sort((a,b)=>(ord(a)-ord(b))||String(a).localeCompare(String(b)))
     .forEach(s=>pills.push({ key:"s:"+s, label:statusLabel(s), statuses:[s], color:s }));
+  // the leftovers: undated, not flagged, job already past Quote
+  if(naRows().length) pills.push({ key:"na", label:"N/A", statuses:[], color:"N/A", na:true });
   // last pill, and only when there is something to fix
-  if((state.stone||[]).some(r=>calDateOf(r)&&dataFlags(r).length))
+  if(attentionRows().length)
     pills.push({ key:"flagged", label:"Needs attention", match:r=>dataFlags(r).length>0, flag:true });
   return pills;
 }
@@ -471,6 +473,8 @@ const state={
   colType:{},                           // Stone_Order colId -> Grist type, for writing dates back
   writable:null,                        // Stone_Order colId -> true for non-formula columns (null = unknown)
   writableJob:null,                     // Jobs_Detail colId -> true, same idea (null = unknown)
+  supGlobal:null,                       // supplier filter across every day (double-click)
+  supDay:{},                            // ymd -> supplier, one day only (single click)
   flashId:null,                         // row id to highlight after a create, so you can see what you made
   jobById:{}, catById:{}
 };
@@ -631,19 +635,48 @@ function passSearch(r){ const q=(state.searchQ||"").trim().toLowerCase(); if(!q)
   return searchMatcher(q).test(stoneHaystack(r)+" "+jobHaystack(jobFor(r))); }
 function passStatus(r){ return state.statusFilter==="all" || matchGroup(findGroup(state.statusFilter),r); }
 // The set of lines the agenda draws from before the status filter. Also feeds the pill job counts.
-function baseRows(){ return (state.stone||[]).filter(r=>calDateOf(r)&&passAssignee(r)&&passSearch(r)); }
+// Rule, as agreed: a job still at Quote is never shown. Of the rest, the existing flagging rules
+// decide what needs attention; whatever is left over and undated falls into the N/A bucket.
+function passSupplier(r,key){
+  if(state.supGlobal) return supplierOf(r)===state.supGlobal;
+  if(key!=null && state.supDay[key]) return supplierOf(r)===state.supDay[key];
+  return true;
+}
+function supplierOf(r){
+  const s=r.Product_Supplier||(catFor(r)&&catFor(r).Supplier)||"";
+  return String(s).trim()||"(no supplier)";
+}
+// Everything in scope before dates or the status pill: Quote excluded, assignee + search applied.
+function liveRows(){ return (state.stone||[]).filter(r=>!isQuote(r)&&passAssignee(r)&&passSearch(r)); }
+function attentionRows(){ return liveRows().filter(r=>dataFlags(r).length>0); }
+function naRows(){ return liveRows().filter(r=>!calDateOf(r)&&!dataFlags(r).length); }
+// The dated set the day bands draw from.
+function baseRows(){ return liveRows().filter(r=>calDateOf(r)); }
+// Rows with no date at all that the current pill still wants shown, so the pill count is reachable.
+function undatedShown(){
+  if(state.statusFilter==="flagged") return attentionRows().filter(r=>!calDateOf(r));
+  if(state.statusFilter==="na") return naRows();
+  return [];
+}
 // Every event indexed by ymd (respecting assignee + search + status filter).
 function buildEventIndex(){
   const byYmd={};
   baseRows().forEach(r=>{ if(!passStatus(r)) return; const cd=calDateOf(r);
-    (byYmd[ymd(cd.date)]=byYmd[ymd(cd.date)]||[]).push({r,date:cd.date}); });
+    const k=ymd(cd.date);
+    if(!passSupplier(r,k)) return;
+    (byYmd[k]=byYmd[k]||[]).push({r,date:cd.date}); });
   return byYmd;
 }
 // Count all stone lines matching search + assignee (any date): drives the pill in the search bar.
 function matchingCount(){ return baseRows().length; }
 // Distinct jobs among the base rows that fall in a given status group: the pill counts.
-function jobCountForGroup(g){ const jobs=new Set();
-  baseRows().forEach(r=>{ if(matchGroup(g,r)) jobs.add(refId(r.Job)); }); return jobs.size; }
+function jobCountForGroup(g){
+  if(!g) return 0;
+  if(g.key==="flagged") return slabSum(attentionRows());
+  if(g.key==="na") return slabSum(naRows());
+  if(g.key==="all") return slabSum(baseRows());
+  return slabSum(baseRows().filter(r=>matchGroup(g,r)));
+}
 function eventsOn(byYmd,d){
   return (byYmd[ymd(d)]||[]).slice()
     .sort((a,b)=>jobClient(jobFor(a.r)).localeCompare(jobClient(jobFor(b.r))));
@@ -662,7 +695,7 @@ function render(){
   const q=(state.searchQ||"").trim();
   document.getElementById("searchClr").hidden=!q;
   const mc=document.getElementById("matchCount");
-  if(q){ const n=matchingCount(); mc.textContent=n+" order"+(n===1?"":"s"); mc.hidden=false; }
+  if(q){ mc.textContent=slabSum(baseRows())+" slabs"; mc.hidden=false; }
   else mc.hidden=true;
 
   // sort button label reflects the current direction
@@ -684,9 +717,10 @@ function render(){
     dayKeys.sort((a,b)=> state.sortDir==="desc" ? b-a : a-b);
   }
 
-  // title: how many orders are currently listed
-  let total=0; dayKeys.forEach(k=>{ total += (byYmd[k]||[]).length; });
-  document.getElementById("title").textContent = total+" stone order"+(total===1?"":"s");
+  // title: slabs currently listed, which is what the team counts in
+  let listed=[]; dayKeys.forEach(k=>{ (byYmd[k]||[]).forEach(e=>listed.push(e.r)); });
+  listed=listed.concat(undatedShown());
+  document.getElementById("title").textContent = slabSum(listed)+" slabs";
 
   renderAgenda(byYmd,dayKeys);
 
@@ -719,41 +753,163 @@ let dayToggles=[];
 function refreshDayToggles(){
   dayToggles.forEach(t=>{ t.el.textContent = t.ids.every(id=>state.sel.has(id)) ? "Clear day" : "Select day"; });
 }
+function stColHead(){
+  const h=$("div","sthead");
+  h.appendChild($("div","stlab","Date · supplier"));
+  const cols=$("div","stcols"); cols.style.gridTemplateColumns=colTemplate();
+  tblCols.forEach(c=>{
+    const def=COLDEF[c.k];
+    const l=$("div","stlab"+alignCls(c.align)+(def.edit?" ed":""));
+    l.textContent=def.label; cols.appendChild(l);
+  });
+  h.appendChild(cols); return h;
+}
+// One table row per stone line. Read-only cells are muted; editable ones write on commit.
+function stRow(r){
+  const row=$("div","strow");
+  row.style.gridTemplateColumns=colTemplate();
+  tblCols.forEach(c=>{
+    const def=COLDEF[c.k];
+    const cell=$("div","stcell"+alignCls(c.align)+(def.edit?" ed":" roc"));
+    cell.dataset.rid=String(r.id); cell.dataset.k=c.k;
+    const raw=def.html(r);
+    const inner=wrapFmt(raw,c);
+    cell.innerHTML=(c.style==="pill"&&raw)?('<span class="evpill">'+inner+"</span>"):inner;
+    if(def.edit){ cell.title="Click to edit"; cell.onclick=ev=>{ ev.stopPropagation(); startCellEdit(cell,r,c); }; }
+    row.appendChild(cell);
+  });
+  if(state.bulk){
+    const box=document.createElement("input"); box.type="checkbox"; box.className="evsel";
+    box.checked=state.sel.has(r.id); box.title="Select for bulk edit";
+    box.onclick=ev=>ev.stopPropagation();
+    box.onchange=()=>{ if(box.checked) state.sel.add(r.id); else state.sel.delete(r.id); renderBulkBar(); };
+    row.appendChild(box);
+  } else {
+    const del=document.createElement("button"); del.className="rowdel"; del.type="button";
+    del.textContent="×"; del.title="Remove this order";
+    del.setAttribute("aria-label","Remove the order for "+jobClient(jobFor(r)));
+    del.onclick=ev=>{ ev.stopPropagation(); askRemove(r); };
+    row.appendChild(del);
+  }
+  if(state.flashId!=null && r.id===state.flashId) row.classList.add("ev-new");
+  return row;
+}
+// Totals row closing a day. "Total" always sits in the second column, which reads as an indent.
+function stSumRow(rows){
+  const row=$("div","stsum");
+  row.style.gridTemplateColumns=colTemplate();
+  const labelAt=tblCols.length>1?1:0;
+  tblCols.forEach((c,i)=>{
+    const def=COLDEF[c.k];
+    const cell=$("div","stcell"+alignCls(c.align));
+    if(def.sum){
+      const v=rows.reduce((s,r)=>s+num(r[def.sum]),0);
+      if(v) cell.textContent=String(Math.round(v*10)/10);
+      else { cell.innerHTML=DASH; cell.className+=" roc"; }
+    } else if(c.k==="flag"){
+      const f=rows.filter(r=>dataFlags(r).length).length;
+      if(f) cell.innerHTML='<span class="evflag">'+f+"</span>";
+    } else if(i===labelAt){
+      cell.appendChild($("span","lb","Total"));
+    }
+    row.appendChild(cell);
+  });
+  return row;
+}
+// The supplier box under each date: slabs per supplier for the WHOLE day, so the rows always add
+// up to the total. Single click filters that day, double click filters every day.
+function supBox(dayAll,key){
+  const per={};
+  dayAll.forEach(r=>{ const s=supplierOf(r); per[s]=(per[s]||0)+slabsOf(r); });
+  const box=$("div","supbox");
+  box.appendChild($("div","cap","Stone by supplier"));
+  const list=$("div","sups");
+  Object.keys(per).sort((a,b)=>per[b]-per[a]).forEach(nm=>{
+    const b=document.createElement("button"); b.type="button";
+    b.className="sup"+(state.supGlobal===nm?" glob":(state.supDay[key]===nm?" dayon":""));
+    const sq=$("span","sq"); sq.style.background=avatarColor(nm);
+    const label=$("span","nm",nm);
+    const q=$("span","q",String(Math.round(per[nm]*10)/10));
+    b.appendChild(sq); b.appendChild(label); b.appendChild(q);
+    b.title="Click: only "+nm+" on this day. Double-click: only "+nm+" on every day.";
+    let timer=null;
+    b.onclick=ev=>{ ev.stopPropagation(); if(timer) return;
+      timer=setTimeout(()=>{ timer=null;
+        if(state.supDay[key]===nm) delete state.supDay[key]; else state.supDay[key]=nm;
+        state.supGlobal=null; render(); },230); };
+    b.ondblclick=ev=>{ ev.stopPropagation(); if(timer){ clearTimeout(timer); timer=null; }
+      state.supGlobal = state.supGlobal===nm ? null : nm;
+      state.supDay={}; render(); };
+    list.appendChild(b);
+  });
+  box.appendChild(list);
+  const tot=$("div","suptot");
+  tot.appendChild($("span","nm","Total"));
+  tot.appendChild($("span","q",String(slabSum(dayAll))));
+  box.appendChild(tot);
+  if(state.supDay[key] && !state.supGlobal) box.appendChild($("div","dayflt","this day only"));
+  return box;
+}
 function renderAgenda(byYmd,dayKeys){
   const list=document.getElementById("agenda"); list.className="agenda"; list.innerHTML=""; dayToggles=[];
   const todayK=ymd(new Date());
-  if(!dayKeys.length){ const q=(state.searchQ||"").trim(); const g=findGroup(state.statusFilter);
+  const undated=undatedShown().filter(r=>passSupplier(r,null));
+
+  if(!dayKeys.length && !undated.length){
+    const q=(state.searchQ||"").trim(); const g=findGroup(state.statusFilter);
     list.appendChild($("div","ag-empty","No stone orders"+(q?(" matching “"+q+"”"):"")
       +(g&&g.key!=="all"?(" · "+g.label):"")+(state.assignee?(" for "+state.assignee):"")+"."));
     return;
   }
+  list.appendChild(stColHead());
+
+  // Undated rows can't sit in a day band, so they head the list under their own banner.
+  if(undated.length){
+    list.appendChild($("div","nodate","No date · "+slabSum(undated)+" slabs"));
+    const body=$("div","strows");
+    undated.forEach(r=>body.appendChild(stRow(r)));
+    if(showTotals) body.appendChild(stSumRow(undated));
+    list.appendChild(body);
+  }
+
   dayKeys.forEach(k=>{
     const d=dateFromYmd(k);
-    const evs=eventsOn(byYmd,d); if(!evs.length && k!==todayK) return;   // today stays as an anchor
-    const row=$("div","ag-day"+(k===todayK?" today":""));
+    const evs=eventsOn(byYmd,d);
+    if(!evs.length && k!==todayK) return;                 // today stays as an anchor
+    const rows=evs.map(e=>e.r);
+    const day=$("div","ag-day tbl"+(k===todayK?" today":""));
     const dc=$("div","ag-date");
     dc.appendChild(document.createTextNode(DOW[(d.getDay()+6)%7]+" "+d.getDate()+" "+MONTHS[d.getMonth()].slice(0,3)+" "+d.getFullYear()));
     if(k===todayK) dc.appendChild($("div","tdy","Today"));
-    if(state.bulk && evs.length){
-      const ids=evs.map(e=>e.r.id);
+    if(state.bulk && rows.length){
+      const ids=rows.map(r=>r.id);
       const tog=$("span","ag-all");
       tog.onclick=ev=>{ ev.stopPropagation();
         const all=ids.every(id=>state.sel.has(id));
         ids.forEach(id=>{ if(all) state.sel.delete(id); else state.sel.add(id); }); render(); };
-      dayToggles.push({ el:tog, ids });        // label kept live by renderBulkBar
+      dayToggles.push({ el:tog, ids });
       dc.appendChild(tog);
     }
-    row.appendChild(dc);
-    const box=$("div","ag-evs");
-    if(evs.length) evs.forEach(e=>box.appendChild(eventChip(e)));
-    else box.appendChild($("div","ag-none","No stone orders today. Double-click to add one."));
-    // double-click the empty space of a day (not a chip) to start an order dated that day
-    box.ondblclick=ev=>{ if(ev.target!==box && !ev.target.classList.contains("ag-none")) return;
-      ev.preventDefault(); closePops(); openNew(d); };
-    row.appendChild(box);
-    list.appendChild(row);
+    // the box always describes the whole day, before any supplier filter
+    const dayAll=baseRows().filter(r=>{ const cd=calDateOf(r); return cd && ymd(cd.date)===k; });
+    if(dayAll.length) dc.appendChild(supBox(dayAll,k));
+    day.appendChild(dc);
+
+    if(!rows.length){
+      const e=$("div","ag-none", dayAll.length ? "Nothing matching on this day"
+        : "No stone orders today. Double-click to add one.");
+      e.ondblclick=ev=>{ if(dayAll.length) return; ev.preventDefault(); closePops(); openNew(d); };
+      day.appendChild(e);
+    } else {
+      const body=$("div","strows");
+      rows.forEach(r=>body.appendChild(stRow(r)));
+      if(showTotals) body.appendChild(stSumRow(rows));
+      day.appendChild(body);
+    }
+    list.appendChild(day);
   });
 }
+
 // ---- template engine (markdown-ish → DOM), ported from the installations calendar ----
 // Connector = whitespace / punctuation that only makes sense *between* two values.
 // The bare multiplier "x" / "×" counts too, so "{ordered} x {product}" collapses to just the
@@ -905,53 +1061,122 @@ function flagEl(list){
 // Highlight/coloured-bar colour = the line's Order_Status colour (raw status hue, dark text).
 function statusBar(r){ return { fill:statusColor(r.Order_Status), text:"#1d2733" }; }
 
-function eventChip(e){
-  const r=e.r, j=jobFor(r);
-  const chip=$("div","ev");
-  const cols=(eventCardCols&&eventCardCols.length)?eventCardCols:DEFAULT_EVENT_COLS;
-  chip.style.gridTemplateColumns=cols.map(c=>"minmax(0,"+(c.width||1)+"fr)").join(" ");
-  const tint=softTint(statusColor(r.Order_Status));
-  chip.style.background=tint.bg; chip.style.borderColor=tint.dot;
-  const tokens=eventCardTokens(e), sb=statusBar(r);
-  cols.forEach(col=>{
-    const cell=$("div","evcol al-"+(col.align||"left"));
-    let host=cell;
-    if(col.style==="pill"){ const p=$("span","evpill"); cell.appendChild(p); host=p; }
-    else if(col.style==="highlight"){ const p=$("span","evpill hl"); p.style.background=sb.fill; p.style.color=sb.text; cell.appendChild(p); host=p; }
-    renderCardTemplate(col.tpl, tokens, host, { bar:sb });
-    chip.appendChild(cell);
-  });
-  chip.setAttribute("data-rid",String(r.id));
-  if(state.flashId!=null && r.id===state.flashId) chip.classList.add("ev-new");
-  const flags=dataFlags(r);
-  chip.title=fmtDMY(e.date)+" · "+statusLabel(r.Order_Status)+"\n"+jobClient(j)+" ("+jobCode(j)+")\n"+stoneLabel(r)
-    +"\nOrd "+num(r.Ordered_Qty)+" / Deliv "+num(r.Delivery_Qty)
-    +(flags.length?("\n\n! "+flags.join("\n! ")):"");
-  // Single click peeks at the line, double click edits it. The peek is held back briefly so a
-  // double click doesn't flash the popup open behind the edit panel.
-  let clickT=null;
-  chip.onclick=ev=>{ ev.stopPropagation();
-    if(clickT) return;
-    clickT=setTimeout(()=>{ clickT=null; openDay(e.date,[e],chip); },220);
-  };
-  chip.ondblclick=ev=>{ ev.preventDefault(); ev.stopPropagation();
-    if(clickT){ clearTimeout(clickT); clickT=null; }
-    closePops(); openEdit(r);
-  };
-  // Every chip sits in a row with a fixed-width slot after it for the warning mark, so the chips
-  // line up whether or not anything is flagged. In bulk mode the tick box goes on the very end.
-  const row=$("div","evrow");
-  const gut=$("div","evgut");
-  if(flags.length) gut.appendChild(flagEl(flags));
-  row.appendChild(chip); row.appendChild(gut);
-  if(state.bulk){
-    const box=document.createElement("input"); box.type="checkbox"; box.className="evsel";
-    box.checked=state.sel.has(r.id); box.title="Select for bulk edit";
-    box.onclick=ev=>ev.stopPropagation();
-    box.onchange=()=>{ if(box.checked) state.sel.add(r.id); else state.sel.delete(r.id); renderBulkBar(); };
-    row.appendChild(box);                              // tick box sits to the right of the chip
+// ============================================================
+//  INLINE CELL EDITING
+// ============================================================
+// Writes land in Grist as soon as the cell is committed, per how the team wants it. The write is
+// debounced so holding a key does not fire one UpdateRecord per keystroke, and a failure puts the
+// old value back rather than leaving the table disagreeing with the doc.
+let cellTimer=null, cellQueue=[];
+function queueCellWrite(update){
+  cellQueue=cellQueue.filter(u=>!(u.id===update.id && Object.keys(u.fields)[0]===Object.keys(update.fields)[0]));
+  cellQueue.push(update);
+  if(cellTimer) clearTimeout(cellTimer);
+  cellTimer=setTimeout(flushCellWrites,250);
+}
+async function flushCellWrites(){
+  cellTimer=null;
+  const batch=cellQueue; cellQueue=[];
+  if(!batch.length) return;
+  try{ await writeRows(batch); }
+  catch(err){ console.error(err);
+    await confirmBox("Couldn\u2019t save","Grist rejected the change: "
+      +(err&&err.message?err.message:String(err))+" The table has been reloaded.",
+      [{v:"ok",label:"OK",kind:"primary"}]);
+    await refetch(); }
+}
+function startCellEdit(cell,r,c){
+  const spec=COLDEF[c.k].edit; if(!spec) return;
+  if(cell.querySelector("input,select")) return;
+  const prev=cell.innerHTML;
+  const was=r[spec.f];
+  cell.innerHTML="";
+  let el;
+  if(spec.t==="choice"){
+    el=document.createElement("select");
+    const blank=document.createElement("option"); blank.value=""; blank.textContent="(to sort)";
+    el.appendChild(blank);
+    const seen=new Set();
+    const opts=STATUS_ORDER.slice();
+    if(r[spec.f] && !opts.includes(r[spec.f])) opts.unshift(r[spec.f]);
+    opts.forEach(s=>{ if(!s||seen.has(s))return; seen.add(s);
+      const o=document.createElement("option"); o.value=s; o.textContent=s; el.appendChild(o); });
+    el.value=r[spec.f]==null?"":String(r[spec.f]);
+  } else {
+    el=document.createElement("input");
+    el.type = spec.t==="date" ? "date" : spec.t==="num" ? "number" : "text";
+    if(spec.t==="num"){ el.min="0"; el.step="0.5"; }
+    el.value = spec.t==="date" ? dateToInput(r[spec.f],state.colType[spec.f])
+             : spec.t==="num"  ? (num(r[spec.f])||"")
+             : (r[spec.f]==null?"":String(r[spec.f]));
   }
-  return row;
+  cell.appendChild(el);
+  el.focus(); if(el.select) try{ el.select(); }catch(e){}
+  let done=false;
+  const commit=()=>{
+    if(done) return; done=true;
+    const v=el.value;
+    const next = spec.t==="date" ? inputToGrist(v,state.colType[spec.f])
+               : spec.t==="num"  ? (v===""?null:num(v))
+               : (v===""?"":v);
+    const same = spec.t==="date" ? (String(next??"")===String(was??""))
+               : spec.t==="num"  ? (num(next)===num(was))
+               : (String(next??"")===String(was??""));
+    if(same){ cell.innerHTML=prev; return; }
+    r[spec.f]=next;                                  // optimistic, so the table stays responsive
+    reindex(); render();
+    const again=document.querySelector('[data-rid="'+r.id+'"][data-k="'+c.k+'"]');
+    if(again) again.classList.add("saved");
+    queueCellWrite({ id:r.id, fields:{ [spec.f]: next } });
+  };
+  const cancel=()=>{ if(done) return; done=true; cell.innerHTML=prev; };
+  el.onblur=commit;
+  el.onkeydown=e=>{
+    if(e.key==="Enter"){ e.preventDefault(); commit(); }
+    else if(e.key==="Escape"){ e.preventDefault(); e.stopPropagation(); cancel(); }
+  };
+  if(spec.t==="choice") el.onchange=commit;
+}
+
+// ============================================================
+//  REMOVE AN ORDER
+// ============================================================
+// Three ways out, because a delete cannot be undone from the widget: change the status and keep
+// the record, delete the row outright, or back out. Changing the status is the primary action.
+async function askRemove(r){
+  const j=jobFor(r);
+  const suggested = /cancel/i.test(String(r.Order_Status||"")) ? "N/A" : "Cancelled";
+  const choice=await confirmBox("Remove this stone order?",
+    jobClient(j)+" \u00b7 "+stoneLabel(r)+" \u00b7 "+slabsOf(r)+" slab"+(slabsOf(r)===1?"":"s")
+      +" \u00b7 "+statusLabel(r.Order_Status)
+      +(toDate(r.Order_Date)?(", dated "+fmtDMY(r.Order_Date)):", undated")+"."
+      +"\n\nChanging the status to \u201c"+suggested+"\u201d keeps the record and its history."
+      +" Deleting removes the row from Grist, and the widget cannot undo it.",
+    [{v:"discard",label:"Discard"},
+     {v:"status",label:"Change to "+suggested,kind:"primary"},
+     {v:"delete",label:"Delete order"}]);
+  if(choice==="status") await setRowStatus(r,suggested);
+  else if(choice==="delete") await deleteRow(r);
+}
+async function setRowStatus(r,v){
+  try{ await writeRows([{ id:r.id, fields:{ Order_Status:v } }]); }
+  catch(err){ console.error(err);
+    await confirmBox("Couldn\u2019t save","Grist rejected the change: "
+      +(err&&err.message?err.message:String(err)),[{v:"ok",label:"OK",kind:"primary"}]); }
+}
+async function deleteRow(r){
+  if(!state.grist){
+    const i=state.stone.findIndex(x=>x.id===r.id);
+    if(i>=0) state.stone.splice(i,1);
+    reindex(); render(); return;
+  }
+  try{
+    await grist.docApi.applyUserActions([["RemoveRecord","Stone_Order",r.id]]);
+    state.sel.delete(r.id);
+    await refetch();
+  }catch(err){ console.error(err);
+    await confirmBox("Couldn\u2019t remove","Grist rejected the removal: "
+      +(err&&err.message?err.message:String(err)),[{v:"ok",label:"OK",kind:"primary"}]); }
 }
 
 // ---- card editor modal ----

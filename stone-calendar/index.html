@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Milano — Stone Order Calendar</title>
+<title>Milano - Stone Order Calendar</title>
 <script src="https://milano.getgrist.com/grist-plugin-api.js"></script>
 <style>
   :root{
@@ -67,7 +67,7 @@
   /* ---- body: calendar only ---- */
   .body{flex:1 1 auto;min-height:0;display:flex;gap:12px}
 
-  /* ---- agenda event card (chip) — a grid of customisable columns ---- */
+  /* ---- agenda event card (chip): a grid of customisable columns ---- */
   /* chip tint (background + border) is set inline from the line's Order_Status colour;
      text is a fixed dark ink so it stays readable on the light status tints in either theme */
   .ev{font-size:var(--ev-card-font,10.5px);line-height:1.32;border-radius:6px;padding:3px 8px;cursor:pointer;overflow:hidden;
@@ -102,7 +102,7 @@
   .ag-date .tdy{display:block;margin-top:1px;font-size:10px;font-weight:700;color:var(--accent-ink);letter-spacing:.02em}
   .ag-evs{flex:1 1 auto;display:flex;flex-direction:column;gap:5px;min-width:0}
   .ag-empty{color:var(--muted);text-align:center;padding:40px;font-size:13px}
-  /* today's placeholder — quieter than a real card, so it reads as an anchor not an order */
+  /* today's placeholder: quieter than a real card, so it reads as an anchor not an order */
   .ag-none{color:var(--muted);font-size:11.5px;font-style:italic;padding:2px 0}
 
   /* assignee menu rows (reuse .pop) */
@@ -299,7 +299,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Milano — Stone Order Calendar widget
+   Milano - Stone Order Calendar widget
    A single Agenda listing every Stone_Order line on its ORDER
    date (falling back to its delivery date only when it has no
    order date), grouped by day. Chips are tinted by the line's
@@ -335,7 +335,7 @@ const statusLabel = s => (s==null||s==="") ? "To sort" : s;
 const SPECIAL_COL = /^(manualSort|gristHelper_|id$)/;
 // Delivered = any status meaning delivered, regardless of who delivered it.
 function isDeliveredStatus(r){ const low=String(r.Order_Status||"").toLowerCase(); return /deliver/.test(low) && !/not deliver/.test(low); }
-// Named status-filter groups — this is also the pill order. "Delivered" groups every
+// Named status-filter groups. This is also the pill order. "Delivered" groups every
 // delivered status together; extra pills are added for any other status found in the data.
 const PRIMARY_GROUPS=[
   { key:"awaiting_order",  label:"Awaiting Order",   statuses:["Awaiting Order"] },
@@ -366,7 +366,7 @@ function refId(v){ if(v==null)return null; if(typeof v==="number")return v;
 function toDate(v){ if(v==null||v==="")return null;
   if(typeof v==="number")return new Date(v*1000);
   if(v instanceof Date)return v; const d=new Date(v); return isNaN(d)?null:d; }
-function fmtDMY(v){ const d=toDate(v); if(!d)return "—";
+function fmtDMY(v){ const d=toDate(v); if(!d)return "-";
   return String(d.getDate()).padStart(2,"0")+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+d.getFullYear(); }
 const num=v=>{ const n=Number(v); return isFinite(n)?n:0; };
 function ymd(d){ return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate(); }
@@ -386,7 +386,7 @@ const state={
   stone:[], jobs:[], catalogue:[], grist:false,
   ref:{ product:null },
   assignee:null,                        // null = all assignees
-  searchQ:"",                           // stone search — live-filters events
+  searchQ:"",                           // stone search, live-filters events
   statusFilter:"all",                   // status-pill filter (group/status key)
   sortDir:"asc",                        // agenda date order: asc = oldest first
   bulk:false,                           // bulk-edit mode: checkboxes + the bottom action bar
@@ -398,8 +398,8 @@ window._stonecal=state;
 
 // ---- customisable card template (mirrors the installations calendar) ----
 // The event card is a row of 1–4 SECTIONS (columns). Each section holds a bit of
-// markdown-ish template — **bold**, *italic*, {token}, ==coloured bar==, --- divider,
-// \n = new line — plus a style (plain / pill / in-highlight) and an alignment.
+// markdown-ish template: **bold**, *italic*, {token}, ==coloured bar==, --- divider,
+// \n = new line, plus a style (plain / pill / in-highlight) and an alignment.
 const STYLES=["plain","pill","highlight"];        // highlight = pill in the line's Order_Status colour
 const ALIGNS=["left","centre","right"];
 const DEFAULT_EVENT_COLS=[{ tpl:'**{client}** · {product}', style:'plain', align:'left', width:1 }];
@@ -420,6 +420,13 @@ function normaliseCols(v){
 }
 function applyCardFonts(){ document.documentElement.style.setProperty("--ev-card-font",eventCardFont+"px"); }
 function loadLocalCards(){ try{ return JSON.parse(localStorage.getItem(CARD_LS)||"{}")||{}; }catch(e){ return {}; } }
+// View preferences that stick between sessions, per person (like the card design above).
+// Kept out of grist.setOption on purpose: the agenda direction is a personal habit, not
+// something one operator should change for everyone.
+const PREF_LS='milano_stonecal_prefs';
+function loadPrefs(){ try{ const p=JSON.parse(localStorage.getItem(PREF_LS)||"{}")||{};
+  if(p.sort==="asc"||p.sort==="desc") state.sortDir=p.sort; }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem(PREF_LS,JSON.stringify({sort:state.sortDir})); }catch(e){} }
 function saveLocalCards(){ try{ localStorage.setItem(CARD_LS,JSON.stringify({cols:eventCardCols,scope:cardScope,ef:eventCardFont})); }catch(e){} }
 function publishCards(){ try{ grist.setOption("eventCardCols",eventCardCols);
   grist.setOption("eventCardFont",eventCardFont); }catch(e){} }
@@ -452,15 +459,15 @@ function stoneLabel(r){ const c=catFor(r);
   if(c && c.Product_Full && String(c.Product_Full).trim()) return String(c.Product_Full).trim();
   if(r.Product_Code) return [r.Product_Supplier,r.Product_Code].filter(Boolean).join(" · ");
   return r.Product_Supplier || r.Stone || "Stone"; }
-function jobClient(j){ return j ? ((String(j.Client_Label||"")).trim() || (String(j.Job_Address||"")).trim() || j.Job_ID || ("#"+j.id)) : "—"; }
+function jobClient(j){ return j ? ((String(j.Client_Label||"")).trim() || (String(j.Job_Address||"")).trim() || j.Job_ID || ("#"+j.id)) : "-"; }
 function jobCode(j){ return j ? (j.Job_ID || ("#"+j.id)) : ""; }
 
 // Every stone line appears on its ORDER date (falling back to the delivery date
 // only when there is no order date, so nothing silently vanishes).
 function calDateOf(r){ const d = toDate(r.Order_Date) || toDate(r.Delivery_Date); return d ? { date:d } : null; }
 function passAssignee(r){ return !state.assignee || assigneesOf(r).includes(state.assignee); }
-// Search matches the STONE (name/supplier/code/order status) AND its JOB — mirroring
-// the Inbox search fields (client, address, job id, stage, payment, assignees) — so
+// Search matches the STONE (name/supplier/code/order status) AND its JOB, mirroring
+// the Inbox search fields (client, address, job id, stage, payment, assignees), so
 // anything you can find in the Inbox you can find here too, even without the client name.
 // statusLabel() folds a blank Order_Status in as "To sort" so it's searchable too.
 function stoneHaystack(r){ const c=catFor(r);
@@ -477,7 +484,7 @@ function searchMatcher(q){ const esc=q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
 function passSearch(r){ const q=(state.searchQ||"").trim().toLowerCase(); if(!q) return true;
   return searchMatcher(q).test(stoneHaystack(r)+" "+jobHaystack(jobFor(r))); }
 function passStatus(r){ return state.statusFilter==="all" || matchGroup(findGroup(state.statusFilter),r); }
-// The set of lines the agenda draws from before the status filter — also feeds the pill job counts.
+// The set of lines the agenda draws from before the status filter. Also feeds the pill job counts.
 function baseRows(){ return (state.stone||[]).filter(r=>calDateOf(r)&&passAssignee(r)&&passSearch(r)); }
 // Every event indexed by ymd (respecting assignee + search + status filter).
 function buildEventIndex(){
@@ -486,9 +493,9 @@ function buildEventIndex(){
     (byYmd[ymd(cd.date)]=byYmd[ymd(cd.date)]||[]).push({r,date:cd.date}); });
   return byYmd;
 }
-// Count all stone lines matching search + assignee (any date) — drives the pill in the search bar.
+// Count all stone lines matching search + assignee (any date): drives the pill in the search bar.
 function matchingCount(){ return baseRows().length; }
-// Distinct jobs among the base rows that fall in a given status group — the pill counts.
+// Distinct jobs among the base rows that fall in a given status group: the pill counts.
 function jobCountForGroup(g){ const jobs=new Set();
   baseRows().forEach(r=>{ if(matchGroup(g,r)) jobs.add(refId(r.Job)); }); return jobs.size; }
 function eventsOn(byYmd,d){
@@ -524,7 +531,7 @@ function render(){
   const dayKeys=Object.keys(byYmd).map(Number).sort((a,b)=> state.sortDir==="desc" ? b-a : a-b);
 
   // Today always gets a row (even with nothing on) so it stays as an anchor point in the list.
-  // Skipped when nothing matches at all — the empty-state message covers that case instead.
+  // Skipped when nothing matches at all: the empty-state message covers that case instead.
   const todayKey=ymd(new Date());
   if(dayKeys.length && !dayKeys.includes(todayKey)){
     dayKeys.push(todayKey);
@@ -621,7 +628,7 @@ function inlineParts(str,tokens,ctx){
   return parts;
 }
 // Drop empty token parts, then any connector text left dangling at the ends or next to a
-// removed token — so an absent {scope}/{ordered}/… takes its surrounding "·", ":" etc. with it.
+// removed token, so an absent {scope}/{ordered}/… takes its surrounding "·", ":" etc. with it.
 function keepParts(parts){
   const seq=parts.filter(p=>!p.empty).map(p=>{
     if(p.text!=null) return { kind: CARD_CONNECTOR.test(p.text) ? "conn" : "text", text:p.text };
@@ -667,17 +674,17 @@ function avatarsEl(list){ if(!list||!list.length)return null; const w=$("span","
 function priceOf(r){ const c=catFor(r); const v=(r.Product_Price_slab!=null&&r.Product_Price_slab!=="")?r.Product_Price_slab:(c?c.Price_Slab:null);
   return (v!=null&&v!=="")?("$"+v):null; }
 // ---- "what's happening" phrase ----
-// Some suppliers (WF, Aboda, client-supplied) are never *ordered* by us — we just wait for the
-// stone to turn up — so those rows carry no Ordered_Qty and the card has nothing to say. This
+// Some suppliers (WF, Aboda, client-supplied) are never *ordered* by us, we just wait for the
+// stone to turn up, so those rows carry no Ordered_Qty and the card has nothing to say. This
 // turns Order_Status + the quantities into a plain-English line for exactly those rows.
 // Matched on keywords, not exact choice values, so renaming/adding a Grist choice degrades to
-// "<Status> — 2 slabs" rather than going blank.
+// "<Status>: 2 slabs" rather than going blank.
 function slabs(n){ return n+" slab"+(n===1?"":"s"); }
 function actionText(r){
   const s=String(r.Order_Status||"").trim();
   const scope=num(r.Scope_Qty), del=num(r.Delivery_Qty), ord=num(r.Ordered_Qty);
   const out=Math.max(0,(scope||ord)-del);                  // still to come
-  const qty=n=>n?(" — "+slabs(n)):"";                      // " — 2 slabs", or nothing when unknown
+  const qty=n=>n?(": "+slabs(n)):"";                       // ": 2 slabs", or nothing when unknown
   const of=(verb,n)=>n?(verb+" "+slabs(n)):verb;           // "Return 2 slabs" / "Return"
   if(!s) return "To sort";
   if(/n\/a/i.test(s)) return null;
@@ -712,7 +719,7 @@ function eventCardTokens(e){
     scope:()=>txtNode(num(r.Scope_Qty)?("Scope "+num(r.Scope_Qty)):null),
     ordered:()=>txtNode(num(r.Ordered_Qty)?("Ord "+num(r.Ordered_Qty)):null),
     delivered:()=>txtNode(num(r.Delivery_Qty)?("Deliv "+num(r.Delivery_Qty)):null),
-    // Only fills the gap left by a missing order number — ordered rows already read fine.
+    // Only fills the gap left by a missing order number. Ordered rows already read fine.
     action:()=>num(r.Ordered_Qty)?null:txtNode(actionText(r)),
     orderdate:()=>txtNode(toDate(r.Order_Date)?fmtDMY(r.Order_Date):null),
     deliverydate:()=>txtNode(toDate(r.Delivery_Date)?fmtDMY(r.Delivery_Date):null),
@@ -773,11 +780,11 @@ function renderCardEditor(){
   if(!eventCardCols.length) eventCardCols=cloneCols(DEFAULT_EVENT_COLS);
   const note=$("div","ce-note");
   note.innerHTML="The chip shown for each stone order. Each <b>section</b> is a column laid side-by-side. "
-    +"Per column choose an alignment and a style — <b>plain</b>, a <b>pill</b>, or <b>in highlight</b> "
+    +"Per column choose an alignment and a style: <b>plain</b>, a <b>pill</b>, or <b>in highlight</b> "
     +"(a pill in the order's status colour). Inside a section use **bold**, *italic*, {tokens}, --- divider, ==coloured bar==.";
   body.appendChild(note);
 
-  let activeTa=null;                                   // last-focused section — the token chips insert here
+  let activeTa=null;                                   // last-focused section: the token chips insert here
   function commit(){ saveLocalCards(); render(); }
 
   body.appendChild($("div","ce-sechead","Sections (columns)"));
@@ -814,7 +821,7 @@ function renderCardEditor(){
       const b=document.createElement("button"); b.type="button"; b.textContent=lab; b.title=title; if(col.align===v)b.className="on";
       b.onclick=()=>{ col.align=v; commit(); renderCardEditor(); }; alignSeg.appendChild(b); });
     opts.appendChild(alignSeg);
-    // per-column width (relative — how much of the card this column takes)
+    // per-column width (relative: how much of the card this column takes)
     opts.appendChild($("span","ce-optlab","Width"));
     const wStep=$("div","ce-wstep");
     const wMinus=document.createElement("button"); wMinus.type="button"; wMinus.className="ce-fbtn"; wMinus.textContent="−";
@@ -833,7 +840,7 @@ function renderCardEditor(){
   add.onclick=()=>{ if(eventCardCols.length<4){ eventCardCols.push({tpl:"",style:"plain",align:"left",width:1}); commit(); renderCardEditor(); } };
   body.appendChild(add);
 
-  // shared token palette — inserts into the last-focused section
+  // shared token palette: inserts into the last-focused section
   const toks=$("div","ce-tokens");
   const insert=text=>{ const a=activeTa; if(!a||!a.ta) return; const t=a.ta;
     const s=t.selectionStart||0,en=t.selectionEnd||0;
@@ -866,13 +873,13 @@ function renderCardEditor(){
   setNote(); foot.appendChild(scopeNote);
   const row=$("div","ce-btnrow");
   const bMe=document.createElement("button"); bMe.type="button"; bMe.className="ce-save ghost"; bMe.textContent="Save just for me";
-  bMe.onclick=()=>{ cardScope="me"; saveLocalCards(); setNote("Saved — just for you."); };
+  bMe.onclick=()=>{ cardScope="me"; saveLocalCards(); setNote("Saved. Just for you."); };
   const bAll=document.createElement("button"); bAll.type="button"; bAll.className="ce-save primary"; bAll.textContent="Save for everyone";
-  bAll.onclick=()=>{ cardScope="everyone"; publishCards(); saveLocalCards(); setNote("Saved — shared with everyone."); };
+  bAll.onclick=()=>{ cardScope="everyone"; publishCards(); saveLocalCards(); setNote("Saved. Shared with everyone."); };
   row.appendChild(bMe); row.appendChild(bAll); foot.appendChild(row); body.appendChild(foot);
 }
 // ============================================================
-//  EDIT PANEL — double-click a chip
+//  EDIT PANEL: double-click a chip
 // ============================================================
 // The fields the card can show and an operator would actually change on the day. Status is a
 // live choice list from the Grist column, so it always matches the Stone Order page.
@@ -912,7 +919,7 @@ function renderEdit(r){
       input=document.createElement("select"); input.className="se-in";
       const seen=new Set(); const opts=STATUS_ORDER.slice();
       if(edit.cur[f.col] && !opts.includes(edit.cur[f.col])) opts.unshift(edit.cur[f.col]);   // keep an unknown value
-      const blank=document.createElement("option"); blank.value=""; blank.textContent="— To sort —"; input.appendChild(blank);
+      const blank=document.createElement("option"); blank.value=""; blank.textContent="(to sort)"; input.appendChild(blank);
       opts.forEach(s=>{ if(!s||seen.has(s))return; seen.add(s);
         const o=document.createElement("option"); o.value=s; o.textContent=s; input.appendChild(o); });
       input.value=edit.cur[f.col]||"";
@@ -984,13 +991,13 @@ function setBulk(on){
   document.getElementById("bulkBtn").classList.toggle("on",state.bulk);
   render();
 }
-// Rebuilt only when the live choice list actually changes — a rebuild would reset the operator's
+// Rebuilt only when the live choice list actually changes: a rebuild would reset the operator's
 // pick, and render() runs on every tick of the selection.
 let _bulkStatusSig="";
 function bulkStatusOptions(){
   const sig=STATUS_ORDER.join("|"); if(sig===_bulkStatusSig) return; _bulkStatusSig=sig;
   const sel=document.getElementById("bulkStatus"); const keepVal=sel.value; sel.innerHTML="";
-  const keep=document.createElement("option"); keep.value=""; keep.textContent="— leave unchanged —"; sel.appendChild(keep);
+  const keep=document.createElement("option"); keep.value=""; keep.textContent="(leave unchanged)"; sel.appendChild(keep);
   STATUS_ORDER.forEach(s=>{ if(!s)return; const o=document.createElement("option"); o.value=s; o.textContent=s; sel.appendChild(o); });
   if(keepVal) sel.value=keepVal;
 }
@@ -1005,7 +1012,7 @@ function renderBulkBar(){
   const apply=document.getElementById("bulkApply");
   apply.disabled=!n; apply.style.opacity=n?"":".5"; apply.style.cursor=n?"pointer":"default";
 }
-// Delivered qty follows the order number, per how the team works — falling back to the scope
+// Delivered qty follows the order number, per how the team works, falling back to the scope
 // qty for the suppliers we never place an order with (WF, Aboda, client-supplied).
 function bulkDeliveryQty(r){ return num(r.Ordered_Qty)||num(r.Scope_Qty)||null; }
 async function applyBulk(){
@@ -1065,11 +1072,11 @@ function positionPop(el,anchor,w){
 function closePops(){ ["dayPop","assignPop","sortPop"].forEach(id=>{const e=document.getElementById(id); if(e)e.hidden=true;}); }
 function openSortMenu(){
   const m=document.getElementById("sortPop"); m.innerHTML="";
-  [{v:"asc",label:"Order date — oldest first"},{v:"desc",label:"Order date — newest first"}].forEach(o=>{
+  [{v:"asc",label:"Order date, oldest first"},{v:"desc",label:"Order date, newest first"}].forEach(o=>{
     const on=state.sortDir===o.v; const row=$("div","cprow"+(on?" on":""));
     row.appendChild(document.createTextNode(o.label));
     if(on) row.appendChild($("span","rtick","✓"));
-    row.onmousedown=e=>{ e.preventDefault(); state.sortDir=o.v; closePops(); render(); };
+    row.onmousedown=e=>{ e.preventDefault(); state.sortDir=o.v; savePrefs(); closePops(); render(); };
     m.appendChild(row);
   });
   closePops(); m.hidden=false; positionPop(m,document.getElementById("sortBtn"),240);
@@ -1151,7 +1158,7 @@ async function writeRows(updates){
   await refetch();
 }
 // ---- shared confirm / unsaved dialog ----
-// btns: [{v,label,kind}] — resolves with the chosen v, or null if dismissed.
+// btns: [{v,label,kind}]. Resolves with the chosen v, or null if dismissed.
 let _cfRes=null;
 function confirmBox(title,body,btns){
   return new Promise(res=>{
@@ -1252,6 +1259,7 @@ document.addEventListener("keydown",e=>{
   if(lc.scope==="me"||lc.scope==="everyone") cardScope=lc.scope;
   if(typeof lc.ef==="number") eventCardFont=lc.ef;
   applyCardFonts(); }
+loadPrefs();                                   // restore the saved agenda direction
 if(!state.ref.product) state.ref.product=DEMO_REF.product;
 // sample-first so the grid is never blank; live wiring above flips + replaces it.
 window._test(SAMPLE_STONE,SAMPLE_JOBS,SAMPLE_CAT);

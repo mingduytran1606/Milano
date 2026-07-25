@@ -12,7 +12,7 @@
     --accent:#16b378; --accent-soft:#eafaf2; --accent-ink:#0f7a52;
     --danger:#e5484d;
     --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.10);
-    --radius:14px; --datecol:200px;
+    --radius:14px; --datecol:200px; --tblfont:12.5px;
   }
   @media (prefers-color-scheme:dark){
     :root{ --bg:#12161b; --panel:#1a1f26; --ink:#e8edf2; --muted:#9aa6b2;
@@ -265,7 +265,7 @@
   .strows{display:flex;flex-direction:column;min-width:0}
   .strow{display:grid;align-items:stretch;border-bottom:1px solid var(--line2)}
   .strow:hover{background:var(--accent-soft)}
-  .stcell{padding:7px 8px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  .stcell{font-size:var(--tblfont);padding:7px 8px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     display:flex;align-items:center;gap:4px}
   .stcell.r{justify-content:flex-end;font-variant-numeric:tabular-nums}
   .stcell.c{justify-content:center;padding-left:2px;padding-right:2px}
@@ -309,9 +309,13 @@
   .nodate{padding:6px 10px;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
     color:var(--danger);background:var(--bg);border-bottom:1px solid var(--line)}
 
+  .cpset{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:11px}
+  .cpset .lab{font-size:11.5px;font-weight:600;color:var(--muted)}
+  .cpset .grp{display:flex;align-items:center;gap:7px}
   /* ---- column editor: an inline panel, not an overlay ---- */
-  .colpanel{display:none;border-bottom:1px solid var(--line);background:var(--bg);padding:11px 14px;
-    max-height:46vh;overflow-y:auto}
+  .colpanel{display:none;flex:0 0 auto;border:1px solid var(--line);border-radius:var(--radius);
+    background:var(--panel);padding:12px 14px;max-height:52vh;overflow-y:auto;box-shadow:var(--shadow)}
+  .colpanel.open{display:block}
   .colpanel.open{display:block}
   .colpanel h4{margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.05em;
     text-transform:uppercase;color:var(--muted)}
@@ -522,6 +526,12 @@ const PREF_LS='milano_stonecal_prefs';
 // to everyone through grist.setOption so one operator can set the shared default.
 const TBL_LS='milano_stonecal_table';
 let colScope='everyone';
+let dateColW=200, tblFont=12.5;
+function applyTableVars(){
+  const rs=document.documentElement.style;
+  rs.setProperty("--datecol",dateColW+"px");
+  rs.setProperty("--tblfont",tblFont+"px");
+}
 // Only accept known column keys and sane values, so a stale or hand-edited option can't break the grid.
 function normaliseTblCols(v){
   if(!Array.isArray(v)) return null;
@@ -540,14 +550,20 @@ function loadTablePrefs(){
     const p=JSON.parse(localStorage.getItem(TBL_LS)||"{}")||{};
     const cols=normaliseTblCols(p.cols); if(cols) tblCols=cols;
     if(typeof p.totals==="boolean") showTotals=p.totals;
+    if(typeof p.datecol==="number") dateColW=Math.max(120,Math.min(360,p.datecol));
+    if(typeof p.font==="number") tblFont=Math.max(9.5,Math.min(18,p.font));
     if(p.scope==="me"||p.scope==="everyone") colScope=p.scope;
   }catch(e){}
+  applyTableVars();
 }
 function saveTablePrefs(){
-  try{ localStorage.setItem(TBL_LS,JSON.stringify({cols:tblCols,totals:showTotals,scope:colScope})); }catch(e){}
+  applyTableVars();
+  try{ localStorage.setItem(TBL_LS,JSON.stringify({cols:tblCols,totals:showTotals,
+    datecol:dateColW,font:tblFont,scope:colScope})); }catch(e){}
 }
 function publishTableCols(){
-  try{ grist.setOption("tblCols",tblCols); grist.setOption("tblTotals",showTotals); }catch(e){}
+  try{ grist.setOption("tblCols",tblCols); grist.setOption("tblTotals",showTotals);
+       grist.setOption("tblDateCol",dateColW); grist.setOption("tblFont",tblFont); }catch(e){}
 }
 function loadPrefs(){ try{ const p=JSON.parse(localStorage.getItem(PREF_LS)||"{}")||{};
   if(p.sort==="asc"||p.sort==="desc") state.sortDir=p.sort; }catch(e){} }
@@ -562,6 +578,9 @@ function applyGristOptions(opts){
   const cols=normaliseTblCols(opts.tblCols);
   if(cols) tblCols=cols;
   if(typeof opts.tblTotals==="boolean") showTotals=opts.tblTotals;
+  if(typeof opts.tblDateCol==="number") dateColW=Math.max(120,Math.min(360,opts.tblDateCol));
+  if(typeof opts.tblFont==="number") tblFont=Math.max(9.5,Math.min(18,opts.tblFont));
+  applyTableVars();
   render();
 }
 
@@ -1127,6 +1146,26 @@ function renderColEditor(){
     +'<div class="cphint">Drag a row to move the column. Headings are fixed because a heading '
     +'names the Grist field the column reads. <b>Editable</b> columns can be changed straight '
     +'in the table.</div>';
+
+  // width of the date column, and the table's font size
+  const set=$("div","cpset");
+  const stepper=(label,get,set2,fmt,step,lo,hi)=>{
+    const grp=$("div","grp");
+    grp.appendChild($("span","lab",label));
+    const w=$("div","ce-wstep");
+    const mk=(txt,delta,title)=>{ const b=document.createElement("button"); b.type="button";
+      b.className="ce-fbtn"; b.textContent=txt; b.title=title;
+      b.onclick=()=>{ set2(Math.max(lo,Math.min(hi,Math.round((get()+delta)*10)/10)));
+        saveTablePrefs(); render(); renderColEditor(); };
+      return b; };
+    w.appendChild(mk("−",-step,"Smaller"));
+    w.appendChild($("span","ce-fval",fmt(get())));
+    w.appendChild(mk("+",step,"Larger"));
+    grp.appendChild(w); return grp;
+  };
+  set.appendChild(stepper("Date column",()=>dateColW,v=>{dateColW=v;},v=>v+"px",10,120,360));
+  set.appendChild(stepper("Font size",()=>tblFont,v=>{tblFont=v;},v=>v+"px",0.5,9.5,18));
+  box.appendChild(set);
 
   const tog=document.createElement("label"); tog.className="coltog";
   const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=showTotals;
@@ -1867,8 +1906,9 @@ document.addEventListener("keydown",e=>{
   closePops();
 });
 
-// restore this person's table columns and their totals preference
+// restore this person's columns, date-column width, font size and totals preference
 loadTablePrefs();
+applyTableVars();
 loadPrefs();                                   // restore the saved agenda direction
 if(!state.ref.product) state.ref.product=DEMO_REF.product;
 if(!state.ref.client)  state.ref.client=DEMO_REF.client;

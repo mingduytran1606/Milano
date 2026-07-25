@@ -253,15 +253,17 @@
   .cf-f{display:flex;gap:8px;justify-content:flex-end}
 
   /* ---- table agenda: date + supplier box on the left, aligned rows on the right ---- */
-  .ag-day.tbl{display:grid;grid-template-columns:var(--datecol) 1fr;gap:0;padding:0;align-items:stretch}
+  .ag-day.tbl{display:grid;grid-template-columns:var(--datecol) 1fr;gap:0;padding:0;align-items:stretch;
+    border-bottom:2px solid var(--rule)}
+  .ag-day.tbl:last-child{border-bottom:0}
   .ag-day.tbl>.ag-date{flex:none;padding:9px 12px 11px;background:var(--bg);
-    border-right:2px solid var(--rule);font-size:12.5px;font-weight:600;color:var(--ink)}
+    border-right:1px solid var(--line);font-size:12.5px;font-weight:600;color:var(--ink)}
   .ag-day.tbl.today>.ag-date{background:var(--accent-soft)}
   .ag-day.tbl>.ag-none{padding:14px}
   .sthead{display:grid;grid-template-columns:var(--datecol) 1fr;border-bottom:1px solid var(--line);
     background:var(--bg);position:sticky;top:0;z-index:3}
   .stcols{display:grid}
-  .sthead>.stlab:first-child{background:var(--bg);border-right:2px solid var(--rule)}
+  .sthead>.stlab:first-child{background:var(--bg);border-right:1px solid var(--line)}
   .stlab{padding:7px 8px;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
   .stlab.ed{color:var(--accent-ink)}
   .stlab.r{text-align:right}

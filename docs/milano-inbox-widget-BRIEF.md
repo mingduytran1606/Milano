@@ -50,7 +50,7 @@ file that loads `grist-plugin-api.js`, reads live data, and is deployed to Netli
 | `Client_Label` | Client | Text (formula) | **use this for display** (the client name) |
 | `Job_Address` | Job Address | Text | editable |
 | `Address_Formatted` | Address (verified) | Text | geocoded; may be blank |
-| `Stage` | Stage | Choice | editable — colours below |
+| `Stage` | Stage | Choice, **trigger formula** `"Quote"` on new records | the doc sets it; don't write it on create |
 | `Assigned_To` | Assigned To | ChoiceList | multi; render as neutral initials avatars |
 | `Payment_Status` | Payment Status | Choice | editable — colours below |
 | `Cash` | Cash | Text (choices Invoice/Cash) | |
@@ -113,12 +113,15 @@ Not Invoiced (none)   Deposit Paid #FFFACD   Outstanding Bal #FECBCC
 Fully Paid  #E1FEDE   Other (none)           Not Paid Yet   #FEE7C3
 TBC By a Minh #E8D0FE
 ```
-**Stone_Order.Order_Status**
+**Stone_Order.Order_Status** — verified against the live column 2026-07-25. The choices carry
+**no number prefixes**; an earlier version of this brief listed them as `2.  Placed Order` etc.
+and code matching on that form will not match anything.
 ```
-2.  Placed Order   #FEF47A   3. Awaiting Order  #FED6FB   6. Delivered      #98FD90
-4. Awaiting Pickup #75B5FC   7. Not Delivered Yet #CCFEFE  5. On hold        #FEE7C3
-1. No Stock        #FD8182   Cancelled          #DCDCDC   Delivered by WF/Aboda/Client #E1FEDE
-Return #CCFEFE     N/A (none)
+Placed Order   #FEF47A   Awaiting Order    #FED6FB   Delivered            #98FD90
+Awaiting Pickup #75B5FC  Not Delivered Yet #CCFEFE   On hold              #FEE7C3
+No Stock       #FD8182   Cancelled         #DCDCDC   Delivered by WF      #E1FEDE
+Return         #CCFEFE   N/A (none)                 Delivered by Aboda   #E1FEDE
+Milano Pickup  (none)                               Delivered by Client  #E1FEDE
 ```
 
 ---

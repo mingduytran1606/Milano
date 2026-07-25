@@ -1,0 +1,11 @@
+{
+  "name": "milano-widgets",
+  "private": true,
+  "description": "Grist custom widgets for the Milano doc. The widgets themselves are standalone HTML; this package exists only to run the headless tests.",
+  "scripts": {
+    "test": "node test/run.js"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  }
+}

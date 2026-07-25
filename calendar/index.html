@@ -1091,7 +1091,13 @@
       stage: function () { var sv = fmtVal(rec[mappingsCache.type]); return (sv && mappingsCache.type) ? pillSpan(sv, mappingsCache.type) : null; },
       payment: function () { return (j && j.payment) ? pillSpan(j.payment, JOB_COLS.payment) : null; },
       assigned: function () { return avatarsEl((j && j.assigned) || []); },
-      installer: function () { var v = installerOf(rec); return v ? pillSpan(v, mappingsCache.installer) : null; },
+      // In the pivot the row the card sits in already names the fitter, so repeating it on every
+      // card is noise. The template is untouched - the token just renders nothing in that layout.
+      installer: function () {
+        if (groupMode() === 'grid') return null;
+        var v = installerOf(rec);
+        return v ? pillSpan(v, mappingsCache.installer) : null;
+      },
       date: function () { var d = gristToLocalDate(rec[mappingsCache.startDate]); return d ? txtNode(fmtShort(d)) : null; },
       seq: function () { return (info && info.total > 1) ? txtNode(info.n + '/' + info.total) : null; },
       note: function () { return (mappingsCache.seqNote != null) ? txtNode(fmtVal(rec[mappingsCache.seqNote])) : null; },

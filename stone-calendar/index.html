@@ -573,14 +573,27 @@ function publishTableCols(){
 }
 function loadPrefs(){ try{ const p=JSON.parse(localStorage.getItem(PREF_LS)||"{}")||{};
   if(p.sort==="asc"||p.sort==="desc") state.sortDir=p.sort; }catch(e){} }
-function savePrefs(){ try{ localStorage.setItem(PREF_LS,JSON.stringify({sort:state.sortDir})); }catch(e){} }
+// The sort goes to BOTH stores on purpose. localStorage alone is not enough: the widget runs in a
+// cross-origin iframe, so a browser set to block third-party storage throws here (swallowed by the
+// catch) and the direction silently reverted on every reload. grist.setOption lives in the document,
+// so it survives that — same belt-and-braces the column prefs already had.
+function savePrefs(){
+  try{ localStorage.setItem(PREF_LS,JSON.stringify({sort:state.sortDir})); }catch(e){}
+  try{ grist.setOption("sort",state.sortDir); }catch(e){}
+}
 function saveLocalCards(){ try{ localStorage.setItem(CARD_LS,JSON.stringify({cols:eventCardCols,scope:cardScope,ef:eventCardFont})); }catch(e){} }
 function publishCards(){ try{ grist.setOption("eventCardCols",eventCardCols);
   grist.setOption("eventCardFont",eventCardFont); }catch(e){} }
 function applyGristOptions(opts){
   if(!opts) return;
+  // The sort is adopted before the column gate below: that gate is about the column layout, and a
+  // person keeping their own columns ("me") still wants the remembered agenda direction back.
+  let sorted=false;
+  if(opts.sort==="asc"||opts.sort==="desc"){
+    if(state.sortDir!==opts.sort){ state.sortDir=opts.sort; sorted=true; }
+  }
   const editing=colPanelOpen;                      // don't reshuffle while someone is editing
-  if(colScope==="me" || editing) return;          // don't yank the layout out from under an editor
+  if(colScope==="me" || editing){ if(sorted) render(); return; }
   const cols=normaliseTblCols(opts.tblCols);
   if(cols) tblCols=cols;
   if(typeof opts.tblTotals==="boolean") showTotals=opts.tblTotals;
@@ -792,9 +805,13 @@ function render(){
 
   renderAgenda(byYmd,dayKeys);
 
-  // drop any selection that a search/filter change has scrolled out of view, then refresh the bar
+  // drop any selection that a search/filter change has scrolled out of view, then refresh the bar.
+  // The live set must cover EVERY row the agenda renders, undated ones included — they are exactly
+  // the orders a bulk delivery-date edit is aimed at, and leaving them out silently unticked them
+  // on the next render (so Apply then did nothing).
   if(state.bulk && state.sel.size){
     const live=new Set(); dayKeys.forEach(k=>(byYmd[k]||[]).forEach(e=>live.add(e.r.id)));
+    undatedShown().filter(r=>passSupplier(r,null)).forEach(r=>live.add(r.id));
     [...state.sel].forEach(id=>{ if(!live.has(id)) state.sel.delete(id); });
   }
   renderBulkBar();

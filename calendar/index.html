@@ -12,6 +12,9 @@
     --line:#e2e5ea; --line2:#eef1f4; --sw-off:#cfd4d1;
     --accent:#16b378; --accent-soft:#eafaf2; --accent-ink:#0f7a52;
     --danger:#e5484d; --danger-soft:#fdecea; --warn:#e5860b;
+    /* row rule in the installer pivot - deliberately darker than --line so a week reads
+       across a row; the verticals stay faint so it does not become a wire cage */
+    --grid-rule:#c4ccd7;
   }
   @media (prefers-color-scheme:dark){
     :root{
@@ -19,6 +22,7 @@
       --line:#2a323b; --line2:#232a32; --sw-off:#3a434d;
       --accent:#35c993; --accent-soft:#173a30; --accent-ink:#7ee0bd;
       --danger:#e5484d; --danger-soft:#3a1f22; --warn:#e5860b;
+      --grid-rule:#454f5c;
     }
   }
   html, body { margin:0; padding:0; height:100%; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--panel); }
@@ -94,7 +98,6 @@
   .sbtn.open .fc { transform:rotate(90deg); }
   .sbtn .flabel { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   #fsrow2 { display:flex; gap:4px; }
-  #fsrow3 { display:flex; gap:4px; }
   .fnum2 { flex:0 0 auto; font-size:10px; font-weight:600; background:var(--accent); color:#fff; border-radius:9px; padding:0 6px; line-height:15px; display:none; }
   .fnum2.show { display:inline-block; }
   .fmenu { display:none; position:absolute; top:100%; left:8px; right:8px; margin-top:4px; z-index:11;
@@ -120,6 +123,14 @@
   /* pill bar lives in the top toolbar, aligned with Today / Week / Jobs */
   #toolbar .navbar { flex:1 1 auto; min-width:0; margin:0 6px; padding:0; }
   #toolbar #navTabs:empty { display:none; }
+  /* installer pill bar: its own row directly under the assignee bar, with a lead-in label
+     so the two rows can't be mistaken for one another */
+  #instbar { display:flex; align-items:center; gap:6px; flex:0 0 auto;
+             padding:5px 8px; border-bottom:1px solid var(--line); background:var(--panel); }
+  #instbar:empty { display:none; }
+  #instbar .barlbl { flex:0 0 auto; font-size:9.5px; font-weight:700; letter-spacing:.09em;
+                     text-transform:uppercase; color:var(--muted); }
+  #instbar .navbar { flex:1 1 auto; min-width:0; padding:0; }
 
   /* ---- saved views ---- */
   #viewsBtn { display:flex; align-items:center; gap:6px; width:100%; font-size:11.5px; padding:5px 8px;
@@ -177,6 +188,9 @@
     background:var(--panel); cursor:pointer; color:var(--ink);
   }
   #toolbar button:hover { background:var(--line2); }
+  #toolbar button.active, #toolbar select.active { border-color:var(--accent); color:var(--accent-ink); background:var(--accent-soft); }
+  #toolbar button:disabled, #toolbar select:disabled { opacity:.45; cursor:default; }
+  #toolbar button:disabled:hover { background:var(--panel); }
   #rangeLabel { font-size:13px; font-weight:600; color:var(--ink); margin-left:6px; }
   #msg { padding:20px; font-size:13px; color:var(--muted); display:none; }
   #cal { flex:1; min-height:0; display:flex; flex-direction:column; }
@@ -192,6 +206,36 @@
   .daycol.today { background:var(--danger-soft); }
   .daybody { flex:1; overflow-y:auto; padding:8px 8px 4px 4px; display:flex; flex-direction:column; gap:7px; }
   .daybody.dragover { background:var(--accent-soft); }
+
+  /* ---- installer grid: a pivot of installers (rows) x days (columns) ----
+     Every installer keeps a row whether or not they have work, so a free day reads as an
+     empty cell rather than an absence. Structural throughout: rules and labels, no fills. */
+  #gridwrap { flex:1; min-height:0; overflow:auto; background:var(--panel); }
+  .gtable { display:grid; min-width:100%; }
+  .gcorner, .ghead { position:sticky; top:0; z-index:2; background:var(--bg);
+                     border-bottom:1px solid var(--grid-rule); }
+  .gcorner { left:0; z-index:4; border-right:1px solid var(--grid-rule); }
+  .ghead { text-align:center; padding:5px 2px; font-size:12px; color:var(--muted);
+           border-right:1px solid var(--line2); }
+  .ghead .num { font-size:16px; font-weight:600; color:var(--ink); margin-right:4px; }
+  .ghead.today { color:var(--danger); background:var(--danger-soft); font-weight:600; }
+  .ghead.today .num { background:var(--danger); color:#fff; border-radius:50%; display:inline-block;
+                      min-width:23px; line-height:23px; text-align:center; margin-right:3px; }
+  .grlbl { position:sticky; left:0; z-index:3; background:var(--panel);
+           border-right:1px solid var(--grid-rule); border-bottom:1px solid var(--grid-rule);
+           padding:7px 8px 7px 9px; display:flex; align-items:baseline; gap:5px; }
+  .grlbl .rname { font-size:9.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase;
+                  color:var(--ink); overflow-wrap:break-word; min-width:0; }
+  .grlbl.none .rname { color:var(--muted); font-weight:600; }
+  .grlbl .rcount { margin-left:auto; font-size:9.5px; font-weight:600; color:var(--muted);
+                   font-variant-numeric:tabular-nums; flex:0 0 auto; }
+  .gcell { min-height:54px; padding:5px; display:flex; flex-direction:column; gap:6px; min-width:0;
+           border-right:1px solid var(--line2); border-bottom:1px solid var(--grid-rule); }
+  .gcell.today { background:var(--danger-soft); }
+  .gcell.dragover { box-shadow:inset 0 0 0 1px var(--accent); background:var(--accent-soft); }
+  /* a grid has no row element, so the separator above "No installer" goes on its own cells.
+     It lands directly under the previous row's rule, reading as one heavier break. */
+  .grlbl.grow-sep, .gcell.grow-sep { border-top:2px solid var(--grid-rule); }
 
   /* ---- month view ---- */
   #monthwrap { flex:1; min-height:0; overflow-y:auto; }
@@ -428,15 +472,11 @@
         <button id="paymentBtn" class="sbtn" type="button"><span class="flabel">Payment</span><span id="paymentNum" class="fnum2"></span><span class="fc">&#8250;</span></button>
       </div>
       <div id="fsrow2">
-        <button id="installerBtn" class="sbtn" type="button"><span class="flabel">Installer</span><span id="installerNum" class="fnum2"></span><span class="fc">&#8250;</span></button>
         <button id="visitsBtn" class="sbtn" type="button"><span class="flabel">Installs</span><span id="visitsNum" class="fnum2"></span><span class="fc">&#8250;</span></button>
-      </div>
-      <div id="fsrow3">
         <button id="sortBtn" class="sbtn" type="button"><span class="flabel">&#8645; Sort</span><span class="fc" id="sortCaret">&#8250;</span></button>
       </div>
       <div id="stageMenu" class="fmenu"></div>
       <div id="paymentMenu" class="fmenu"></div>
-      <div id="installerMenu" class="fmenu"></div>
       <div id="visitsMenu" class="fmenu"></div>
       <div id="sortMenu"></div>
     </div>
@@ -452,10 +492,15 @@
         <option value="week" selected>Week</option>
         <option value="month">Month</option>
       </select>
+      <select id="groupSel" title="Arrange each day by installer">
+        <option value="off">No grouping</option>
+        <option value="grid">Installer grid</option>
+      </select>
       <span id="rangeLabel"></span>
       <div id="navTabs" class="navbar"></div>
       <button id="btnJobs" title="Show / hide the jobs panel">&#9783; Jobs</button>
     </div>
+    <div id="instbar"></div>
     <div id="msg"></div>
     <div id="cal"></div>
   </div>
@@ -581,6 +626,11 @@
   function emptyFilters() { var f = {}; FILTER_KEYS.forEach(function (k) { f[k] = {}; }); return f; }
   var filters = emptyFilters();
   var jobTab = 'all';          // assignee pill bar: 'all' | <person> | '__none' (unassigned)
+  // How the calendar is arranged. Day/Week only - a month cell is too short for the pivot.
+  //   'off'   one flat list per day (the original, and the default)
+  //   'grid'  a pivot: installers down the left, days across the top
+  // A string rather than a boolean so grouping by Stage/Payment later is another rowKeyOf() case.
+  var groupLayout = 'off';
   var filterView = null;       // (legacy) drill state for the retired combined Filter panel
   var sortBy = { key: 'client', dir: 1 };   // dir 1 = A-Z / soonest / fewest; -1 reversed
   var SORT_OPTS = [
@@ -1245,8 +1295,20 @@
     return card;
   }
 
-  function makeDropTarget(el, day) {
-    el.addEventListener('dragover', function (e) { e.preventDefault(); el.classList.add('dragover'); });
+  // opts.installer: a value / NO_INSTALLER when this target is an installer section - dropping
+  //   there reassigns the fitter as well as the date. Undefined = leave the fitter alone.
+  // opts.noOrder: skip the Cal_Pos rewrite. Set for grid cells - Cal_Pos orders a whole day, and
+  //   a cell holds one installer's slice of it, so a cell-local index can't express a day position.
+  function makeDropTarget(el, day, opts) {
+    opts = opts || {};
+    // fields for the installer change implied by this target, if any
+    var installerFields = function () {
+      var f = {};
+      if (opts.installer === undefined || mappingsCache.installer == null) return f;
+      f[mappingsCache.installer] = (opts.installer === NO_INSTALLER) ? '' : opts.installer;
+      return f;
+    };
+    el.addEventListener('dragover', function (e) { e.preventDefault(); e.stopPropagation(); el.classList.add('dragover'); });
     el.addEventListener('dragleave', function () { el.classList.remove('dragover'); });
     el.addEventListener('drop', function (e) {
       e.preventDefault(); e.stopPropagation(); el.classList.remove('dragover');
@@ -1263,7 +1325,7 @@
         if (note === null) return;   // cancelled -> no visit created
         note = note.trim();
         var idx = dropIndex(el, e.clientY, -1);
-        var fields = {};
+        var fields = installerFields();
         fields[mappingsCache.groupBy] = jobRowId;
         fields[mappingsCache.startDate] = localDateToGrist(day);
         if (note && mappingsCache.seqNote != null) fields[mappingsCache.seqNote] = note;
@@ -1275,8 +1337,10 @@
               rec[mappingsCache.groupBy] = jobRowId;
               rec[mappingsCache.startDate] = new Date(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate()));
               if (note && mappingsCache.seqNote != null) rec[mappingsCache.seqNote] = note;
+              if (mappingsCache.installer != null && opts.installer !== undefined)
+                rec[mappingsCache.installer] = (opts.installer === NO_INSTALLER) ? '' : opts.installer;
               recordsCache.push(rec);
-              commitDayOrder(day, res.id, idx);
+              if (!opts.noOrder) commitDayOrder(day, res.id, idx);
               selectedRowId = res.id;
               isolatedJobKey = 'g:' + jobRowId;
               pendingCursor = res.id;   // re-assert once the row arrives via onRecords
@@ -1288,16 +1352,19 @@
         return;
       }
 
-      // an existing visit card moved -> reschedule and stick at the drop slot
+      // an existing visit card moved -> reschedule (and reassign, if dropped in a section)
       var rowId = Number(e.dataTransfer.getData('text/plain'));
       if (!rowId || !mappingsCache) return;
       var idx2 = dropIndex(el, e.clientY, rowId);
       var rec2 = recordsCache.find(function (r) { return r.id === rowId; });
-      if (rec2) rec2[mappingsCache.startDate] = new Date(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate()));
-      var fields2 = {};
+      var fields2 = installerFields();
+      if (rec2) {
+        rec2[mappingsCache.startDate] = new Date(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate()));
+        Object.keys(fields2).forEach(function (k) { rec2[k] = fields2[k]; });   // optimistic local
+      }
       fields2[mappingsCache.startDate] = localDateToGrist(day);
       grist.getTable().update({ id: rowId, fields: fields2 }).catch(function (err) { console.error(err); });
-      commitDayOrder(day, rowId, idx2);
+      if (!opts.noOrder) commitDayOrder(day, rowId, idx2);
       render();
     });
     el.addEventListener('dblclick', function (e) {
@@ -1307,13 +1374,78 @@
                         'Add a note (optional) - or Cancel to abort:', '');
       if (note === null) return;   // cancelled
       note = note.trim();
-      var fields = {};
+      var fields = installerFields();   // dbl-clicking inside a section prefills that fitter
       fields[mappingsCache.startDate] = localDateToGrist(day);
       if (note && mappingsCache.seqNote != null) fields[mappingsCache.seqNote] = note;
       grist.getTable().create({ fields: fields })
         .then(function (res) { if (res && res.id) { selectedRowId = res.id; isolatedJobKey = null; grist.setCursorPos({ rowId: res.id }); } })
         .catch(function (err) { console.error(err); });
     });
+  }
+
+  // ---- optional sectioned day body ----
+  // Sectioning needs the Installer column mapped AND at least one installer to exist - otherwise
+  // every card lands in the same "No installer" bucket, which is a flat list with extra chrome.
+  function installerMapped() { return !!(mappingsCache && mappingsCache.installer != null); }
+  function sectioningAvailable() { return installerMapped() && installerValues().length > 0; }
+  function groupMode() {
+    if (!sectioningAvailable() || view === 'month') return 'off';
+    return groupLayout === 'grid' ? 'grid' : 'off';
+  }
+  function rowKeyOf(rec) { return installerOf(rec) || NO_INSTALLER; }
+  // Row order follows the Grist choice order, so it matches how the column reads in the
+  // document, with the unassigned row last because that is the queue you work down.
+  function rowList() { return installerValues().concat([NO_INSTALLER]); }
+
+  // ---- installer x day pivot ----
+  // One row per installer (unassigned last), one column per day in the current range.
+  // Cal_Pos is a per-DAY order, so a cell can't express a position within it - dropping into a
+  // cell sets the day and the fitter but leaves the hand-arranged order alone (opts.noOrder).
+  function renderGrid(byDay, days, today) {
+    var rows = rowList();
+    var wrap = document.createElement('div'); wrap.id = 'gridwrap';
+    var table = document.createElement('div'); table.className = 'gtable';
+    table.style.gridTemplateColumns = 'minmax(74px, 92px) repeat(' + days.length + ', minmax(96px, 1fr))';
+
+    table.appendChild(Object.assign(document.createElement('div'), { className: 'gcorner' }));
+    days.forEach(function (day) {
+      var h = document.createElement('div');
+      h.className = 'ghead' + (sameDay(day, today) ? ' today' : '');
+      h.innerHTML = '<span class="num">' + day.getDate() + '</span>' + DAYS[(day.getDay()+6)%7];
+      table.appendChild(h);
+    });
+
+    rows.forEach(function (key) {
+      var isNone = key === NO_INSTALLER;
+      // total across the visible range, so you can read who is loaded and who is free
+      var total = days.reduce(function (n, day) {
+        return n + (byDay[dkey(day)] || []).filter(function (r) { return rowKeyOf(r) === key; }).length;
+      }, 0);
+
+      var lbl = document.createElement('div');
+      lbl.className = 'grlbl' + (isNone ? ' none' : '') + (isNone ? ' grow-sep' : '');
+      var nm = document.createElement('span'); nm.className = 'rname';
+      nm.textContent = isNone ? 'No installer' : key;
+      lbl.appendChild(nm);
+      if (total) {
+        var c = document.createElement('span'); c.className = 'rcount'; c.textContent = total;
+        c.title = total + (total === 1 ? ' install' : ' installs') + ' in view';
+        lbl.appendChild(c);
+      }
+      table.appendChild(lbl);
+
+      days.forEach(function (day) {
+        var cell = document.createElement('div');
+        cell.className = 'gcell' + (sameDay(day, today) ? ' today' : '') + (isNone ? ' grow-sep' : '');
+        (byDay[dkey(day)] || []).filter(function (r) { return rowKeyOf(r) === key; })
+          .forEach(function (rec) { cell.appendChild(makeCard(rec)); });
+        makeDropTarget(cell, day, { installer: key, noOrder: true });
+        table.appendChild(cell);
+      });
+    });
+
+    wrap.appendChild(table);
+    return wrap;
   }
 
   // ---- jobs sidebar ----
@@ -1567,15 +1699,8 @@
     var pOpts = paymentOpts();
     renderChoiceFilter('paymentMenu', 'payment', Object.keys(pOpts), function (v) { return (pOpts[v] || {}).fillColor; }, null);
   }
-  function renderInstallerMenu() {
-    var meta = (mappingsCache && mappingsCache.installer != null) ? colMeta(mappingsCache.installer) : null;
-    var opts = (meta && meta.choiceOptions) || {};
-    var values = installerValues();
-    if (values.length) values = values.concat([NO_INSTALLER]);   // ...plus "not set yet"
-    renderChoiceFilter('installerMenu', 'installer', values,
-      function (v) { return v === NO_INSTALLER ? null : (opts[v] || {}).fillColor; },
-      function (v) { return v === NO_INSTALLER ? 'No installer' : v; });
-  }
+  // No installer dropdown: the pill bar under the toolbar is the only installer control, and it is
+  // single-select. A multi-select menu alongside it could express a state the bar cannot show.
   function renderVisitsMenu() {
     var vnames = { '0': 'No installs', '1': '1 install', '2+': '2+ installs' };
     renderChoiceFilter('visitsMenu', 'visits', ['0', '1', '2+'], null, function (v) { return vnames[v]; });
@@ -1609,9 +1734,61 @@
       bar.appendChild(el);
     });
   }
+  // Installer pill bar, directly under the assignee bar and behaving the same way: one fitter at
+  // a time, All to clear. The state stays a filters.installer set (so recPasses, jobPasses and
+  // saved views need no special case) but the bar only ever puts a single key in it.
+  function renderInstallerBar() {
+    var host = document.getElementById('instbar');
+    if (!host) return;
+    host.innerHTML = '';
+    if (!installerMapped()) return;                 // nothing to show until the column is mapped
+    var people = installerValues();
+    if (!people.length) return;
+
+    // counts are installs per fitter across everything loaded, mirroring the assignee bar's totals
+    var counts = {}, none = 0;
+    recordsCache.forEach(function (r) {
+      var v = installerOf(r);
+      if (v) counts[v] = (counts[v] || 0) + 1; else none++;
+    });
+
+    host.appendChild(Object.assign(document.createElement('span'),
+      { className: 'barlbl', textContent: 'Installer' }));
+    var bar = document.createElement('div'); bar.className = 'navbar';
+    var picked = activeKeys(filters.installer);
+
+    var all = document.createElement('button'); all.type = 'button';
+    all.className = 'ntab' + (picked.length ? '' : ' on');
+    all.appendChild(Object.assign(document.createElement('span'), { textContent: 'All' }));
+    all.appendChild(Object.assign(document.createElement('span'),
+      { className: 'ncount', textContent: String(recordsCache.length) }));
+    all.title = 'Show every installer';
+    all.addEventListener('click', function () { filters.installer = {}; render(); });
+    bar.appendChild(all);
+
+    var add = function (key, label, n) {
+      var el = document.createElement('button'); el.type = 'button';
+      el.className = 'ntab' + (filters.installer[key] ? ' on' : '') + (n ? '' : ' empty');
+      el.appendChild(Object.assign(document.createElement('span'), { textContent: label }));
+      el.appendChild(Object.assign(document.createElement('span'),
+        { className: 'ncount', textContent: String(n) }));
+      el.title = 'Show only ' + label;
+      el.addEventListener('click', function () {
+        var f = {}; f[key] = true;      // replaces, never accumulates - one fitter at a time
+        filters.installer = f;
+        render();
+      });
+      bar.appendChild(el);
+    };
+    people.forEach(function (p) { add(p, p, counts[p] || 0); });
+    if (none) add(NO_INSTALLER, 'Unassigned', none);
+
+    host.appendChild(bar);
+  }
+
   function updateFilterBadges() {
     [['stage', 'stageBtn', 'stageNum'], ['payment', 'paymentBtn', 'paymentNum'],
-     ['installer', 'installerBtn', 'installerNum'], ['visits', 'visitsBtn', 'visitsNum']].forEach(function (t) {
+     ['visits', 'visitsBtn', 'visitsNum']].forEach(function (t) {
       var n = activeKeys(filters[t[0]]).length;
       var badge = document.getElementById(t[2]), btn = document.getElementById(t[1]);
       if (badge) { badge.textContent = n; badge.classList.toggle('show', n > 0); }
@@ -2441,6 +2618,13 @@
     } else {
       var n = view === 'day' ? 1 : 7;
       var start = view === 'day' ? new Date(refDate) : weekStart(refDate);
+      if (groupMode() === 'grid') {
+        var gdays = [];
+        for (var g = 0; g < n; g++) gdays.push(addDays(start, g));
+        cal.appendChild(renderGrid(byDay, gdays, today));
+        finishRender();
+        return;
+      }
       var cols = document.createElement('div'); cols.className = 'cols';
       for (var j = 0; j < n; j++) {
         var day2 = addDays(start, j);
@@ -2458,8 +2642,15 @@
       }
       cal.appendChild(cols);
     }
+    finishRender();
+  }
+
+  // everything outside the calendar grid itself - shared by the column and pivot paths
+  function finishRender() {
     updateRangeLabel();
+    updateGroupSel();
     renderTabs();
+    renderInstallerBar();
     renderSidebar();
     updateFilterBadges();
     renderSortMenu();
@@ -2481,6 +2672,21 @@
       var s = weekStart(refDate), e = addDays(s, 6);
       el.textContent = fmtShort(s) + ' – ' + fmtDate(e);
     }
+  }
+
+  // Grouping selector: greyed out in Month (no room) and until Installer is mapped with choices.
+  function updateGroupSel() {
+    var sel = document.getElementById('groupSel');
+    if (!sel) return;
+    var usable = sectioningAvailable() && view !== 'month';
+    sel.value = usable ? groupLayout : 'off';
+    sel.disabled = !usable;
+    sel.classList.toggle('active', usable && groupLayout !== 'off');
+    sel.title = !installerMapped()
+      ? 'Map the Installer column in the widget panel to arrange days by installer'
+      : (!installerValues().length ? 'Add the installer names to the Installer column choices in Grist first'
+      : (view === 'month' ? 'Installer grouping is available in Day and Week view'
+      : 'Arrange each day by installer'));
   }
 
   function navigate(dir) {  // dir = -1 | 0 | 1
@@ -2570,6 +2776,11 @@
     grist.setOption('view', view);
     render();
   });
+  document.getElementById('groupSel').addEventListener('change', function (e) {
+    groupLayout = e.target.value;
+    grist.setOption('groupLayout', groupLayout);
+    render();
+  });
   document.getElementById('jobSearch').addEventListener('input', function (e) {
     jobQuery = e.target.value;
     renderSidebar();
@@ -2577,7 +2788,6 @@
   var MENUS = [
     ['stageBtn', 'stageMenu', renderStageMenu],
     ['paymentBtn', 'paymentMenu', renderPaymentMenu],
-    ['installerBtn', 'installerMenu', renderInstallerMenu],
     ['visitsBtn', 'visitsMenu', renderVisitsMenu],
     ['sortBtn', 'sortMenu', renderSortMenu]
   ];
@@ -2678,6 +2888,7 @@
       sidebarOpen = opts.sidebar;
       if (window._applySidebar) window._applySidebar();
     }
+    if (typeof opts.groupLayout === 'string') groupLayout = opts.groupLayout || 'off';
     if (opts.sort && opts.sort.key) sortBy = opts.sort;
     // adopt the shared card design only when following it ("for everyone") and not mid-edit
     var editing = (document.getElementById('cardEditModal') || {}).classList && document.getElementById('cardEditModal').classList.contains('open');

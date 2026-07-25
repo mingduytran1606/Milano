@@ -13,16 +13,20 @@
     --danger:#e5484d;
     --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.10);
     --radius:14px; --datecol:200px; --tblfont:12.5px;
+    --rule:#94a0ad;   /* date-column divider: a real rule, not a hairline */
   }
   @media (prefers-color-scheme:dark){
     :root{ --bg:#12161b; --panel:#1a1f26; --ink:#e8edf2; --muted:#9aa6b2;
       --line:#2a323b; --line2:#232a32;
-      --accent:#35c993; --accent-soft:#173a30; --accent-ink:#7ee0bd; --shadow:0 1px 2px rgba(0,0,0,.4);}
+      --accent:#35c993; --accent-soft:#173a30; --accent-ink:#7ee0bd; --rule:#5b6878;
+      --shadow:0 1px 2px rgba(0,0,0,.4);}
   }
   :root[data-theme="light"]{ --bg:#f6f7f9; --panel:#ffffff; --ink:#1d2733; --muted:#6b7683;
-    --line:#e2e5ea; --line2:#eef1f4; --accent:#16b378; --accent-soft:#eafaf2; --accent-ink:#0f7a52;}
+    --line:#e2e5ea; --line2:#eef1f4; --accent:#16b378; --accent-soft:#eafaf2; --accent-ink:#0f7a52;
+    --rule:#94a0ad;}
   :root[data-theme="dark"]{ --bg:#12161b; --panel:#1a1f26; --ink:#e8edf2; --muted:#9aa6b2;
-    --line:#2a323b; --line2:#232a32; --accent:#35c993; --accent-soft:#173a30; --accent-ink:#7ee0bd;}
+    --line:#2a323b; --line2:#232a32; --accent:#35c993; --accent-soft:#173a30; --accent-ink:#7ee0bd;
+    --rule:#5b6878;}
 
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
@@ -251,13 +255,13 @@
   /* ---- table agenda: date + supplier box on the left, aligned rows on the right ---- */
   .ag-day.tbl{display:grid;grid-template-columns:var(--datecol) 1fr;gap:0;padding:0;align-items:stretch}
   .ag-day.tbl>.ag-date{flex:none;padding:9px 12px 11px;background:var(--bg);
-    border-right:1px solid var(--line);font-size:12.5px;font-weight:600;color:var(--ink)}
+    border-right:2px solid var(--rule);font-size:12.5px;font-weight:600;color:var(--ink)}
   .ag-day.tbl.today>.ag-date{background:var(--accent-soft)}
   .ag-day.tbl>.ag-none{padding:14px}
   .sthead{display:grid;grid-template-columns:var(--datecol) 1fr;border-bottom:1px solid var(--line);
     background:var(--bg);position:sticky;top:0;z-index:3}
   .stcols{display:grid}
-  .sthead>.stlab:first-child{background:var(--bg);border-right:1px solid var(--line)}
+  .sthead>.stlab:first-child{background:var(--bg);border-right:2px solid var(--rule)}
   .stlab{padding:7px 8px;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
   .stlab.ed{color:var(--accent-ink)}
   .stlab.r{text-align:right}

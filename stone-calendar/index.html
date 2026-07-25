@@ -102,6 +102,8 @@
   .ag-date .tdy{display:block;margin-top:1px;font-size:10px;font-weight:700;color:var(--accent-ink);letter-spacing:.02em}
   .ag-evs{flex:1 1 auto;display:flex;flex-direction:column;gap:5px;min-width:0}
   .ag-empty{color:var(--muted);text-align:center;padding:40px;font-size:13px}
+  /* today's placeholder — quieter than a real card, so it reads as an anchor not an order */
+  .ag-none{color:var(--muted);font-size:11.5px;font-style:italic;padding:2px 0}
 
   /* assignee menu rows (reuse .pop) */
   .cprow{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:12.5px}
@@ -338,7 +340,7 @@ let eventCardCols=cloneCols(DEFAULT_EVENT_COLS);
 let cardScope='everyone', eventCardFont=10.5;
 const CARD_LS='milano_stonecal_cards';
 const EVENT_TOKENS={ client:'Client', job:'Job ID', stage:'Job stage', address:'Address', product:'Product', supplier:'Supplier',
-  code:'Product code', status:'Status pill', scope:'Scope qty', ordered:'Ordered qty', delivered:'Delivered qty',
+  code:'Product code', status:'Status pill', scope:'Scope qty', ordered:'Ordered qty', delivered:'Delivered qty', action:'What’s happening',
   orderdate:'Order date', deliverydate:'Delivery date', inv:'Invoice #', note:'Note', price:'$ / slab', assigned:'Assignee avatars' };
 function cloneCols(cols){ return (cols||[]).map(c=>({ tpl:String(c.tpl||""),
   style:STYLES.includes(c.style)?c.style:'plain', align:ALIGNS.includes(c.align)?c.align:'left',
@@ -454,6 +456,14 @@ function render(){
   // every day that has an event, in the chosen date order
   const dayKeys=Object.keys(byYmd).map(Number).sort((a,b)=> state.sortDir==="desc" ? b-a : a-b);
 
+  // Today always gets a row (even with nothing on) so it stays as an anchor point in the list.
+  // Skipped when nothing matches at all — the empty-state message covers that case instead.
+  const todayKey=ymd(new Date());
+  if(dayKeys.length && !dayKeys.includes(todayKey)){
+    dayKeys.push(todayKey);
+    dayKeys.sort((a,b)=> state.sortDir==="desc" ? b-a : a-b);
+  }
+
   // title: how many orders are currently listed
   let total=0; dayKeys.forEach(k=>{ total += (byYmd[k]||[]).length; });
   document.getElementById("title").textContent = total+" stone order"+(total===1?"":"s");
@@ -484,19 +494,24 @@ function renderAgenda(byYmd,dayKeys){
   }
   dayKeys.forEach(k=>{
     const d=dateFromYmd(k);
-    const evs=eventsOn(byYmd,d); if(!evs.length) return;
+    const evs=eventsOn(byYmd,d); if(!evs.length && k!==todayK) return;   // today stays as an anchor
     const row=$("div","ag-day"+(k===todayK?" today":""));
     const dc=$("div","ag-date");
     dc.appendChild(document.createTextNode(DOW[(d.getDay()+6)%7]+" "+d.getDate()+" "+MONTHS[d.getMonth()].slice(0,3)+" "+d.getFullYear()));
     if(k===todayK) dc.appendChild($("div","tdy","Today"));
     row.appendChild(dc);
-    const box=$("div","ag-evs"); evs.forEach(e=>box.appendChild(eventChip(e))); row.appendChild(box);
+    const box=$("div","ag-evs");
+    if(evs.length) evs.forEach(e=>box.appendChild(eventChip(e)));
+    else box.appendChild($("div","ag-none","No stone orders today"));
+    row.appendChild(box);
     list.appendChild(row);
   });
 }
 // ---- template engine (markdown-ish → DOM), ported from the installations calendar ----
 // Connector = whitespace / punctuation that only makes sense *between* two values.
-const CARD_CONNECTOR=/^[\s·•|/\\,;:–—()\[\].-]+$/;
+// The bare multiplier "x" / "×" counts too, so "{ordered} x {product}" collapses to just the
+// product when nothing was ordered (WF/Aboda etc. deliver without us placing an order).
+const CARD_CONNECTOR=/^[\s·•|/\\,;:–—()\[\].-]*[x×]?[\s·•|/\\,;:–—()\[\].-]*$/;
 // Parse a line into ordered parts: {text} literals and {node,empty} rendered tokens/format.
 function inlineParts(str,tokens,ctx){
   const re=/\*\*([^*]+)\*\*|\*([^*]+)\*|==([^=]+)==|\{([a-z_]+)\}|([^{*=]+)|([\s\S])/g;
@@ -562,6 +577,38 @@ function avatarsEl(list){ if(!list||!list.length)return null; const w=$("span","
   list.slice(0,4).forEach(n=>{ if(!n)return; const a=$("span","av"); a.style.background=avatarColor(n); a.textContent=initials(n); a.title=n; w.appendChild(a); }); return w; }
 function priceOf(r){ const c=catFor(r); const v=(r.Product_Price_slab!=null&&r.Product_Price_slab!=="")?r.Product_Price_slab:(c?c.Price_Slab:null);
   return (v!=null&&v!=="")?("$"+v):null; }
+// ---- "what's happening" phrase ----
+// Some suppliers (WF, Aboda, client-supplied) are never *ordered* by us — we just wait for the
+// stone to turn up — so those rows carry no Ordered_Qty and the card has nothing to say. This
+// turns Order_Status + the quantities into a plain-English line for exactly those rows.
+// Matched on keywords, not exact choice values, so renaming/adding a Grist choice degrades to
+// "<Status> — 2 slabs" rather than going blank.
+function slabs(n){ return n+" slab"+(n===1?"":"s"); }
+function actionText(r){
+  const s=String(r.Order_Status||"").trim();
+  const scope=num(r.Scope_Qty), del=num(r.Delivery_Qty), ord=num(r.Ordered_Qty);
+  const out=Math.max(0,(scope||ord)-del);                  // still to come
+  const qty=n=>n?(" — "+slabs(n)):"";                      // " — 2 slabs", or nothing when unknown
+  const of=(verb,n)=>n?(verb+" "+slabs(n)):verb;           // "Return 2 slabs" / "Return"
+  if(!s) return "To sort";
+  if(/n\/a/i.test(s)) return null;
+  if(/cancel/i.test(s)) return "Cancelled";
+  if(/await/i.test(s)&&/pick/i.test(s)) return "Pick up to be booked"+qty(out);
+  if(/milano/i.test(s)&&/pick/i.test(s)) return of("Milano to pick up",out);
+  if(/await/i.test(s)&&/order/i.test(s)) return of("To order",out);
+  if(/placed/i.test(s)||/not deliver/i.test(s)) return out?("Awaiting "+slabs(out)+" to deliver"):"Awaiting delivery";
+  if(isDeliveredStatus(r)){
+    const by=(s.match(/deliver(?:ed)?\s+by\s+(.+)$/i)||[])[1];
+    const who=by?(" by "+by.trim()):"";
+    if(del&&scope&&del<scope) return "Delivered "+del+" of "+slabs(scope)+who;
+    if(del) return "Delivered "+slabs(del)+who;
+    return "Delivered"+who;
+  }
+  if(/return/i.test(s)) return of("Return",del||out);
+  if(/hold/i.test(s)) return "On hold"+qty(out);
+  if(/no stock/i.test(s)) return "No stock"+qty(out);
+  return s+qty(out);
+}
 function eventCardTokens(e){
   const r=e.r, j=jobFor(r);
   return {
@@ -576,6 +623,8 @@ function eventCardTokens(e){
     scope:()=>txtNode(num(r.Scope_Qty)?("Scope "+num(r.Scope_Qty)):null),
     ordered:()=>txtNode(num(r.Ordered_Qty)?("Ord "+num(r.Ordered_Qty)):null),
     delivered:()=>txtNode(num(r.Delivery_Qty)?("Deliv "+num(r.Delivery_Qty)):null),
+    // Only fills the gap left by a missing order number — ordered rows already read fine.
+    action:()=>num(r.Ordered_Qty)?null:txtNode(actionText(r)),
     orderdate:()=>txtNode(toDate(r.Order_Date)?fmtDMY(r.Order_Date):null),
     deliverydate:()=>txtNode(toDate(r.Delivery_Date)?fmtDMY(r.Delivery_Date):null),
     inv:()=>txtNode(r.INV||null),

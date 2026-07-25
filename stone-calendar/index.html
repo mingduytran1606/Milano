@@ -248,6 +248,61 @@
   .cf-b{font-size:12.5px;color:var(--muted);line-height:1.5;margin-bottom:14px}
   .cf-f{display:flex;gap:8px;justify-content:flex-end}
 
+  /* ---- table agenda: date + supplier box on the left, aligned rows on the right ---- */
+  .sthead{display:grid;grid-template-columns:var(--datecol,200px) 1fr;border-bottom:1px solid var(--line);
+    background:var(--bg);position:sticky;top:0;z-index:3}
+  .stcols{display:grid}
+  .stlab{padding:7px 8px;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+  .stlab.ed{color:var(--accent-ink)}
+  .stlab.r{text-align:right}
+  .stlab.c{text-align:center}
+  .strows{display:flex;flex-direction:column;min-width:0}
+  .strow{display:grid;align-items:stretch;border-bottom:1px solid var(--line2)}
+  .strow:hover{background:var(--accent-soft)}
+  .stcell{padding:7px 8px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    display:flex;align-items:center;gap:4px}
+  .stcell.r{justify-content:flex-end;font-variant-numeric:tabular-nums}
+  .stcell.c{justify-content:center;padding-left:2px;padding-right:2px}
+  .stcell.ed{cursor:text;border-radius:5px}
+  .stcell.ed:hover{box-shadow:inset 0 0 0 1px var(--accent)}
+  .stcell.roc{color:var(--muted)}
+  .stcell.saved{animation:stfl 1.1s ease-out}
+  @keyframes stfl{0%{background:var(--accent);color:#fff}100%{background:transparent}}
+  .stcell b{font-weight:700;color:var(--ink)}
+  .stcell i{font-style:italic}
+  .stcell u{text-decoration:underline;text-underline-offset:2px}
+  .stzero{color:var(--muted)}
+  .stcell input,.stcell select{font:inherit;font-size:12.5px;width:100%;color:var(--ink);
+    background:var(--panel);border:1px solid var(--accent);border-radius:6px;padding:3px 5px;outline:none}
+  .stsum{display:grid;align-items:center;border-top:1px solid var(--line);background:var(--bg)}
+  .stsum .stcell{font-weight:700;font-size:11.5px}
+  .stsum .lb{color:var(--muted);font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+  .stage-pill{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;color:#1d2733}
+  .supbox{margin-top:9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:5px}
+  .supbox .cap{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--muted);padding:0 4px 4px}
+  .sups{display:flex;flex-direction:column;gap:2px}
+  .sup{display:flex;align-items:center;gap:6px;font:inherit;font-size:11px;padding:2px 5px;border-radius:6px;
+    cursor:pointer;border:1px solid transparent;color:var(--ink);background:none;text-align:left}
+  .sup:hover{background:var(--bg);border-color:var(--line)}
+  .sup.dayon{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+  .sup.glob{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .sup .nm{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sup .q{font-weight:600;font-variant-numeric:tabular-nums}
+  .sup .sq{width:8px;height:8px;border-radius:2px;flex:0 0 auto}
+  .suptot{display:flex;align-items:baseline;gap:6px;margin-top:4px;padding:4px 5px 1px;
+    border-top:1px solid var(--line);font-size:11px;font-variant-numeric:tabular-nums}
+  .suptot .nm{flex:1 1 auto;color:var(--muted);font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+  .suptot .q{font-weight:700}
+  .dayflt{font-size:10px;color:var(--accent-ink);font-weight:700;padding:3px 4px 0}
+  .rowdel{justify-self:start;align-self:center;width:20px;height:20px;margin-left:6px;font:inherit;
+    font-size:13px;line-height:1;color:var(--muted);background:none;border:1px solid transparent;
+    border-radius:6px;cursor:pointer;opacity:0}
+  .strow:hover .rowdel,.rowdel:focus-visible{opacity:1}
+  .rowdel:hover{color:#fff;background:var(--danger);border-color:var(--danger)}
+  .nodate{padding:6px 10px;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--danger);background:var(--bg);border-bottom:1px solid var(--line)}
+
   .demo-tag{position:fixed;bottom:9px;left:11px;font-size:10px;color:var(--muted);background:var(--panel);
     border:1px solid var(--line);border-radius:20px;padding:2px 9px;opacity:.75;z-index:40}
 </style>
@@ -497,6 +552,61 @@ function stoneLabel(r){ const c=catFor(r);
   return r.Product_Supplier || r.Stone || "Stone"; }
 function jobClient(j){ return j ? ((String(j.Client_Label||"")).trim() || (String(j.Job_Address||"")).trim() || j.Job_ID || ("#"+j.id)) : "-"; }
 function jobCode(j){ return j ? (j.Job_ID || ("#"+j.id)) : ""; }
+
+// ---- slabs ----
+// A slab count is the ordered qty, falling back to the scope qty for the suppliers we never place
+// an order with (WF, Aboda, client-supplied). Same rule bulk edit already uses.
+function slabsOf(r){ return num(r.Ordered_Qty)||num(r.Scope_Qty)||0; }
+const slabSum=rs=>Math.round(rs.reduce((s,r)=>s+slabsOf(r),0)*10)/10;
+function stageOf(r){ const j=jobFor(r); return String((j&&j.Stage)||"").trim(); }
+const isQuote=r=>/quote/i.test(stageOf(r));
+const escH=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+const DASH='<span class="stzero">-</span>';
+const txtH=s=>(s==null||s==="")?DASH:escH(s);
+const STAGE_C={"Quote":"#FEF47A","Live":"#98FD90","WIP":"#CCFEFE","Completed":"#FECC81",
+  "Cancelled":"#FFFFFF","Others":"#DCDCDC","Closed !":"#f0d1ed","On hold":"#FECBCC","Fix Job":"#e9edf1"};
+const stageColor=s=>STAGE_C[s]||"#e9edf1";
+
+// ---- table columns ----
+// One entry per available column. `edit` names the Stone_Order field a cell writes back to and
+// `sum` the field the day total adds up. Headings are fixed: the heading IS the field.
+const COLDEF={
+  client:      {label:"Client",       w:138, html:r=>txtH(jobClient(jobFor(r)))},
+  jobstatus:   {label:"Job status",   w:96,  html:r=>{ const s=stageOf(r); return s
+                 ? '<span class="stage-pill" style="background:'+escH(stageColor(s))+'">'+escH(s)+"</span>" : DASH; }},
+  job:         {label:"Job ID",       w:78,  html:r=>txtH(jobCode(jobFor(r)))},
+  stone:       {label:"Stone",        w:200, html:r=>txtH(stoneLabel(r))},
+  code:        {label:"Code",         w:86,  html:r=>txtH(r.Product_Code)},
+  supplier:    {label:"Supplier",     w:112, html:r=>txtH(r.Product_Supplier||(catFor(r)&&catFor(r).Supplier)||"")},
+  scope:       {label:"Scope",        w:54,  align:"right", sum:"Scope_Qty",    edit:{f:"Scope_Qty",t:"num"},
+                 html:r=>num(r.Scope_Qty)?String(num(r.Scope_Qty)):DASH},
+  ordered:     {label:"Ord",          w:50,  align:"right", sum:"Ordered_Qty",  edit:{f:"Ordered_Qty",t:"num"},
+                 html:r=>num(r.Ordered_Qty)?String(num(r.Ordered_Qty)):DASH},
+  delivered:   {label:"Del",          w:50,  align:"right", sum:"Delivery_Qty", edit:{f:"Delivery_Qty",t:"num"},
+                 html:r=>num(r.Delivery_Qty)?String(num(r.Delivery_Qty)):DASH},
+  status:      {label:"Order status", w:150, edit:{f:"Order_Status",t:"choice"},
+                 html:r=>'<span class="evpill" style="border-color:transparent;color:#1d2733;background:'
+                   +escH(statusColor(r.Order_Status))+'">'+escH(statusLabel(r.Order_Status))+"</span>"},
+  orderdate:   {label:"Order date",   w:100, edit:{f:"Order_Date",t:"date"},
+                 html:r=>txtH(toDate(r.Order_Date)?fmtDMY(r.Order_Date):"")},
+  deliverydate:{label:"Delivery date",w:108, edit:{f:"Delivery_Date",t:"date"},
+                 html:r=>txtH(toDate(r.Delivery_Date)?fmtDMY(r.Delivery_Date):"")},
+  inv:         {label:"Invoice",      w:100, edit:{f:"INV",t:"text"},  html:r=>txtH(r.INV)},
+  note:        {label:"Note",         w:160, edit:{f:"Note",t:"text"}, html:r=>txtH(r.Note)},
+  price:       {label:"$ / slab",     w:84,  align:"right",            html:r=>txtH(priceOf(r))},
+  assigned:    {label:"Assignees",    w:110, html:r=>{ const a=assigneesOf(r); return a.length?escH(a.join(", ")):DASH; }},
+  flag:        {label:"",             w:34,  align:"centre",
+                 html:r=>{ const f=dataFlags(r); return f.length
+                   ? '<span class="evflag" title="'+escH(f.join(" / "))+'">!</span>' : ""; }}
+};
+const mkCol=(k,over)=>Object.assign({k,w:COLDEF[k].w,align:COLDEF[k].align||"left",
+  style:"plain",b:false,i:false,u:false},over||{});
+const DEFAULT_COLS=["client","jobstatus","stone","supplier","scope","ordered","delivered","status","flag"];
+let tblCols=DEFAULT_COLS.map(k=>mkCol(k,k==="client"?{b:true}:null));
+let showTotals=true;
+const colTemplate=()=>tblCols.map(c=>c.w+"px").join(" ")+" minmax(0,1fr)";
+const alignCls=a=>a==="right"?" r":a==="centre"?" c":"";
+const wrapFmt=(h,c)=>{ let s=h; if(c.u)s="<u>"+s+"</u>"; if(c.i)s="<i>"+s+"</i>"; if(c.b)s="<b>"+s+"</b>"; return s; };
 
 // Every stone line appears on its ORDER date (falling back to the delivery date
 // only when there is no order date, so nothing silently vanishes).

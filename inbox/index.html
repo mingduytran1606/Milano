@@ -578,9 +578,14 @@
   .stones .scope-n{margin-top:14px}
   .stones .scope-n:first-child{margin-top:0}
   .stones .scope-n + .stone{margin-top:4px}
-  .stone{display:grid;grid-template-columns:auto minmax(0,1.6fr) minmax(0,1fr);align-items:center;gap:8px;padding-left:16px}
+  /* Stone name + note split. The two tracks come from Customize > Stone table;
+     the leading `auto` is the bullet, which is never configurable. */
+  .stone{display:grid;grid-template-columns:auto var(--sumstone-cols,minmax(0,1.6fr) minmax(0,1fr));align-items:center;gap:8px;padding-left:16px}
   .stone .snm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-stone,13px);font-weight:600}
   .stone .snote{justify-self:stretch;text-align:left;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-stoneNote,12px);color:var(--muted);cursor:default}
+  .stone .snm.al-centre,.stone .snote.al-centre{text-align:center}
+  .stone .snm.al-right,.stone .snote.al-right{text-align:right}
+  .stone .snm.al-left,.stone .snote.al-left{text-align:left}
   .sdot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.14) inset}
   /* per-status sub-heading (only used when a job spans multiple statuses) */
   .stgrp-head{display:flex;align-items:baseline;gap:5px;margin-top:14px;font-size:var(--fs-stoneStatus,14px)}
@@ -961,6 +966,37 @@ function stoneCols(){ return state.stoneCols&&state.stoneCols.length===STONE_ORD
 function stoneAlign(k){ const c=stoneCols().find(x=>x.k===k); return c?c.align:"left"; }
 function cloneStoneCols(cols){ return normaliseStoneCols(cols).map(c=>({k:c.k,w:c.w,align:c.align})); }
 
+// ---- SUMMARY CARD stone lines (the "Scope" block, detail panel) ------------
+// Each bulleted stone under a status heading is `bullet · name · note`. The bullet
+// is fixed; the other two are proportional tracks whose share and alignment are
+// adjustable, same as everywhere else. Widths are fr shares, not pixels - this sits
+// inside the summary card's resizable left column, so a pixel width would fight the
+// splitter every time it moved.
+const SUMSTONECOL={ name:{label:"Stone name",w:3}, note:{label:"Stone note",w:2} };
+const SUMSTONE_ORDER=["name","note"];
+function defaultSumStoneCols(){
+  return SUMSTONE_ORDER.map(k=>({k, w:SUMSTONECOL[k].w, align:"left"}));
+}
+function normaliseSumStoneCols(v){
+  const saved={};
+  if(Array.isArray(v)) v.forEach(c=>{ if(c&&SUMSTONECOL[c.k]) saved[c.k]=c; });
+  return SUMSTONE_ORDER.map(k=>{
+    const s=saved[k]||{};
+    return { k, w:Math.max(1,Math.min(6,Math.round(Number(s.w)||SUMSTONECOL[k].w))),
+      align:CARD_ALIGNS.includes(s.align)?s.align:"left" };
+  });
+}
+function sumStoneCols(){ return state.sumStoneCols&&state.sumStoneCols.length===SUMSTONE_ORDER.length
+  ? state.sumStoneCols : defaultSumStoneCols(); }
+function cloneSumStoneCols(cols){ return normaliseSumStoneCols(cols).map(c=>({k:c.k,w:c.w,align:c.align})); }
+function sumStoneAlign(k){ const c=sumStoneCols().find(x=>x.k===k); return c?c.align:"left"; }
+// Applied to the .stones container; .stone reads it for its two non-bullet tracks.
+function applySumStoneGrid(el){
+  if(!el) return;
+  el.style.setProperty("--sumstone-cols",
+    sumStoneCols().map(c=>"minmax(0,"+c.w+"fr)").join(" "));
+}
+
 // ---- helpers ----
 const $ = (t,c,txt)=>{const e=document.createElement(t); if(c)e.className=c; if(txt!=null)e.textContent=txt; return e;};
 const esc = s => (s==null?"":String(s));
@@ -1155,6 +1191,7 @@ const state = { jobs:[], stone:[], inst:[], clients:[], catalogue:[], selectedId
                                         // the schema; the write path never sends these (brief §5)
   stoneNoteH:null,                      // shared height for stone-order note boxes
   stoneCols:defaultStoneCols(),         // Stone Order table: per-column width (px) + alignment
+  sumStoneCols:defaultSumStoneCols(),   // summary card stone lines: name/note share + alignment
   sumLeftPct:null,                      // summary card: left column width %
   listW:null,                           // adjustable list-pane width (drag splitter)
   assignChoices:null,                   // Assigned_To choice list (from schema / data)
@@ -1180,7 +1217,7 @@ function pruneRecent(){ let changed=false; const now=Date.now(); for(const k in 
 function pushRecentJobs(){ if(!state.grist) return; try{ grist.setOption("recentJobs", state.recentJobs); }catch(e){} }
 
 function loadPrefs(){ try{ return JSON.parse(localStorage.getItem(LSKEY))||{}; }catch(e){ return {}; } }
-function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ savedViews:state.savedViews.filter(v=>!v.shared), current:snapshot(true), stoneNoteH:state.stoneNoteH||null, listW:state.listW||null, templateShared:state.templateShared, groupCollapsed:state.groupCollapsed||{}, savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"", stoneCols:cloneStoneCols(state.stoneCols), sumLeftPct:state.sumLeftPct||null, listCardFont:state.listCardFont, summaryFont:state.summaryFont, colors:state.colors, fmtCollapsed:state.fmtCollapsed, stageOrder:(state.stageOrder||STAGES).slice(), stageOrderShared:state.stageOrderShared, tab:state.tab||"all", recentJobs:state.recentJobs||{} })); }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ savedViews:state.savedViews.filter(v=>!v.shared), current:snapshot(true), stoneNoteH:state.stoneNoteH||null, listW:state.listW||null, templateShared:state.templateShared, groupCollapsed:state.groupCollapsed||{}, savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"", stoneCols:cloneStoneCols(state.stoneCols), sumStoneCols:cloneSumStoneCols(state.sumStoneCols), sumLeftPct:state.sumLeftPct||null, listCardFont:state.listCardFont, summaryFont:state.summaryFont, colors:state.colors, fmtCollapsed:state.fmtCollapsed, stageOrder:(state.stageOrder||STAGES).slice(), stageOrderShared:state.stageOrderShared, tab:state.tab||"all", recentJobs:state.recentJobs||{} })); }catch(e){} }
 function snapshot(withMeta){
   const s={ q:state.filter.q, stage:cleanSet(state.filter.stage), assigned:cleanSet(state.filter.assigned),
     payment:cleanSet(state.filter.payment), sort:{key:state.sort.key,dir:state.sort.dir}, sort2:{key:state.sort2.key,dir:state.sort2.dir}, stageOrder:(state.stageOrder||STAGES).slice(), cardFontSize:state.cardFontSize||12.5, fields:Object.assign({},state.fields),
@@ -2137,6 +2174,7 @@ function sharedConfigObj(){
     cardCols:cloneCardCols(state.cardCols),
     cardHeadings:!!state.cardHeadings,
     stoneCols:cloneStoneCols(state.stoneCols),
+    sumStoneCols:cloneSumStoneCols(state.sumStoneCols),
     cardFontSize:state.cardFontSize||12.5,
     listCardFont:state.listCardFont, summaryFont:state.summaryFont,
     colors:state.colors, fields:state.fields,
@@ -2465,7 +2503,43 @@ function openCardEditor(){
   }
   state.stoneCols=normaliseStoneCols(state.stoneCols);
   drawStone();
-  panelStone.appendChild($("div","tpl-help","Select a job with stone lines to watch the table change as you adjust it."));
+
+  // The bulleted stone lines in the summary card above the table are the other place
+  // a stone gets a note, and they had the same fixed split. Width here is a share of
+  // the row, not pixels, because the summary's left column is itself resizable.
+  panelStone.appendChild($("div","tpl-sec","Summary card · stone lines"));
+  panelStone.appendChild($("div","tpl-help","The bulleted “2× Cararra Lux · note” rows under Scope. Width is each one's share of the row; the bullet is fixed."));
+  const ssWrap=$("div","cm-cols"); panelStone.appendChild(ssWrap);
+  function refreshSumStone(){
+    state.sumStoneCols=normaliseSumStoneCols(state.sumStoneCols);
+    savePrefs(); renderDetail();
+  }
+  function drawSumStone(){
+    ssWrap.innerHTML="";
+    sumStoneCols().forEach(col=>{
+      const row=$("div","colrow");
+      row.appendChild($("div","colname",SUMSTONECOL[col.k].label));
+      const al=$("div","cm-seg");
+      [["left","L","Left"],["centre","C","Centre"],["right","R","Right"]].forEach(sp=>{
+        const b=document.createElement("button"); b.type="button"; b.textContent=sp[1]; b.title=sp[2];
+        if(col.align===sp[0]) b.className="on";
+        b.onclick=()=>{ col.align=sp[0]; refreshSumStone(); drawSumStone(); };
+        al.appendChild(b); });
+      row.appendChild(al);
+      const sp2=document.createElement("span"); sp2.style.flex="1 1 auto"; row.appendChild(sp2);
+      const wseg=$("div","cm-wstep");
+      const wm=document.createElement("button"); wm.type="button"; wm.className="cm-wb"; wm.textContent="−"; wm.title="Narrower";
+      wm.onclick=()=>{ col.w=Math.max(1,col.w-1); refreshSumStone(); drawSumStone(); };
+      const wv=$("span","cm-wv",col.w+"×");
+      const wp=document.createElement("button"); wp.type="button"; wp.className="cm-wb"; wp.textContent="+"; wp.title="Wider";
+      wp.onclick=()=>{ col.w=Math.min(6,col.w+1); refreshSumStone(); drawSumStone(); };
+      wseg.appendChild(wm); wseg.appendChild(wv); wseg.appendChild(wp); row.appendChild(wseg);
+      ssWrap.appendChild(row);
+    });
+  }
+  state.sumStoneCols=normaliseSumStoneCols(state.sumStoneCols);
+  drawSumStone();
+  panelStone.appendChild($("div","tpl-help","Select a job with stone lines to watch both areas change as you adjust them."));
 
   // ---- Grouping panel ----
   const gwrap=$("div","grp-editor"); panelGroup.appendChild(gwrap); renderGroupingEditor(gwrap);
@@ -2490,7 +2564,7 @@ function openCardEditor(){
 }
 function resetActivePanel(){
   if(state._cardTab==="group") state.grouping={by:"",rules:[],restMode:"value"};
-  else if(state._cardTab==="stone") state.stoneCols=defaultStoneCols();
+  else if(state._cardTab==="stone"){ state.stoneCols=defaultStoneCols(); state.sumStoneCols=defaultSumStoneCols(); }
   else { state.cardCols=DEFAULT_JOB_COLS(); state.cardTemplate=colsToTemplate(state.cardCols); state.cardHeadings=false; }
   savePrefs(); pushSharedTemplate(); renderAll(); openCardEditor();
 }
@@ -3027,7 +3101,7 @@ function renderDetail(){
       tot.appendChild($("span",null,total===1?"slab":"slabs"));
       scopeBlk.appendChild(tot);
     }
-    const sl=$("div","stones");
+    const sl=$("div","stones"); applySumStoneGrid(sl);
     [...groups.entries()]
       .sort((a,b)=> (qtyOf(b[1])-qtyOf(a[1])) || ((ORDS.indexOf(a[0])+1||99)-(ORDS.indexOf(b[0])+1||99)))
       .forEach(([s,rows])=>{
@@ -3052,9 +3126,9 @@ function renderDetail(){
           const row=$("div","stone");
           row.appendChild($("span","sbul"));
           const showQty = !singleColour && g.hasQty;
-          row.appendChild($("span","snm", (showQty ? g.qty+"× " : "")+esc(g.label)));
+          row.appendChild($("span","snm al-"+sumStoneAlign("name"), (showQty ? g.qty+"× " : "")+esc(g.label)));
           const noteTxt=g.notes.join(" \u00b7 ");
-          const sn=$("span","snote", esc(noteTxt)); if(noteTxt) sn.title=esc(noteTxt); row.appendChild(sn);
+          const sn=$("span","snote al-"+sumStoneAlign("note"), esc(noteTxt)); if(noteTxt) sn.title=esc(noteTxt); row.appendChild(sn);
           sl.appendChild(row);
         });
       });
@@ -3329,6 +3403,10 @@ if(typeof grist!=="undefined"){
         const sc=normaliseStoneCols(opts.stoneCols);
         if(J(sc)!==J(cloneStoneCols(state.stoneCols))){ state.stoneCols=sc; changed=true; }
       }
+      if(Array.isArray(opts.sumStoneCols) && opts.sumStoneCols.length){
+        const ss=normaliseSumStoneCols(opts.sumStoneCols);
+        if(J(ss)!==J(cloneSumStoneCols(state.sumStoneCols))){ state.sumStoneCols=ss; changed=true; }
+      }
     }
     // NB: the active grouping is intentionally NOT adopted - it's personal, so the
     // widget always defaults to "No grouping" and the team's grouping is never forced.
@@ -3478,7 +3556,8 @@ document.addEventListener("click",closeMenus);
 {
   const p=loadPrefs(); state.savedViews=p.savedViews||[]; applyConfig(p.current);
   state.stoneNoteH=p.stoneNoteH||null; state.listW=p.listW||null; state.groupCollapsed=p.groupCollapsed||{};
-  state.stoneCols=normaliseStoneCols(p.stoneCols); state.sumLeftPct=p.sumLeftPct||null;
+  state.stoneCols=normaliseStoneCols(p.stoneCols); state.sumStoneCols=normaliseSumStoneCols(p.sumStoneCols);
+  state.sumLeftPct=p.sumLeftPct||null;
   state.listCardFont=Object.assign({},LIST_CARD_FONT,p.listCardFont||{}); state.summaryFont=Object.assign({},SUMMARY_FONT,p.summaryFont||{});
   state.colors=normalizeColors(p.colors); applyColorOverrides();
   state.fmtCollapsed=(p.fmtCollapsed&&typeof p.fmtCollapsed==="object")?p.fmtCollapsed:{};

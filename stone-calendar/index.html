@@ -215,7 +215,7 @@
   .se-chip.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
   /* the chip you just created, so a create is visibly confirmed */
   @keyframes evnew{0%,100%{box-shadow:0 0 0 0 var(--accent-soft)}45%{box-shadow:0 0 0 3px var(--accent)}}
-  .ev.ev-new{animation:evnew 1.1s ease-in-out 2}
+  .ev.ev-new,.strow.ev-new{animation:evnew 1.1s ease-in-out 2}
   .se-dirty{font-size:11.5px;color:var(--accent-ink);font-weight:600;margin-right:auto}
   /* status <select> gets a dot of the chosen colour in front of it */
   .se-statwrap{display:flex;align-items:center;gap:8px}
@@ -817,6 +817,7 @@ function stRow(r){
     del.onclick=ev=>{ ev.stopPropagation(); askRemove(r); };
     row.appendChild(del);
   }
+  row.dataset.rid=String(r.id);          // flashNewRow() finds the created row by this
   if(state.flashId!=null && r.id===state.flashId) row.classList.add("ev-new");
   return row;
 }
@@ -1478,14 +1479,15 @@ async function createRow(){
   if(state.grist) await refetch(); else render();
   flashNewRow();
 }
-// Scroll the freshly created chip into view and pulse it, so a create is visibly confirmed
+// Scroll the freshly created row into view and pulse it, so a create is visibly confirmed
 // rather than silently folding into a long agenda.
 function flashNewRow(){
   const id=state.flashId; if(id==null) return;
+  const find=()=>document.querySelector('.strow[data-rid="'+id+'"]');
   setTimeout(()=>{
-    const el=document.querySelector('.ev[data-rid="'+id+'"]');
+    const el=find();
     if(el&&el.scrollIntoView) el.scrollIntoView({block:"center",behavior:"smooth"});
-    setTimeout(()=>{ state.flashId=null; const e2=document.querySelector('.ev[data-rid="'+id+'"]');
+    setTimeout(()=>{ state.flashId=null; const e2=find();
       if(e2) e2.classList.remove("ev-new"); },2600);
   },0);
 }

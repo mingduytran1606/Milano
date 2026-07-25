@@ -192,6 +192,44 @@
   .ce-save.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
   .ce-save.primary:hover{filter:brightness(1.06)}
 
+  /* ---- edit panel (double-click a chip) ---- */
+  .se-grid{display:grid;grid-template-columns:120px 1fr;gap:9px 12px;align-items:center}
+  .se-lab{font-size:11.5px;font-weight:600;color:var(--muted)}
+  .se-in{width:100%;font:inherit;font-size:12.5px;color:var(--ink);background:var(--bg);
+    border:1px solid var(--line);border-radius:9px;padding:7px 9px;outline:none}
+  .se-in:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+  textarea.se-in{min-height:56px;resize:vertical;line-height:1.45}
+  .se-head{font-size:12.5px;font-weight:700;color:var(--ink)}
+  .se-sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .se-full{grid-column:1 / -1}
+  .se-dirty{font-size:11.5px;color:var(--accent-ink);font-weight:600;margin-right:auto}
+  /* status <select> gets a dot of the chosen colour in front of it */
+  .se-statwrap{display:flex;align-items:center;gap:8px}
+  .se-dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto;border:1px solid rgba(0,0,0,.12)}
+
+  /* ---- bulk edit ---- */
+  .assign.on{background:var(--accent-soft);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+  .evrow{display:flex;align-items:center;gap:8px;min-width:0}
+  .evrow .ev{flex:1 1 auto;min-width:0}
+  .evsel{flex:0 0 auto;width:15px;height:15px;cursor:pointer;accent-color:var(--accent);margin:0}
+  .ag-all{display:block;margin-top:5px;font-size:10.5px;font-weight:600;color:var(--accent-ink);cursor:pointer}
+  .ag-all:hover{text-decoration:underline}
+  .bulkbar{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:70;display:none;
+    align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    box-shadow:0 12px 34px rgba(0,0,0,.22);padding:9px 12px;font-size:12.5px;max-width:calc(100vw - 24px);flex-wrap:wrap}
+  .bulkbar.open{display:flex}
+  .bulkbar .bcount{font-weight:700}
+  .bulkbar .blab{color:var(--muted);font-size:11.5px;font-weight:600}
+  .bulkbar select.se-in,.bulkbar input.se-in{width:auto;padding:6px 8px}
+  /* confirm / unsaved overlay, shared by both panels */
+  .cf{position:fixed;inset:0;background:rgba(16,24,40,.42);z-index:95;display:none;align-items:center;justify-content:center;padding:20px}
+  .cf.open{display:flex}
+  .cf-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);
+    width:min(400px,96vw);padding:16px}
+  .cf-t{font-size:13.5px;font-weight:700;margin-bottom:6px}
+  .cf-b{font-size:12.5px;color:var(--muted);line-height:1.5;margin-bottom:14px}
+  .cf-f{display:flex;gap:8px;justify-content:flex-end}
+
   .demo-tag{position:fixed;bottom:9px;left:11px;font-size:10px;color:var(--muted);background:var(--panel);
     border:1px solid var(--line);border-radius:20px;padding:2px 9px;opacity:.75;z-index:40}
 </style>
@@ -207,6 +245,7 @@
     </div>
     <button class="assign" id="sortBtn" title="Sort the agenda">Sort: Oldest first ▾</button>
     <button class="assign" id="assignBtn">All assignees ▾</button>
+    <button class="assign" id="bulkBtn" title="Select several orders and set their status together">☑ Bulk edit</button>
     <button class="assign" id="cardsBtn" title="Customise how cards appear">⚙ Cards</button>
   </div>
   <div class="filterbar">
@@ -228,6 +267,31 @@
       <span class="modal-close" id="cardClose">&times;</span>
     </div>
     <div class="ce-body" id="ceBody"></div>
+  </div>
+</div>
+<div class="modal" id="editModal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div class="ce-tabs"><span class="ce-tab on">Stone order</span></div>
+      <span class="modal-close" id="editClose">&times;</span>
+    </div>
+    <div class="ce-body" id="seBody"></div>
+  </div>
+</div>
+<div class="bulkbar" id="bulkBar">
+  <span class="bcount" id="bulkCount">0 selected</span>
+  <span class="blab">Status</span>
+  <select class="se-in" id="bulkStatus"></select>
+  <span class="blab">Delivery date</span>
+  <input class="se-in" id="bulkDate" type="date">
+  <button class="ce-save ghost" id="bulkClear" type="button">Clear</button>
+  <button class="ce-save primary" id="bulkApply" type="button">Apply</button>
+</div>
+<div class="cf" id="cfBox">
+  <div class="cf-card">
+    <div class="cf-t" id="cfTitle"></div>
+    <div class="cf-b" id="cfBody"></div>
+    <div class="cf-f" id="cfFoot"></div>
   </div>
 </div>
 <div class="demo-tag" id="demoTag" hidden>demo data</div>
@@ -325,6 +389,9 @@ const state={
   searchQ:"",                           // stone search — live-filters events
   statusFilter:"all",                   // status-pill filter (group/status key)
   sortDir:"asc",                        // agenda date order: asc = oldest first
+  bulk:false,                           // bulk-edit mode: checkboxes + the bottom action bar
+  sel:new Set(),                        // row ids ticked for bulk edit
+  colType:{},                           // Stone_Order colId -> Grist type, for writing dates back
   jobById:{}, catById:{}
 };
 window._stonecal=state;
@@ -469,6 +536,13 @@ function render(){
   document.getElementById("title").textContent = total+" stone order"+(total===1?"":"s");
 
   renderAgenda(byYmd,dayKeys);
+
+  // drop any selection that a search/filter change has scrolled out of view, then refresh the bar
+  if(state.bulk && state.sel.size){
+    const live=new Set(); dayKeys.forEach(k=>(byYmd[k]||[]).forEach(e=>live.add(e.r.id)));
+    [...state.sel].forEach(id=>{ if(!live.has(id)) state.sel.delete(id); });
+  }
+  renderBulkBar();
 }
 function renderStatusbar(){
   const bar=document.getElementById("statusbar"); bar.innerHTML="";
@@ -484,8 +558,14 @@ function renderStatusbar(){
 }
 // Turn a ymd integer (y*10000 + m*100 + d) back into a Date.
 function dateFromYmd(k){ return new Date(Math.floor(k/10000), Math.floor(k/100)%100 - 1, k%100); }
+// Per-day "select all" toggles for bulk mode, rebuilt with the agenda. Ticking one checkbox only
+// refreshes the bar (re-rendering would rebuild the boxes mid-click), so the bar refreshes these.
+let dayToggles=[];
+function refreshDayToggles(){
+  dayToggles.forEach(t=>{ t.el.textContent = t.ids.every(id=>state.sel.has(id)) ? "Clear day" : "Select day"; });
+}
 function renderAgenda(byYmd,dayKeys){
-  const list=document.getElementById("agenda"); list.className="agenda"; list.innerHTML="";
+  const list=document.getElementById("agenda"); list.className="agenda"; list.innerHTML=""; dayToggles=[];
   const todayK=ymd(new Date());
   if(!dayKeys.length){ const q=(state.searchQ||"").trim(); const g=findGroup(state.statusFilter);
     list.appendChild($("div","ag-empty","No stone orders"+(q?(" matching “"+q+"”"):"")
@@ -499,6 +579,15 @@ function renderAgenda(byYmd,dayKeys){
     const dc=$("div","ag-date");
     dc.appendChild(document.createTextNode(DOW[(d.getDay()+6)%7]+" "+d.getDate()+" "+MONTHS[d.getMonth()].slice(0,3)+" "+d.getFullYear()));
     if(k===todayK) dc.appendChild($("div","tdy","Today"));
+    if(state.bulk && evs.length){
+      const ids=evs.map(e=>e.r.id);
+      const tog=$("span","ag-all");
+      tog.onclick=ev=>{ ev.stopPropagation();
+        const all=ids.every(id=>state.sel.has(id));
+        ids.forEach(id=>{ if(all) state.sel.delete(id); else state.sel.add(id); }); render(); };
+      dayToggles.push({ el:tog, ids });        // label kept live by renderBulkBar
+      dc.appendChild(tog);
+    }
     row.appendChild(dc);
     const box=$("div","ag-evs");
     if(evs.length) evs.forEach(e=>box.appendChild(eventChip(e)));
@@ -654,8 +743,26 @@ function eventChip(e){
   });
   chip.title=fmtDMY(e.date)+" · "+statusLabel(r.Order_Status)+"\n"+jobClient(j)+" ("+jobCode(j)+")\n"+stoneLabel(r)
     +"\nOrd "+num(r.Ordered_Qty)+" / Deliv "+num(r.Delivery_Qty);
-  chip.onclick=ev=>{ ev.stopPropagation(); openDay(e.date,[e],chip); };
-  return chip;
+  // Single click peeks at the line, double click edits it. The peek is held back briefly so a
+  // double click doesn't flash the popup open behind the edit panel.
+  let clickT=null;
+  chip.onclick=ev=>{ ev.stopPropagation();
+    if(clickT) return;
+    clickT=setTimeout(()=>{ clickT=null; openDay(e.date,[e],chip); },220);
+  };
+  chip.ondblclick=ev=>{ ev.preventDefault(); ev.stopPropagation();
+    if(clickT){ clearTimeout(clickT); clickT=null; }
+    closePops(); openEdit(r);
+  };
+  if(!state.bulk) return chip;
+  // bulk mode: a tick box beside each chip
+  const row=$("div","evrow");
+  const box=document.createElement("input"); box.type="checkbox"; box.className="evsel";
+  box.checked=state.sel.has(r.id); box.title="Select for bulk edit";
+  box.onclick=ev=>ev.stopPropagation();
+  box.onchange=()=>{ if(box.checked) state.sel.add(r.id); else state.sel.delete(r.id); renderBulkBar(); };
+  row.appendChild(box); row.appendChild(chip);
+  return row;
 }
 
 // ---- card editor modal ----
@@ -764,6 +871,174 @@ function renderCardEditor(){
   bAll.onclick=()=>{ cardScope="everyone"; publishCards(); saveLocalCards(); setNote("Saved — shared with everyone."); };
   row.appendChild(bMe); row.appendChild(bAll); foot.appendChild(row); body.appendChild(foot);
 }
+// ============================================================
+//  EDIT PANEL — double-click a chip
+// ============================================================
+// The fields the card can show and an operator would actually change on the day. Status is a
+// live choice list from the Grist column, so it always matches the Stone Order page.
+const EDIT_FIELDS=[
+  { col:"Order_Status",  label:"Status",       kind:"status" },
+  { col:"Ordered_Qty",   label:"Ordered qty",  kind:"num" },
+  { col:"Delivery_Qty",  label:"Delivered qty",kind:"num" },
+  { col:"Order_Date",    label:"Order date",   kind:"date" },
+  { col:"Delivery_Date", label:"Delivery date",kind:"date" },
+  { col:"INV",           label:"Invoice #",    kind:"text" },
+  { col:"Note",          label:"Note",         kind:"note" }
+];
+let edit={ id:null, orig:{}, cur:{} };
+function editDirty(){ return EDIT_FIELDS.some(f=>String(edit.cur[f.col]??"")!==String(edit.orig[f.col]??"")); }
+function openEdit(r){
+  edit={ id:r.id, orig:{}, cur:{} };
+  EDIT_FIELDS.forEach(f=>{
+    const v = f.kind==="date" ? dateToInput(r[f.col],state.colType[f.col])
+            : f.kind==="num"  ? (num(r[f.col])||"")
+            : (r[f.col]==null?"":String(r[f.col]));
+    edit.orig[f.col]=v; edit.cur[f.col]=v;
+  });
+  renderEdit(r);
+  document.getElementById("editModal").classList.add("open");
+}
+function renderEdit(r){
+  const j=jobFor(r), body=document.getElementById("seBody"); body.innerHTML="";
+  const head=$("div","se-head",jobClient(j)+(jobCode(j)?(" · "+jobCode(j)):""));
+  body.appendChild(head);
+  body.appendChild($("div","se-sub",stoneLabel(r)+" · Scope "+num(r.Scope_Qty)));
+  const grid=$("div","se-grid"); grid.style.marginTop="12px";
+  EDIT_FIELDS.forEach(f=>{
+    grid.appendChild($("div","se-lab",f.label));
+    let host=grid, input;
+    if(f.kind==="status"){
+      const wrap=$("div","se-statwrap"); const dot=$("span","se-dot");
+      input=document.createElement("select"); input.className="se-in";
+      const seen=new Set(); const opts=STATUS_ORDER.slice();
+      if(edit.cur[f.col] && !opts.includes(edit.cur[f.col])) opts.unshift(edit.cur[f.col]);   // keep an unknown value
+      const blank=document.createElement("option"); blank.value=""; blank.textContent="— To sort —"; input.appendChild(blank);
+      opts.forEach(s=>{ if(!s||seen.has(s))return; seen.add(s);
+        const o=document.createElement("option"); o.value=s; o.textContent=s; input.appendChild(o); });
+      input.value=edit.cur[f.col]||"";
+      const paint=()=>{ dot.style.background=statusColor(input.value); };
+      paint(); input.onchange=()=>{ edit.cur[f.col]=input.value; paint(); updateEditFoot(); };
+      wrap.appendChild(dot); wrap.appendChild(input); grid.appendChild(wrap); return;
+    }
+    if(f.kind==="note"){ input=document.createElement("textarea"); input.className="se-in"; }
+    else { input=document.createElement("input"); input.className="se-in";
+      input.type = f.kind==="date" ? "date" : (f.kind==="num" ? "number" : "text");
+      if(f.kind==="num"){ input.min="0"; input.step="1"; } }
+    input.value=edit.cur[f.col];
+    input.oninput=()=>{ edit.cur[f.col]=input.value; updateEditFoot(); };
+    host.appendChild(input);
+  });
+  body.appendChild(grid);
+  const foot=$("div","ce-foot");
+  const row=$("div","ce-btnrow"); row.id="seFoot";
+  const flag=$("span","se-dirty"); flag.id="seDirty";
+  const cancel=document.createElement("button"); cancel.type="button"; cancel.className="ce-save ghost"; cancel.textContent="Cancel";
+  cancel.onclick=()=>tryCloseEdit();
+  const save=document.createElement("button"); save.type="button"; save.className="ce-save primary"; save.textContent="Save";
+  save.id="seSave"; save.onclick=()=>saveEdit();
+  row.appendChild(flag); row.appendChild(cancel); row.appendChild(save);
+  foot.appendChild(row); body.appendChild(foot);
+  updateEditFoot();
+}
+function updateEditFoot(){
+  const d=editDirty(), f=document.getElementById("seDirty"), s=document.getElementById("seSave");
+  if(f) f.textContent=d?"Unsaved changes":"";
+  if(s) s.disabled=!d, s.style.opacity=d?"":".5", s.style.cursor=d?"pointer":"default";
+}
+// Build only the fields that actually changed, so a save never rewrites untouched columns.
+function editUpdate(){
+  const fields={};
+  EDIT_FIELDS.forEach(f=>{
+    const cur=edit.cur[f.col], was=edit.orig[f.col];
+    if(String(cur??"")===String(was??"")) return;
+    fields[f.col] = f.kind==="date" ? inputToGrist(cur,state.colType[f.col])
+                  : f.kind==="num"  ? (cur===""?null:num(cur))
+                  : (cur===""?null:cur);
+  });
+  return Object.keys(fields).length?{ id:edit.id, fields }:null;
+}
+async function saveEdit(){
+  const u=editUpdate(); if(!u){ closeEditNow(); return; }
+  const s=document.getElementById("seSave"); if(s){ s.disabled=true; s.textContent="Saving…"; }
+  try{ await writeRows([u]); closeEditNow(); }
+  catch(err){ console.error(err);
+    if(s){ s.disabled=false; s.textContent="Save"; }
+    await confirmBox("Couldn’t save","Grist rejected the change: "+(err&&err.message?err.message:String(err)),
+      [{v:"ok",label:"OK",kind:"primary"}]); }
+}
+function closeEditNow(){ document.getElementById("editModal").classList.remove("open"); edit={ id:null, orig:{}, cur:{} }; }
+async function tryCloseEdit(){
+  if(!editDirty()){ closeEditNow(); return; }
+  const c=await confirmBox("Unsaved changes","Save your changes to this stone order, or discard them?",
+    [{v:"cancel",label:"Cancel"},{v:"discard",label:"Discard"},{v:"save",label:"Save",kind:"primary"}]);
+  if(c==="save") await saveEdit();
+  else if(c==="discard") closeEditNow();
+}
+
+// ============================================================
+//  BULK EDIT
+// ============================================================
+function setBulk(on){
+  state.bulk=!!on;
+  if(!state.bulk) state.sel.clear();
+  document.getElementById("bulkBtn").classList.toggle("on",state.bulk);
+  render();
+}
+// Rebuilt only when the live choice list actually changes — a rebuild would reset the operator's
+// pick, and render() runs on every tick of the selection.
+let _bulkStatusSig="";
+function bulkStatusOptions(){
+  const sig=STATUS_ORDER.join("|"); if(sig===_bulkStatusSig) return; _bulkStatusSig=sig;
+  const sel=document.getElementById("bulkStatus"); const keepVal=sel.value; sel.innerHTML="";
+  const keep=document.createElement("option"); keep.value=""; keep.textContent="— leave unchanged —"; sel.appendChild(keep);
+  STATUS_ORDER.forEach(s=>{ if(!s)return; const o=document.createElement("option"); o.value=s; o.textContent=s; sel.appendChild(o); });
+  if(keepVal) sel.value=keepVal;
+}
+function renderBulkBar(){
+  bulkStatusOptions();
+  const bar=document.getElementById("bulkBar");
+  bar.classList.toggle("open",state.bulk);
+  if(!state.bulk) return;
+  refreshDayToggles();
+  const n=state.sel.size;
+  document.getElementById("bulkCount").textContent=n+" selected";
+  const apply=document.getElementById("bulkApply");
+  apply.disabled=!n; apply.style.opacity=n?"":".5"; apply.style.cursor=n?"pointer":"default";
+}
+// Delivered qty follows the order number, per how the team works — falling back to the scope
+// qty for the suppliers we never place an order with (WF, Aboda, client-supplied).
+function bulkDeliveryQty(r){ return num(r.Ordered_Qty)||num(r.Scope_Qty)||null; }
+async function applyBulk(){
+  const status=document.getElementById("bulkStatus").value;
+  const dateStr=document.getElementById("bulkDate").value;
+  if(!status && !dateStr){
+    await confirmBox("Nothing to apply","Pick a status or a delivery date first.",[{v:"ok",label:"OK",kind:"primary"}]);
+    return;
+  }
+  const rows=(state.stone||[]).filter(r=>state.sel.has(r.id));
+  if(!rows.length) return;
+  const marksDelivered=!!status && isDeliveredStatus({Order_Status:status});
+  const bits=[]; if(status) bits.push('status "'+status+'"'); if(dateStr) bits.push("delivery date "+fmtDMY(inputToGrist(dateStr,"Date")));
+  const qtyNote=(marksDelivered||dateStr)?" Delivered qty is set to match the order number (or the scope qty where nothing was ordered).":"";
+  const ok=await confirmBox("Apply to "+rows.length+" stone order"+(rows.length===1?"":"s")+"?",
+    "Set "+bits.join(" and ")+" on "+rows.length+" selected order"+(rows.length===1?"":"s")+"."+qtyNote,
+    [{v:"cancel",label:"Cancel"},{v:"go",label:"Apply",kind:"primary"}]);
+  if(ok!=="go") return;
+  const updates=rows.map(r=>{
+    const fields={};
+    if(status) fields.Order_Status=status;
+    if(dateStr) fields.Delivery_Date=inputToGrist(dateStr,state.colType.Delivery_Date);
+    if(marksDelivered||dateStr){ const q=bulkDeliveryQty(r); if(q!=null) fields.Delivery_Qty=q; }
+    return { id:r.id, fields };
+  });
+  const apply=document.getElementById("bulkApply"); apply.disabled=true; apply.textContent="Saving…";
+  try{ await writeRows(updates); setBulk(false); }
+  catch(err){ console.error(err);
+    await confirmBox("Couldn’t save","Grist rejected the change: "+(err&&err.message?err.message:String(err)),
+      [{v:"ok",label:"OK",kind:"primary"}]); }
+  finally{ apply.disabled=false; apply.textContent="Apply"; renderBulkBar(); }
+}
+
 function openDay(d,evs,anchor){
   const m=document.getElementById("dayPop"); m.innerHTML="";
   m.appendChild($("h4",null,DOW[(d.getDay()+6)%7]+" "+d.getDate()+" "+MONTHS[d.getMonth()]+" "+d.getFullYear()));
@@ -840,7 +1115,9 @@ async function loadGristSchema(){
     let wo={}; try{ wo=JSON.parse(col.widgetOptions||"{}")||{}; }catch(e){ return null; }
     return { choices:wo.choices||[], options:wo.choiceOptions||{} };
   }
-  return { refInfo, choiceModel };
+  // colId -> Grist type for one table, so date writes match the column (Date vs DateTime)
+  function typeMap(parentTableId){ const m={}; colsOf(parentTableId).forEach(c=>{ if(c.colId) m[c.colId]=c.type||""; }); return m; }
+  return { refInfo, choiceModel, typeMap };
 }
 async function pullTables(){
   const [so,jd]=await Promise.all([grist.docApi.fetchTable("Stone_Order"), grist.docApi.fetchTable("Jobs_Detail")]);
@@ -850,13 +1127,55 @@ async function pullTables(){
 }
 async function refetch(){ if(!state.grist)return; try{ await pullTables(); }catch(e){ console.warn("fetch failed",e); } render(); }
 
+// ---- writing back to Grist ----
+// Grist stores a Date as epoch seconds at UTC midnight; a DateTime as a real instant, so for
+// those we send local midnight instead. Read back with the matching UTC/local parts.
+function dateToGrist(d,type){ if(!d)return null;
+  return /^DateTime/.test(type||"") ? Math.floor(new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime()/1000)
+                                    : Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/1000; }
+// Grist date value -> "YYYY-MM-DD" for an <input type="date">, and back again.
+function dateToInput(v,type){ const d=toDate(v); if(!d)return "";
+  const utc=!/^DateTime/.test(type||"") && typeof v==="number";
+  const y=utc?d.getUTCFullYear():d.getFullYear(), m=(utc?d.getUTCMonth():d.getMonth())+1, dd=utc?d.getUTCDate():d.getDate();
+  return y+"-"+String(m).padStart(2,"0")+"-"+String(dd).padStart(2,"0"); }
+function inputToGrist(s,type){ if(!s)return null; const p=String(s).split("-").map(Number);
+  if(p.length!==3||!p[0])return null; return dateToGrist(new Date(p[0],p[1]-1,p[2]),type); }
+// One batched write for both single and bulk edits, then re-read so the view matches the doc.
+async function writeRows(updates){
+  if(!updates.length) return;
+  if(!state.grist){                                     // standalone/demo: patch the sample rows
+    updates.forEach(u=>{ const r=state.stone.find(x=>x.id===u.id); if(r) Object.assign(r,u.fields); });
+    reindex(); render(); return;
+  }
+  await grist.docApi.applyUserActions(updates.map(u=>["UpdateRecord","Stone_Order",u.id,u.fields]));
+  await refetch();
+}
+// ---- shared confirm / unsaved dialog ----
+// btns: [{v,label,kind}] — resolves with the chosen v, or null if dismissed.
+let _cfRes=null;
+function confirmBox(title,body,btns){
+  return new Promise(res=>{
+    _cfRes=res;
+    document.getElementById("cfTitle").textContent=title;
+    document.getElementById("cfBody").textContent=body;
+    const foot=document.getElementById("cfFoot"); foot.innerHTML="";
+    btns.forEach(b=>{ const el=document.createElement("button"); el.type="button";
+      el.className="ce-save "+(b.kind||"ghost"); el.textContent=b.label;
+      el.onclick=ev=>{ ev.stopPropagation(); closeConfirm(b.v); }; foot.appendChild(el); });
+    document.getElementById("cfBox").classList.add("open");
+  });
+}
+function closeConfirm(v){ document.getElementById("cfBox").classList.remove("open");
+  const r=_cfRes; _cfRes=null; if(r) r(v===undefined?null:v); }
+
 if(typeof grist!=="undefined"){
   try{ grist.ready({ requiredAccess:"full" }); }catch(e){}
   try{ grist.onRecord(()=>{}); }catch(e){}
   try{ grist.onOptions(applyGristOptions); }catch(e){}   // adopt the shared card design
   grist.docApi.fetchTable("Stone_Order").then(async ()=>{
     try{ const sc=await loadGristSchema(); state.ref.product=sc.refInfo("Stone_Order","Product");
-         applyStatusModel(sc.choiceModel("Stone_Order","Order_Status")); }catch(e){ console.warn("schema failed",e); }
+         applyStatusModel(sc.choiceModel("Stone_Order","Order_Status"));
+         state.colType=sc.typeMap("Stone_Order"); }catch(e){ console.warn("schema failed",e); }
     try{ await pullTables(); }catch(e){ console.warn("initial fetch failed",e); }
     state.grist=true; render();
   }).catch(()=>{});
@@ -906,11 +1225,25 @@ const stoneSearch=document.getElementById("stoneSearch");
 stoneSearch.oninput=e=>{ state.searchQ=e.target.value; render(); };
 document.getElementById("searchClr").onclick=()=>{ state.searchQ=""; stoneSearch.value=""; render(); stoneSearch.focus(); };
 document.getElementById("cardsBtn").onclick=e=>{ e.stopPropagation(); openCardEditor(); };
+document.getElementById("bulkBtn").onclick=e=>{ e.stopPropagation(); closePops(); setBulk(!state.bulk); };
+document.getElementById("bulkBar").onclick=e=>e.stopPropagation();
+document.getElementById("bulkClear").onclick=()=>{ state.sel.clear(); render(); };
+document.getElementById("bulkApply").onclick=()=>applyBulk();
+document.getElementById("editClose").onclick=()=>tryCloseEdit();
+document.getElementById("editModal").onclick=e=>{ if(e.target.id==="editModal") tryCloseEdit(); };
+document.getElementById("cfBox").onclick=e=>{ if(e.target.id==="cfBox") closeConfirm(null); };
 document.getElementById("cardClose").onclick=closeCardEditor;
 document.getElementById("cardModal").onclick=e=>{ if(e.target.id==="cardModal") closeCardEditor(); };
 document.getElementById("dayPop").onclick=e=>e.stopPropagation();
 document.addEventListener("click",closePops);
-document.addEventListener("keydown",e=>{ if(e.key==="Escape") closePops(); });
+document.addEventListener("keydown",e=>{
+  if(e.key!=="Escape") return;
+  // innermost first: confirm dialog, then the edit panel (which asks about unsaved work), then popups
+  if(document.getElementById("cfBox").classList.contains("open")){ closeConfirm(null); return; }
+  if(document.getElementById("editModal").classList.contains("open")){ tryCloseEdit(); return; }
+  if(state.bulk){ setBulk(false); return; }
+  closePops();
+});
 
 // restore any personal card design
 { const lc=loadLocalCards();

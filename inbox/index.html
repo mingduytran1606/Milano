@@ -578,14 +578,27 @@
   .stones .scope-n{margin-top:14px}
   .stones .scope-n:first-child{margin-top:0}
   .stones .scope-n + .stone{margin-top:4px}
-  /* Stone name + note split. The two tracks come from Customize > Stone table;
-     the leading `auto` is the bullet, which is never configurable. */
-  .stone{display:grid;grid-template-columns:auto var(--sumstone-cols,minmax(0,1.6fr) minmax(0,1fr));align-items:center;gap:8px;padding-left:16px}
-  .stone .snm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-stone,13px);font-weight:600}
-  .stone .snote{justify-self:stretch;text-align:left;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-stoneNote,12px);color:var(--muted);cursor:default}
+  /* Stone name + note split. The two tracks come from Customize > Stone table or
+     from dragging the divider between them; the leading `auto` is the bullet, which
+     is never configurable. The 8px track between name and note is the drag handle -
+     it doubles as the gap, so the row keeps its old spacing. */
+  .stone{display:grid;grid-template-columns:auto minmax(0,var(--sumstone-name-w,1.6fr)) 8px minmax(0,var(--sumstone-note-w,1fr));align-items:center;padding-left:16px}
+  .stones.wrapping .stone{align-items:start}
+  .stone .snm{min-width:0;font-size:var(--fs-stone,13px);font-weight:600}
+  .stone .snote{justify-self:stretch;text-align:left;min-width:0;font-size:var(--fs-stoneNote,12px);color:var(--muted);cursor:default}
+  /* Overflow behaviour, per column: one line + ellipsis, or wrap to N lines. */
+  .stone .wr-clip{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .stone .wr-wrap{white-space:normal;overflow-wrap:anywhere;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical}
+  .stone .snm.wr-wrap{-webkit-line-clamp:var(--sumstone-name-lines,2)}
+  .stone .snote.wr-wrap{-webkit-line-clamp:var(--sumstone-note-lines,2)}
   .stone .snm.al-centre,.stone .snote.al-centre{text-align:center}
   .stone .snm.al-right,.stone .snote.al-right{text-align:right}
   .stone .snm.al-left,.stone .snote.al-left{text-align:left}
+  /* Divider: invisible until you're over the block, so the card stays clean. */
+  .stone .ssplit{align-self:stretch;cursor:col-resize;position:relative}
+  .stone .ssplit::after{content:"";position:absolute;left:3px;top:0;bottom:0;width:2px;border-radius:2px;background:var(--accent);opacity:0;transition:opacity .12s}
+  .stones:hover .stone .ssplit::after{opacity:.22}
+  .stones .stone .ssplit:hover::after,.stones.rsz-drag .stone .ssplit::after{opacity:.85}
   .sdot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.14) inset}
   /* per-status sub-heading (only used when a job spans multiple statuses) */
   .stgrp-head{display:flex;align-items:baseline;gap:5px;margin-top:14px;font-size:var(--fs-stoneStatus,14px)}
@@ -968,33 +981,73 @@ function cloneStoneCols(cols){ return normaliseStoneCols(cols).map(c=>({k:c.k,w:
 
 // ---- SUMMARY CARD stone lines (the "Scope" block, detail panel) ------------
 // Each bulleted stone under a status heading is `bullet · name · note`. The bullet
-// is fixed; the other two are proportional tracks whose share and alignment are
-// adjustable, same as everywhere else. Widths are fr shares, not pixels - this sits
-// inside the summary card's resizable left column, so a pixel width would fight the
-// splitter every time it moved.
+// is fixed; the other two are proportional tracks whose share, alignment and
+// overflow behaviour are adjustable, same as everywhere else. Widths are fr shares,
+// not pixels - this sits inside the summary card's resizable left column, so a pixel
+// width would fight the splitter every time it moved.
+// The share is set two ways and they are the same number: drag the divider between
+// the two columns on the card, or use +/- in Customize > Stone table. Dragging lands
+// on fractions, so `w` is a float, not an integer step.
 const SUMSTONECOL={ name:{label:"Stone name",w:3}, note:{label:"Stone note",w:2} };
 const SUMSTONE_ORDER=["name","note"];
+const SUMSTONE_WRAPS=["clip","wrap"];   // clip = one line + ellipsis, wrap = up to `lines`
+const SUMSTONE_W_MIN=0.4, SUMSTONE_W_MAX=8, SUMSTONE_LINES_MAX=6;
 function defaultSumStoneCols(){
-  return SUMSTONE_ORDER.map(k=>({k, w:SUMSTONECOL[k].w, align:"left"}));
+  return SUMSTONE_ORDER.map(k=>({k, w:SUMSTONECOL[k].w, align:"left", wrap:"clip", lines:2}));
 }
 function normaliseSumStoneCols(v){
   const saved={};
   if(Array.isArray(v)) v.forEach(c=>{ if(c&&SUMSTONECOL[c.k]) saved[c.k]=c; });
   return SUMSTONE_ORDER.map(k=>{
-    const s=saved[k]||{};
-    return { k, w:Math.max(1,Math.min(6,Math.round(Number(s.w)||SUMSTONECOL[k].w))),
-      align:CARD_ALIGNS.includes(s.align)?s.align:"left" };
+    const s=saved[k]||{}, w=Number(s.w);
+    return { k,
+      w:Math.round(Math.max(SUMSTONE_W_MIN,Math.min(SUMSTONE_W_MAX, w>0?w:SUMSTONECOL[k].w))*100)/100,
+      align:CARD_ALIGNS.includes(s.align)?s.align:"left",
+      wrap:SUMSTONE_WRAPS.includes(s.wrap)?s.wrap:"clip",
+      lines:Math.max(1,Math.min(SUMSTONE_LINES_MAX,Math.round(Number(s.lines)||2))) };
   });
 }
 function sumStoneCols(){ return state.sumStoneCols&&state.sumStoneCols.length===SUMSTONE_ORDER.length
   ? state.sumStoneCols : defaultSumStoneCols(); }
-function cloneSumStoneCols(cols){ return normaliseSumStoneCols(cols).map(c=>({k:c.k,w:c.w,align:c.align})); }
-function sumStoneAlign(k){ const c=sumStoneCols().find(x=>x.k===k); return c?c.align:"left"; }
+function cloneSumStoneCols(cols){ return normaliseSumStoneCols(cols).map(c=>({k:c.k,w:c.w,align:c.align,wrap:c.wrap,lines:c.lines})); }
+function sumStoneCol(k){ return sumStoneCols().find(x=>x.k===k)||defaultSumStoneCols().find(x=>x.k===k); }
+function sumStoneAlign(k){ return sumStoneCol(k).align; }
+// Classes for one of the two text spans: alignment + how it handles overflow.
+function sumStoneClasses(k){
+  const c=sumStoneCol(k);
+  return " al-"+c.align+" wr-"+c.wrap;
+}
 // Applied to the .stones container; .stone reads it for its two non-bullet tracks.
 function applySumStoneGrid(el){
   if(!el) return;
-  el.style.setProperty("--sumstone-cols",
-    sumStoneCols().map(c=>"minmax(0,"+c.w+"fr)").join(" "));
+  const cols=sumStoneCols();
+  cols.forEach(c=>{
+    el.style.setProperty("--sumstone-"+c.k+"-w", c.w+"fr");
+    el.style.setProperty("--sumstone-"+c.k+"-lines", String(c.lines));
+  });
+  // Multi-line rows read better top-aligned; single-line rows stay centred.
+  el.classList.toggle("wrapping", cols.some(c=>c.wrap==="wrap"));
+}
+// Drag the divider between name and note. Shares are relative, so we keep their sum
+// fixed and move the split point; 40px minimum a side so a column can't vanish.
+function startSumStoneDrag(e,handle){
+  e.preventDefault();
+  const box=handle.closest(".stones"); if(!box) return;
+  const nm=box.querySelector(".snm"), nt=box.querySelector(".snote"); if(!nm||!nt) return;
+  const cols=normaliseSumStoneCols(sumStoneCols()), name=cols[0], note=cols[1];
+  const sum=name.w+note.w, startW=nm.getBoundingClientRect().width;
+  const total=startW+nt.getBoundingClientRect().width, startX=e.clientX;
+  if(!(total>0)) return;
+  box.classList.add("rsz-drag");
+  const mv=ev=>{
+    const px=Math.max(40,Math.min(total-40,startW+(ev.clientX-startX)));
+    name.w=Math.round(Math.max(SUMSTONE_W_MIN,sum*(px/total))*100)/100;
+    note.w=Math.round(Math.max(SUMSTONE_W_MIN,sum-name.w)*100)/100;
+    state.sumStoneCols=cols; applySumStoneGrid(box);
+  };
+  const up=()=>{ document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up);
+    box.classList.remove("rsz-drag"); savePrefs(); pushSharedTemplate(); };
+  document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up);
 }
 
 // ---- helpers ----
@@ -2508,7 +2561,7 @@ function openCardEditor(){
   // a stone gets a note, and they had the same fixed split. Width here is a share of
   // the row, not pixels, because the summary's left column is itself resizable.
   panelStone.appendChild($("div","tpl-sec","Summary card · stone lines"));
-  panelStone.appendChild($("div","tpl-help","The bulleted “2× Cararra Lux · note” rows under Scope. Width is each one's share of the row; the bullet is fixed."));
+  panelStone.appendChild($("div","tpl-help","The bulleted “2× Cararra Lux · note” rows under Scope. Width is each one's share of the row (drag the divider on the card for the same thing); the bullet is fixed. Clip cuts a long value off with “…”, Wrap runs it onto more lines."));
   const ssWrap=$("div","cm-cols"); panelStone.appendChild(ssWrap);
   function refreshSumStone(){
     state.sumStoneCols=normaliseSumStoneCols(state.sumStoneCols);
@@ -2516,7 +2569,8 @@ function openCardEditor(){
   }
   function drawSumStone(){
     ssWrap.innerHTML="";
-    sumStoneCols().forEach(col=>{
+    const cols=sumStoneCols(), total=cols.reduce((a,c)=>a+c.w,0)||1;
+    cols.forEach(col=>{
       const row=$("div","colrow");
       row.appendChild($("div","colname",SUMSTONECOL[col.k].label));
       const al=$("div","cm-seg");
@@ -2526,13 +2580,31 @@ function openCardEditor(){
         b.onclick=()=>{ col.align=sp[0]; refreshSumStone(); drawSumStone(); };
         al.appendChild(b); });
       row.appendChild(al);
+      // Overflow: one line + ellipsis, or wrap to a set number of lines.
+      const wr=$("div","cm-seg");
+      [["clip","Clip","One line, cut off with …"],["wrap","Wrap","Run onto more lines"]].forEach(sp=>{
+        const b=document.createElement("button"); b.type="button"; b.textContent=sp[1]; b.title=sp[2];
+        if(col.wrap===sp[0]) b.className="on";
+        b.onclick=()=>{ col.wrap=sp[0]; refreshSumStone(); drawSumStone(); };
+        wr.appendChild(b); });
+      row.appendChild(wr);
+      if(col.wrap==="wrap"){
+        const lseg=$("div","cm-wstep");
+        const lm=document.createElement("button"); lm.type="button"; lm.className="cm-wb"; lm.textContent="−"; lm.title="Fewer lines";
+        lm.onclick=()=>{ col.lines=Math.max(1,col.lines-1); refreshSumStone(); drawSumStone(); };
+        const lv=$("span","cm-wv",col.lines+(col.lines===1?" line":" lines")); lv.style.minWidth="46px";
+        const lp=document.createElement("button"); lp.type="button"; lp.className="cm-wb"; lp.textContent="+"; lp.title="More lines";
+        lp.onclick=()=>{ col.lines=Math.min(SUMSTONE_LINES_MAX,col.lines+1); refreshSumStone(); drawSumStone(); };
+        lseg.appendChild(lm); lseg.appendChild(lv); lseg.appendChild(lp); row.appendChild(lseg);
+      }
       const sp2=document.createElement("span"); sp2.style.flex="1 1 auto"; row.appendChild(sp2);
       const wseg=$("div","cm-wstep");
       const wm=document.createElement("button"); wm.type="button"; wm.className="cm-wb"; wm.textContent="−"; wm.title="Narrower";
-      wm.onclick=()=>{ col.w=Math.max(1,col.w-1); refreshSumStone(); drawSumStone(); };
-      const wv=$("span","cm-wv",col.w+"×");
+      wm.onclick=()=>{ col.w=Math.max(SUMSTONE_W_MIN,Math.round((col.w-0.25)*100)/100); refreshSumStone(); drawSumStone(); };
+      // Shown as a share of the pair, which is what the two numbers actually mean.
+      const wv=$("span","cm-wv",Math.round(col.w/total*100)+"%"); wv.title=col.w+"fr";
       const wp=document.createElement("button"); wp.type="button"; wp.className="cm-wb"; wp.textContent="+"; wp.title="Wider";
-      wp.onclick=()=>{ col.w=Math.min(6,col.w+1); refreshSumStone(); drawSumStone(); };
+      wp.onclick=()=>{ col.w=Math.min(SUMSTONE_W_MAX,Math.round((col.w+0.25)*100)/100); refreshSumStone(); drawSumStone(); };
       wseg.appendChild(wm); wseg.appendChild(wv); wseg.appendChild(wp); row.appendChild(wseg);
       ssWrap.appendChild(row);
     });
@@ -3126,9 +3198,12 @@ function renderDetail(){
           const row=$("div","stone");
           row.appendChild($("span","sbul"));
           const showQty = !singleColour && g.hasQty;
-          row.appendChild($("span","snm al-"+sumStoneAlign("name"), (showQty ? g.qty+"× " : "")+esc(g.label)));
+          const snm=$("span","snm"+sumStoneClasses("name"), (showQty ? g.qty+"× " : "")+esc(g.label));
+          snm.title=esc(g.label); row.appendChild(snm);
+          const hnd=$("span","ssplit"); hnd.title="Drag to resize the name / note split";
+          hnd.onmousedown=e=>startSumStoneDrag(e,hnd); row.appendChild(hnd);
           const noteTxt=g.notes.join(" \u00b7 ");
-          const sn=$("span","snote al-"+sumStoneAlign("note"), esc(noteTxt)); if(noteTxt) sn.title=esc(noteTxt); row.appendChild(sn);
+          const sn=$("span","snote"+sumStoneClasses("note"), esc(noteTxt)); if(noteTxt) sn.title=esc(noteTxt); row.appendChild(sn);
           sl.appendChild(row);
         });
       });

@@ -294,29 +294,35 @@
   /* ---- date gutter: day-number circle + weekday; the only red is TODAY ---- */
   .ag-day.tbl>.ag-date{padding:10px 12px;background:var(--bg)}
   .ag-day.tbl.today>.ag-date{background:var(--bg)}
-  .daychip{display:flex;align-items:center;gap:10px;border-radius:12px;background:transparent;
-    padding:8px 14px 8px 8px;width:max-content;max-width:100%}
-  .daychip .dnum{flex:0 0 auto;width:36px;height:36px;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;font-size:15.5px;font-weight:700;
-    letter-spacing:-.02em;font-variant-numeric:tabular-nums;background:var(--line2);color:var(--ink)}
-  .daychip .dtxt{display:flex;flex-direction:column;line-height:1.15;min-width:0}
-  .daychip .ddow{font-size:13.5px;font-weight:700;color:var(--ink)}
-  .daychip .dmon{font-size:10.5px;font-weight:600;color:var(--muted);letter-spacing:.02em}
+  .daychip{display:inline-flex;align-items:center;border-radius:8px;background:transparent;
+    padding:4px 9px;width:max-content;max-width:100%}
+  .daychip .dtxt{font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;
+    font-variant-numeric:tabular-nums}
   .daychip.today{background:#fdeaea}
-  .daychip.today .dnum{background:#e2453f;color:#fff}
-  .daychip.today .ddow{color:#d23b35}
-  .daychip.today .dmon{color:#c8817d}
+  .daychip.today .dtxt{color:#d23b35;font-weight:700}
   .ag-day.tbl>.ag-date .tdy{margin-top:6px;padding-left:4px;color:#d23b35}
 
   /* ---- supplier group header, sitting above the rows it describes ---- */
-  .supgrp{display:flex;align-items:center;gap:9px;padding:6px 10px;cursor:pointer;
-    background:var(--bg);border-bottom:1px solid var(--line2);
-    font-size:11px;font-weight:700;letter-spacing:.03em;color:var(--ink);user-select:none}
-  .supgrp:hover{background:var(--accent-soft)}
-  .supgrp .tw{color:var(--muted);font-size:9px;width:9px}
-  .supgrp .gnm{text-transform:uppercase}
+  /* job panel: read-outs sit in a quieter block under the editable fields */
+  .jp-sec{margin-top:16px;padding-top:12px;border-top:1px solid var(--line2)}
+  .jp-cap{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--muted);margin-bottom:8px}
+  .jp-ro{display:grid;grid-template-columns:120px 1fr;gap:6px 12px;font-size:12px}
+  .jp-ro .k{color:var(--muted);font-weight:600}
+  .jp-ro .v{color:var(--ink);white-space:pre-wrap}
+  .jp-lines{display:flex;flex-direction:column;gap:6px}
+  .jp-line{display:flex;align-items:center;gap:8px;font-size:12px;padding:6px 8px;
+    border:1px solid var(--line2);border-radius:8px;background:var(--bg)}
+  .jp-line .nm{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .jp-line .q{font-variant-numeric:tabular-nums;color:var(--muted)}
+  .jp-line.here{border-color:var(--accent);background:var(--accent-soft)}
+  .jp-note{font-size:11.5px;color:var(--muted);margin:2px 0 12px}
+  .jp-saved{color:var(--accent-ink);font-weight:700;font-size:11.5px;margin-left:8px}
+  .supgrp{display:flex;align-items:center;gap:9px;padding:6px 10px;
+    background:var(--bg);border-top:1px solid var(--line2);border-bottom:1px solid var(--line);
+    font-size:11px;font-weight:700;letter-spacing:.03em;color:var(--ink)}
+  .supgrp .lb{color:var(--muted);font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
   .supgrp .gq{margin-right:auto;color:var(--accent-ink);font-variant-numeric:tabular-nums}
-  .supgrp.shut{color:var(--muted)}
   .rowdel{justify-self:start;align-self:center;width:20px;height:20px;margin-left:6px;font:inherit;
     font-size:13px;line-height:1;color:var(--muted);background:none;border:1px solid transparent;
     border-radius:6px;cursor:pointer;opacity:0}
@@ -409,6 +415,15 @@
       <span class="modal-close" id="editClose">&times;</span>
     </div>
     <div class="ce-body" id="seBody"></div>
+  </div>
+</div>
+<div class="modal" id="jobModal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div class="ce-tabs"><span class="ce-tab on" id="jobTab">Job</span></div>
+      <span class="modal-close" id="jobClose">&times;</span>
+    </div>
+    <div class="ce-body" id="jobBody"></div>
   </div>
 </div>
 <div class="bulkbar" id="bulkBar">
@@ -530,9 +545,11 @@ const state={
   bulk:false,                           // bulk-edit mode: checkboxes + the bottom action bar
   sel:new Set(),                        // row ids ticked for bulk edit
   colType:{},                           // Stone_Order colId -> Grist type, for writing dates back
+  jobColType:{},                        // Jobs_Detail colId -> Grist type
+  jobChoices:{},                        // live choice lists for the job's Choice columns
+  jobOpen:null,                         // the job row id the panel is showing
   writable:null,                        // Stone_Order colId -> true for non-formula columns (null = unknown)
   writableJob:null,                     // Jobs_Detail colId -> true, same idea (null = unknown)
-  supShut:{},                           // "ymd|supplier" -> folded away in the grouped view
   flashId:null,                         // row id to highlight after a create, so you can see what you made
   jobById:{}, catById:{}
 };
@@ -682,11 +699,16 @@ const COLDEF={
   jobstatus:   {label:"Job status",   w:96,  html:r=>{ const s=stageOf(r); return s
                  ? '<span class="stage-pill" style="background:'+escH(stageColor(s))+'">'+escH(s)+"</span>" : DASH; }},
   job:         {label:"Job ID",       w:78,  html:r=>txtH(jobCode(jobFor(r)))},
-  stone:       {label:"Stone",        w:200, html:r=>txtH(stoneLabel(r))},
+  // Stone and Supplier both read out of the linked catalogue product, so both edit the Product
+  // ref rather than their own cell. Writing Product_Supplier directly would silently do nothing:
+  // it is a formula column ($Product.Supplier), as is Product_Code.
+  stone:       {label:"Stone",        w:200, edit:{f:"Product",t:"product"},
+                 html:r=>txtH(stoneLabel(r))},
   code:        {label:"Code",         w:86,  html:r=>txtH(r.Product_Code)},
   address:     {label:"Job address",  w:190, html:r=>{ const j=jobFor(r);
                  return txtH((j&&(j.Address_Formatted||j.Job_Address))||""); }},
-  supplier:    {label:"Supplier",     w:112, html:r=>txtH(r.Product_Supplier||(catFor(r)&&catFor(r).Supplier)||"")},
+  supplier:    {label:"Supplier",     w:112, edit:{f:"Product",t:"product"},
+                 html:r=>{ const s=supplierOf(r); return s==="(no supplier)"?DASH:escH(s); }},
   scope:       {label:"Scope",        w:54,  align:"right", sum:"Scope_Qty",    edit:{f:"Scope_Qty",t:"num"},
                  html:r=>num(r.Scope_Qty)?String(num(r.Scope_Qty)):DASH},
   ordered:     {label:"Ord",          w:50,  align:"right", sum:"Ordered_Qty",  edit:{f:"Ordered_Qty",t:"num"},
@@ -746,8 +768,20 @@ function passAssignee(r){ return !state.assignee || assigneesOf(r).includes(stat
 // anything you can find in the Inbox you can find here too, even without the client name.
 // statusLabel() folds a blank Order_Status in as "To sort" so it's searchable too.
 function stoneHaystack(r){ const c=catFor(r);
-  return [stoneLabel(r), r.Product_Supplier, r.Product_Code, r.Stone, c&&c.Supplier, c&&c.Product_Full, statusLabel(r.Order_Status)]
+  return [stoneLabel(r), r.Product_Supplier, r.Product_Code, r.Stone, c&&c.Supplier, c&&c.Product_Full,
+    statusLabel(r.Order_Status), dateHaystack(r.Order_Date), dateHaystack(r.Delivery_Date)]
     .filter(Boolean).join(" ").toLowerCase(); }
+// A date is searchable in the shapes people actually type it: the table's own DD-MM-YYYY, the same
+// with slashes, "26 jul"/"jul 26", the month and year on their own, and the ISO form. Written out in
+// full rather than matched with a parser so the existing word-start matcher keeps working.
+function dateHaystack(v){
+  const d=toDate(v); if(!d) return "";
+  const dd=String(d.getDate()).padStart(2,"0"), mm=String(d.getMonth()+1).padStart(2,"0");
+  const y=d.getFullYear(), mon=MONTHS[d.getMonth()], m3=mon.slice(0,3), dow=DOW[(d.getDay()+6)%7];
+  return [dd+"-"+mm+"-"+y, dd+"/"+mm+"/"+y, y+"-"+mm+"-"+dd,
+          d.getDate()+" "+m3, d.getDate()+" "+mon, m3+" "+d.getDate(),
+          m3+" "+y, mon+" "+y, mon, m3, dow, String(y)].join(" ");
+}
 function jobHaystack(j){ if(!j) return "";
   return [j.Client_Label, j.Job_Address, j.Address_Formatted, j.Job_ID, j.Stage, j.Payment_Status,
     choiceList(j.Assigned_To).join(" ")].filter(Boolean).join(" ").toLowerCase(); }
@@ -762,8 +796,33 @@ function passStatus(r){ return state.statusFilter==="all" || matchGroup(findGrou
 // The set of lines the agenda draws from before the status filter. Also feeds the pill job counts.
 // Rule, as agreed: a job still at Quote is never shown. Of the rest, the existing flagging rules
 // decide what needs attention; whatever is left over and undated falls into the N/A bucket.
+// Product_Supplier is the formula $Product.Supplier, so a line reads as having no supplier
+// whenever the catalogue row it points at has an empty Supplier field - even though the supplier
+// is sitting right there at the front of the product label ("WF | Marble | Venus Gold ..."). Rather
+// than bucket those under "(no supplier)", recover the name from the label, checked against the
+// suppliers the catalogue actually uses so a stray word can never invent one. Display only: the
+// real fix is to fill Supplier in on the catalogue row.
+const _norm=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+function knownSuppliers(){
+  const out=[]; const seen={};
+  (state.catalogue||[]).forEach(c=>{ const v=String(c.Supplier||"").trim();
+    if(v && !seen[_norm(v)]){ seen[_norm(v)]=1; out.push(v); } });
+  return out;
+}
+function supplierFromLabel(c){
+  if(!c) return "";
+  const lab=String(c.Product_Full||"").trim(); if(!lab) return "";
+  const known=knownSuppliers(); if(!known.length) return "";
+  const first=lab.split("|")[0].trim();
+  if(first){ const hit=known.find(k=>_norm(k)===_norm(first)); if(hit) return hit; }
+  // otherwise the longest known supplier the label actually starts with
+  const n=_norm(lab);
+  return known.filter(k=>_norm(k) && n.indexOf(_norm(k))===0)
+              .sort((a,b)=>_norm(b).length-_norm(a).length)[0] || "";
+}
 function supplierOf(r){
-  const s=r.Product_Supplier||(catFor(r)&&catFor(r).Supplier)||"";
+  const c=catFor(r);
+  const s=r.Product_Supplier||(c&&c.Supplier)||supplierFromLabel(c)||"";
   return String(s).trim()||"(no supplier)";
 }
 // Everything in scope before dates or the status pill: Quote excluded, assignee + search applied.
@@ -880,7 +939,7 @@ function refreshDayToggles(){
 }
 function stColHead(){
   const h=$("div","sthead"); h.style.minWidth=colRowPx()+"px";
-  h.appendChild($("div","stlab","Date · supplier"));
+  h.appendChild($("div","stlab","Date"));
   const cols=$("div","stcols"); cols.style.gridTemplateColumns=colTemplate();
   cols.style.minWidth=colBodyPx()+"px";
   if(state.bulk) cols.appendChild($("div","stlab"));   // spacer over the leading tick-box column
@@ -921,6 +980,14 @@ function stRow(r){
     del.onclick=ev=>{ ev.stopPropagation(); askRemove(r); };
     row.appendChild(del);
   }
+  // Double-click anywhere on the row opens the job panel. Single clicks still edit cells, and a
+  // dblclick that lands inside an open cell editor is left to the editor.
+  row.ondblclick=ev=>{
+    if(ev.target && ev.target.closest && ev.target.closest("input,select,textarea,.rowdel,.evsel")) return;
+    ev.preventDefault(); ev.stopPropagation(); closePops();
+    state.jobFromRow=r.id;
+    openJobPanel(jobFor(r));
+  };
   row.dataset.rid=String(r.id);          // flashNewRow() finds the created row by this
   if(state.flashId!=null && r.id===state.flashId) row.classList.add("ev-new");
   return row;
@@ -951,19 +1018,14 @@ function stSumRow(rows){
 }
 // The supplier box under each date: slabs per supplier for the WHOLE day, so the rows always add
 // up to the total. Single click filters that day, double click filters every day.
-// Supplier group header: sits above the rows it describes, carrying the supplier and its slab
-// total. Pinned to the table width like every other rule, or its underline would stop at the edge
-// of the visible pane. Click to fold the group away.
-function supGroupHead(nm,grp,gkey,shut){
-  const h=$("div","supgrp"+(shut?" shut":""));
-  h.style.minWidth=colBodyPx()+"px";
-  h.appendChild($("span","tw",shut?"▸":"▾"));
-  h.appendChild($("span","gnm",nm||"No supplier"));
+// Per-supplier subtotal, sitting UNDER the rows it describes. Static on purpose: it is a read-out,
+// not a control, so there is nothing to click and no folded state to remember. The supplier is not
+// repeated in it - the rows above already carry the Supplier column.
+function supTotalRow(grp){
+  const h=$("div","supgrp");
+  h.style.minWidth=colBodyPx()+"px";   // so its rule runs the table width, not the visible pane
+  h.appendChild($("span","lb","Total"));
   h.appendChild($("span","gq",slabSum(grp)+" slabs"));
-  h.title=shut?"Show these orders":"Hide these orders";
-  h.onclick=ev=>{ ev.stopPropagation();
-    if(state.supShut[gkey]) delete state.supShut[gkey]; else state.supShut[gkey]=true;
-    render(); };
   return h;
 }
 function renderAgenda(byYmd,dayKeys){
@@ -999,11 +1061,8 @@ function renderAgenda(byYmd,dayKeys){
     // Day number in a circle + weekday. The intense red is reserved for TODAY, so it is the one
     // thing that jumps out of the gutter; other days keep the same geometry in quiet neutrals.
     const chip=$("div","daychip"+(k===todayK?" today":""));
-    chip.appendChild($("span","dnum",String(d.getDate())));
-    const dtxt=$("span","dtxt");
-    dtxt.appendChild($("span","ddow",DOW[(d.getDay()+6)%7]));
-    dtxt.appendChild($("span","dmon",MONTHS[d.getMonth()].slice(0,3)+" "+d.getFullYear()));
-    chip.appendChild(dtxt);
+    chip.appendChild($("span","dtxt",DOW[(d.getDay()+6)%7]+" "+d.getDate()+" "
+      +MONTHS[d.getMonth()].slice(0,3)+" "+d.getFullYear()));
     dc.appendChild(chip);
     if(state.bulk && rows.length){
       const ids=rows.map(r=>r.id);
@@ -1032,9 +1091,8 @@ function renderAgenda(byYmd,dayKeys){
         rows.forEach(r=>{ const nm=supplierOf(r); (per[nm]=per[nm]||[]).push(r); });
         Object.keys(per).sort((a,b)=>slabSum(per[b])-slabSum(per[a])||a.localeCompare(b))
           .forEach(nm=>{
-            const gkey=k+"|"+nm, shut=!!state.supShut[gkey];
-            body.appendChild(supGroupHead(nm,per[nm],gkey,shut));
-            if(!shut) per[nm].forEach(r=>body.appendChild(stRow(r)));
+            per[nm].forEach(r=>body.appendChild(stRow(r)));
+            body.appendChild(supTotalRow(per[nm]));                 // subtotal under its rows
           });
       } else {
         rows.forEach(r=>body.appendChild(stRow(r)));
@@ -1068,6 +1126,16 @@ function flagEl(list){
 }
 // Highlight/coloured-bar colour = the line's Order_Status colour (raw status hue, dark text).
 function statusBar(r){ return { fill:statusColor(r.Order_Status), text:"#1d2733" }; }
+// A status pill as an element, matching the Order status column's markup. Note openDay() below has
+// always called this without it existing anywhere - harmless only because nothing calls openDay
+// (dead code from before the table view). Defining it here de-fuses that too.
+function pillEl(status){
+  const el=$("span","evpill");
+  el.style.borderColor="transparent"; el.style.color="#1d2733";
+  el.style.background=statusColor(status);
+  el.textContent=statusLabel(status);
+  return el;
+}
 
 // ============================================================
 //  INLINE CELL EDITING
@@ -1110,6 +1178,25 @@ function startCellEdit(cell,r,c){
     opts.forEach(s=>{ if(!s||seen.has(s))return; seen.add(s);
       const o=document.createElement("option"); o.value=s; o.textContent=s; el.appendChild(o); });
     el.value=r[spec.f]==null?"":String(r[spec.f]);
+  } else if(spec.t==="product"){
+    // Same datalist pattern as the new-order picker: type to filter, only a real catalogue
+    // product counts. Picking one updates the Stone label AND the Supplier, since both derive
+    // from it. Choosing a supplier here means "the product of theirs you are ordering".
+    const idx=productPicker();
+    el=document.createElement("input"); el.type="text";
+    el.setAttribute("autocomplete","off");
+    el.placeholder=state.catalogue&&state.catalogue.length?"Type to search the catalogue…":"Catalogue not loaded";
+    const cur=catFor(r);
+    const curLabel=cur?String(cur[(state.ref.product&&state.ref.product.labelCol)||"Product_Full"]
+                              ||cur.Product_Full||"").trim():"";
+    el.value=curLabel;
+    const dl=document.createElement("datalist"); dl.id="dl-cell-product";
+    idx.labels.forEach(l=>{ const o=document.createElement("option"); o.value=l; dl.appendChild(o); });
+    el.setAttribute("list",dl.id);
+    cell.appendChild(dl);
+    el.oninput=()=>{ const hit=idx.map[el.value.trim()];
+      el.style.borderColor=(!el.value.trim()||hit!=null)?"":"var(--danger)"; };
+    el._pickIdx=idx; el._curLabel=curLabel;
   } else {
     el=document.createElement("input");
     el.type = spec.t==="date" ? "date" : spec.t==="num" ? "number" : "text";
@@ -1124,6 +1211,25 @@ function startCellEdit(cell,r,c){
   const commit=()=>{
     if(done) return; done=true;
     const v=el.value;
+    if(spec.t==="product"){
+      const txt=String(v).trim();
+      const id=el._pickIdx?el._pickIdx.map[txt]:null;
+      // Nothing typed clears the link; an unrecognised name is refused rather than guessed at,
+      // so a typo can never silently point a line at the wrong stone.
+      if(txt && id==null){ cell.innerHTML=prev; return; }
+      const wasId=refId(r.Product)||null, nextId=txt?id:null;
+      if(String(nextId||"")===String(wasId||"")){ cell.innerHTML=prev; return; }
+      r.Product=nextId;
+      const c2=nextId?(state.catById[nextId]||null):null;
+      // keep the derived read-outs in step until Grist recomputes the formula columns
+      r.Product_Supplier=c2?(c2.Supplier||""):"";
+      r.Product_Code=c2?(c2.Code||""):"";
+      reindex(); render();
+      const back=document.querySelector('[data-rid="'+r.id+'"][data-k="'+c.k+'"]');
+      if(back) back.classList.add("saved");
+      queueCellWrite({ id:r.id, fields:{ Product: nextId } });
+      return;
+    }
     const next = spec.t==="date" ? inputToGrist(v,state.colType[spec.f])
                : spec.t==="num"  ? (v===""?null:num(v))
                : (v===""?"":v);
@@ -1144,6 +1250,169 @@ function startCellEdit(cell,r,c){
     else if(e.key==="Escape"){ e.preventDefault(); e.stopPropagation(); cancel(); }
   };
   if(spec.t==="choice") el.onchange=commit;
+}
+
+// ============================================================
+//  JOB PANEL  (double-click a row)
+// ============================================================
+// Editable fields are whitelisted AND checked against state.writableJob, which the schema pass
+// builds from Grist's own isFormula flags. That matters here: most of Jobs_Detail is formulas
+// (Job_ID, Stones, Inst_Dates, the qty rollups, Suburb/State/Postcode, Month/Quarter/Year,
+// Client_Label). Writing one of those silently does nothing, so they are shown read-only instead.
+const JOB_FIELDS=[
+  { col:"Client_Name",       lab:"Client",             kind:"ref"    },
+  { col:"Job_Address",       lab:"Address",            kind:"text"   },
+  { col:"Address_Formatted", lab:"Address (verified)", kind:"text"   },
+  { col:"Stage",             lab:"Stage",              kind:"choice" },
+  { col:"Payment_Status",    lab:"Payment",            kind:"choice" },
+  { col:"Assigned_To",       lab:"Assigned to",        kind:"chips"  },
+  { col:"Meas_Date",         lab:"Measure date",       kind:"date"   },
+  { col:"Input_Date",        lab:"Input date",         kind:"date"   },
+  { col:"Cash",              lab:"Cash",               kind:"text"   },
+  { col:"Note",              lab:"Note",               kind:"area"   }
+];
+// Read-outs worth showing, in the order the team reads them.
+const JOB_READONLY=[
+  ["Job_ID","Job ID"],["Stones","Stones"],["Inst_Dates","Install date(s)"],
+  ["Scope_Qty","Scope qty"],["Ordered_Qty","Ordered qty"],["In_WH_Qty","In WH qty"],
+  ["Suburb","Suburb"],["State","State"],["Postcode","Postcode"],["Month","Month"]
+];
+const jobWritable=col=>!state.grist || !!(state.writableJob&&state.writableJob[col]);
+
+function jobChoiceList(col){
+  const m=state.jobChoices&&state.jobChoices[col];
+  if(m&&Array.isArray(m.choices)&&m.choices.length) return m.choices.slice();
+  // demo, or metadata not in yet: fall back to whatever the loaded jobs actually use
+  const seen={}, out=[];
+  (state.jobs||[]).forEach(j=>{ const v=j[col];
+    (Array.isArray(v)?choiceList(v):[v]).forEach(x=>{ const t=String(x||"").trim();
+      if(t && !seen[t]){ seen[t]=1; out.push(t); } }); });
+  return out;
+}
+function writeJob(job,col,val){
+  job[col]=val;                                      // optimistic, so the panel stays responsive
+  if(!state.grist){ reindex(); render(); return Promise.resolve(); }
+  if(!jobWritable(col)) return Promise.resolve();     // never write a formula column
+  return grist.docApi.applyUserActions([["UpdateRecord","Jobs_Detail",job.id,{[col]:val}]])
+    .then(()=>refetch())
+    .catch(e=>{ console.warn("job write failed",e); });
+}
+function jobSaved(host){
+  if(!host) return;
+  const t=$("span","jp-saved","Saved"); host.appendChild(t);
+  setTimeout(()=>{ if(t.parentNode) t.parentNode.removeChild(t); },1200);
+}
+function openJobPanel(job){
+  if(!job) return;
+  state.jobOpen=job.id;
+  const body=document.getElementById("jobBody"); body.innerHTML="";
+  document.getElementById("jobTab").textContent="Job "+(job.Job_ID||("#"+job.id));
+  body.appendChild($("div","se-head",jobClient(job)));
+  body.appendChild($("div","jp-note","Changes save as you leave each field. Greyed values are "
+    +"calculated by Grist and cannot be typed over."));
+
+  const grid=$("div","se-grid");
+  JOB_FIELDS.forEach(f=>{
+    const ro=!jobWritable(f.col);
+    grid.appendChild($("div","se-lab",f.lab));
+    if(f.kind==="chips"){
+      const wrap=$("div","se-chips");
+      jobChoiceList(f.col).forEach(n=>{
+        const b=document.createElement("button"); b.type="button"; b.className="se-chip";
+        b.textContent=n; if(choiceList(job[f.col]).indexOf(n)>-1) b.classList.add("on");
+        b.disabled=ro;
+        b.onclick=()=>{ const list=choiceList(job[f.col]).slice();
+          const i=list.indexOf(n); if(i<0) list.push(n); else list.splice(i,1);
+          b.classList.toggle("on",i<0);
+          writeJob(job,f.col,["L"].concat(list)).then(()=>jobSaved(wrap)); };
+        wrap.appendChild(b);
+      });
+      if(!wrap.children.length) wrap.appendChild($("span","jp-note","No names on file yet."));
+      grid.appendChild(wrap); return;
+    }
+    if(f.kind==="ref"){
+      // the Client ref: the same picker the new-order form uses, so only a real client can be set
+      const lc=(state.ref.client&&state.ref.client.labelCol)||"Client_Name";
+      const idx=pickerIndex(state.clients||[],c=>c[lc]);
+      const inp=document.createElement("input"); inp.className="se-in";
+      inp.value=String(job.Client_Label||"").trim(); inp.setAttribute("autocomplete","off");
+      inp.placeholder=(state.clients||[]).length?"Type to search clients\u2026":"Clients not loaded";
+      inp.disabled=ro;
+      const dl=document.createElement("datalist"); dl.id="dl-job-client";
+      idx.labels.forEach(l=>{ const o=document.createElement("option"); o.value=l; dl.appendChild(o); });
+      inp.setAttribute("list",dl.id);
+      inp.oninput=()=>{ const hit=idx.map[inp.value.trim()];
+        inp.style.borderColor=(!inp.value.trim()||hit!=null)?"":"var(--danger)"; };
+      inp.onblur=()=>{ const txt=inp.value.trim(), hit=idx.map[txt];
+        // an unknown name is refused rather than guessed at, same rule as the product picker
+        if(txt && hit==null){ inp.value=String(job.Client_Label||"").trim(); inp.style.borderColor=""; return; }
+        const nextId=txt?hit:null;
+        if(String(nextId||"")===String(refId(job.Client_Name)||"")) return;
+        job.Client_Label=txt;
+        writeJob(job,"Client_Name",nextId).then(()=>jobSaved(grid));
+      };
+      grid.appendChild(inp); grid.appendChild(dl); return;
+    }
+    if(f.kind==="choice"){
+      const sel=document.createElement("select"); sel.className="se-in"; sel.disabled=ro;
+      const blank=document.createElement("option"); blank.value=""; blank.textContent="(none)";
+      sel.appendChild(blank);
+      const opts=jobChoiceList(f.col);
+      const cur=job[f.col]==null?"":String(job[f.col]);
+      if(cur && opts.indexOf(cur)<0) opts.unshift(cur);       // keep an off-list value visible
+      opts.forEach(v=>{ const o=document.createElement("option"); o.value=v; o.textContent=v; sel.appendChild(o); });
+      sel.value=cur;
+      // Compare against the live value each time, not the one captured at render: otherwise a
+      // second edit of the same field, or changing a value and back again, is wrongly ignored.
+      sel.onchange=()=>{ const live=job[f.col]==null?"":String(job[f.col]);
+        if(sel.value===live) return;
+        writeJob(job,f.col,sel.value||"").then(()=>jobSaved(grid)); };
+      grid.appendChild(sel); return;
+    }
+    const el=document.createElement(f.kind==="area"?"textarea":"input");
+    el.className="se-in"; el.disabled=ro;
+    if(f.kind==="area"){ el.rows=3; el.style.resize="vertical"; }
+    else el.type = f.kind==="date" ? "date" : "text";
+    const shown=()=> f.kind==="date" ? dateToInput(job[f.col],state.jobColType[f.col])
+                                     : (job[f.col]==null?"":String(job[f.col]));
+    el.value=shown();
+    el.onblur=()=>{ if(el.value===shown()) return;     // live value, so re-blurring is a no-op
+      const next = f.kind==="date" ? inputToGrist(el.value,state.jobColType[f.col]) : el.value;
+      writeJob(job,f.col,next).then(()=>jobSaved(grid)); };
+    grid.appendChild(el);
+  });
+  body.appendChild(grid);
+
+  const ros=JOB_READONLY.filter(([c])=>job[c]!=null && String(job[c]).trim()!=="" && String(job[c])!=="0");
+  if(ros.length){
+    const sec=$("div","jp-sec"); sec.appendChild($("div","jp-cap","Calculated by Grist"));
+    const g2=$("div","jp-ro");
+    ros.forEach(([c,lab])=>{ g2.appendChild($("div","k",lab));
+      g2.appendChild($("div","v",String(job[c]))); });
+    sec.appendChild(g2); body.appendChild(sec);
+  }
+
+  // every stone order on this job, with the one you came from marked
+  const mine=(state.stone||[]).filter(r=>refId(r.Job)===job.id);
+  const sec2=$("div","jp-sec");
+  sec2.appendChild($("div","jp-cap",mine.length+(mine.length===1?" stone order":" stone orders")
+    +" \u00b7 "+slabSum(mine)+" slabs"));
+  const list=$("div","jp-lines");
+  mine.forEach(r=>{
+    const row=$("div","jp-line"+(state.jobFromRow===r.id?" here":""));
+    row.appendChild(pillEl(r.Order_Status));
+    row.appendChild($("span","nm",stoneLabel(r)));
+    row.appendChild($("span","q",num(r.Scope_Qty)+"/"+num(r.Ordered_Qty)+"/"+num(r.Delivery_Qty)));
+    list.appendChild(row);
+  });
+  if(!mine.length) list.appendChild($("div","jp-note","No stone orders on this job yet."));
+  sec2.appendChild(list); body.appendChild(sec2);
+
+  document.getElementById("jobModal").classList.add("open");
+}
+function closeJobPanel(){
+  document.getElementById("jobModal").classList.remove("open");
+  state.jobOpen=null; state.jobFromRow=null;
 }
 
 // ============================================================
@@ -1929,7 +2198,12 @@ if(typeof grist!=="undefined"){
          applyStatusModel(sc.choiceModel("Stone_Order","Order_Status"));
          state.colType=sc.typeMap("Stone_Order");
          state.writable=sc.writableCols("Stone_Order");
-         state.writableJob=sc.writableCols("Jobs_Detail"); }catch(e){ console.warn("schema failed",e); }
+         state.writableJob=sc.writableCols("Jobs_Detail");
+         state.jobColType=sc.typeMap("Jobs_Detail");
+         state.jobChoices={ Stage:sc.choiceModel("Jobs_Detail","Stage"),
+                            Payment_Status:sc.choiceModel("Jobs_Detail","Payment_Status"),
+                            Assigned_To:sc.choiceModel("Jobs_Detail","Assigned_To") };
+       }catch(e){ console.warn("schema failed",e); }
     try{ await pullTables(); }catch(e){ console.warn("initial fetch failed",e); }
     state.grist=true; render();
   }).catch(()=>{});
@@ -1986,7 +2260,7 @@ stoneSearch.oninput=e=>{ state.searchQ=e.target.value; render(); };
 document.getElementById("searchClr").onclick=()=>{ state.searchQ=""; stoneSearch.value=""; render(); stoneSearch.focus(); };
 document.getElementById("colsBtn").onclick=e=>{ e.stopPropagation(); toggleColEditor(); };
 document.getElementById("groupBtn").onclick=e=>{ e.stopPropagation(); closePops();
-  groupBySup=!groupBySup; state.supShut={}; savePrefs(); render(); };
+  groupBySup=!groupBySup; savePrefs(); render(); };
 document.getElementById("reloadBtn").onclick=e=>{ e.stopPropagation(); closePops(); hardRefresh(e.shiftKey); };
 document.getElementById("newBtn").onclick=e=>{ e.stopPropagation(); closePops(); openNew(null); };
 document.getElementById("bulkBtn").onclick=e=>{ e.stopPropagation(); closePops(); setBulk(!state.bulk); };
@@ -1994,6 +2268,8 @@ document.getElementById("bulkBar").onclick=e=>e.stopPropagation();
 document.getElementById("bulkClear").onclick=()=>{ state.sel.clear(); render(); };
 document.getElementById("bulkApply").onclick=()=>applyBulk();
 document.getElementById("editClose").onclick=()=>tryCloseEdit();
+document.getElementById("jobClose").onclick=()=>closeJobPanel();
+document.getElementById("jobModal").onclick=e=>{ if(e.target.id==="jobModal") closeJobPanel(); };
 document.getElementById("editModal").onclick=e=>{ if(e.target.id==="editModal") tryCloseEdit(); };
 document.getElementById("cfBox").onclick=e=>{ if(e.target.id==="cfBox") closeConfirm(null); };
 document.getElementById("dayPop").onclick=e=>e.stopPropagation();
@@ -2002,6 +2278,7 @@ document.addEventListener("keydown",e=>{
   if(e.key!=="Escape") return;
   // innermost first: confirm dialog, then the edit panel (which asks about unsaved work), then popups
   if(document.getElementById("cfBox").classList.contains("open")){ closeConfirm(null); return; }
+  if(document.getElementById("jobModal").classList.contains("open")){ closeJobPanel(); return; }
   if(document.getElementById("editModal").classList.contains("open")){ tryCloseEdit(); return; }
   if(state.bulk){ setBulk(false); return; }
   closePops();

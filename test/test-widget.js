@@ -10,6 +10,27 @@ const ok=(n,c,x)=>{ if(c){P++;console.log('  PASS  '+n);} else {F2++;console.log
 const $$=q=>[...D.querySelectorAll(q)];
 
 console.log('== boots on sample data ==');
+console.log('== search finds dates ==');
+{
+  const q=(v)=>{ w.eval('state.searchQ='+JSON.stringify(v)+'; render();'); return $$('.strow').length; };
+  const all=q('');
+  // pick a real order date out of the sample and search for it several ways
+  const d=w.eval(`(function(){var r=state.stone.find(function(x){return x.Order_Date;});
+     var dt=toDate(r.Order_Date);
+     return {dmy:fmtDMY(r.Order_Date), slash:fmtDMY(r.Order_Date).replace(/-/g,'/'),
+             dmon:dt.getDate()+' '+MONTHS[dt.getMonth()].slice(0,3),
+             mon:MONTHS[dt.getMonth()], yr:String(dt.getFullYear())};})()`);
+  ok('DD-MM-YYYY finds orders', q(d.dmy)>0, {term:d.dmy, hits:q(d.dmy)});
+  ok('DD/MM/YYYY finds orders', q(d.slash)>0, {term:d.slash, hits:q(d.slash)});
+  ok('"26 Jul" style finds orders', q(d.dmon)>0, {term:d.dmon, hits:q(d.dmon)});
+  ok('month name finds orders', q(d.mon)>0, {term:d.mon, hits:q(d.mon)});
+  ok('year finds orders', q(d.yr)>0, {term:d.yr, hits:q(d.yr)});
+  ok('a date that is not there finds nothing', q('01-01-1999')===0, q('01-01-1999'));
+  ok('date search narrows rather than matching everything', q(d.dmy)<=all, {hit:q(d.dmy), all});
+  w.eval('state.searchQ=""; render();');
+  ok('clearing the search restores every row', $$('.strow').length===all, {now:$$('.strow').length, all});
+}
+
 ok('no jsdom errors', errs.length===0, errs.slice(0,3));
 ok('state exists', !!s);
 ok('sample rows', s.stone.length===7, s.stone&&s.stone.length);
@@ -44,10 +65,15 @@ ok('pill counts are slab sums', (()=>{ const all=$$('.sfp')[0];
 console.log('== date gutter chip ==');
 ok('a chip per day', $$('.ag-date .daychip').length>0, $$('.ag-date .daychip').length);
 ok('the gutter supplier box is gone', $$('.supbox').length===0);
-ok('chip shows the day number', $$('.daychip .dnum').every(n=>/^\d{1,2}$/.test(n.textContent)),
-   $$('.daychip .dnum').map(n=>n.textContent));
-ok('chip shows a weekday', $$('.daychip .ddow').every(n=>/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)$/.test(n.textContent)),
-   $$('.daychip .ddow').map(n=>n.textContent));
+ok('date is a single line, weekday day mon year',
+   $$('.daychip .dtxt').every(n=>/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} [A-Z][a-z]{2} \d{4}$/.test(n.textContent.trim())),
+   $$('.daychip .dtxt').map(n=>n.textContent));
+ok('no emphasised day-number circle any more', $$('.daychip .dnum').length===0);
+ok('chip is one row', $$('.daychip').every(c=>c.querySelectorAll('span').length===1),
+   $$('.daychip').map(c=>c.querySelectorAll('span').length));
+ok('the gutter heading is just Date',
+   D.querySelector('.sthead .stlab').textContent.trim()==='Date',
+   D.querySelector('.sthead .stlab').textContent);
 ok('at most one chip is flagged today', $$('.daychip.today').length<=1, $$('.daychip.today').length);
 
 console.log('== group by supplier ==');
@@ -57,28 +83,17 @@ D.getElementById('groupBtn').onclick({stopPropagation(){}});
 ok('toggle turns it on', w.eval('groupBySup')===true);
 ok('button reads as active', D.getElementById('groupBtn').classList.contains('on'));
 ok('group headers appear', $$('.supgrp').length>0, $$('.supgrp').length);
-ok('each header names a supplier', $$('.supgrp .gnm').every(e=>e.textContent.trim().length>0));
-ok('headers carry a slab total', $$('.supgrp .gq').every(e=>/\d+ slabs/.test(e.textContent)),
-   $$('.supgrp .gq').map(e=>e.textContent));
-ok('a header sits above rows, inside the same body',
-   $$('.strows').some(b=>{ const kids=[...b.children];
-     const gi=kids.findIndex(e=>e.classList.contains('supgrp'));
-     return gi>-1 && kids[gi+1] && kids[gi+1].classList.contains('strow'); }));
-ok('headers span the table width like the other rules',
-   $$('.supgrp').every(h=>h.style.minWidth===w.eval('colBodyPx()')+'px'),
-   $$('.supgrp').map(h=>h.style.minWidth));
-ok('every row is still shown once', $$('.strow').length===w.eval('state.stone.length')
-   || $$('.strow').length>0, $$('.strow').length);
-// folding a group hides its rows but keeps the header
-{
-  const before=$$('.strow').length;
-  $$('.supgrp')[0].onclick({stopPropagation(){}});
-  ok('clicking a header folds the group', $$('.strow').length<before,
-     {before, after:$$('.strow').length});
-  ok('the folded header is still there', $$('.supgrp.shut').length===1);
-  $$('.supgrp.shut')[0].onclick({stopPropagation(){}});
-  ok('clicking again unfolds it', $$('.strow').length===before, {before, after:$$('.strow').length});
-}
+ok('the group row carries no supplier name, it is a total row', $$('.supgrp .gnm').length===0);
+ok('it is labelled Total', $$('.supgrp .lb').every(e=>/total/i.test(e.textContent)),
+   $$('.supgrp .lb').map(e=>e.textContent));
+ok('the total row is static, not a control',
+   $$('.supgrp').every(h=>!h.onclick), $$('.supgrp').map(h=>typeof h.onclick));
+ok('no fold twisty', $$('.supgrp .tw').length===0);
+ok('every row stays visible - nothing is foldable away',
+   $$('.strow').length===w.eval('baseRows().filter(function(r){return passStatus(r);}).length'),
+   {rows:$$('.strow').length, expected:w.eval('baseRows().filter(function(r){return passStatus(r);}).length')});
+ok('the total row is not a pointer target',
+   !/cursor:\s*pointer/.test(w.eval('[...document.styleSheets[0].cssRules].map(r=>r.cssText).filter(t=>/\.supgrp\{/.test(t)).join("")')));
 D.getElementById('groupBtn').onclick({stopPropagation(){}});
 ok('toggling off removes the headers', $$('.supgrp').length===0 && w.eval('groupBySup')===false);
 

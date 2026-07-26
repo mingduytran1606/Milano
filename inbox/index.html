@@ -13,6 +13,10 @@
     --danger:#e5484d;
     --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.10);
     --radius:14px; --sw-off:#cfd4d1;
+    /* Stone Order table geometry. Both are overwritten inline on .stonecard once the
+       user has set their own widths in Customize > Stone table (see applyStoneGrid). */
+    --stone-grid:minmax(140px,1.2fr) 48px 150px 64px 1px 48px 140px 1px 48px 140px 1px minmax(140px,1fr);
+    --stone-min:1010px;
   }
   @media (prefers-color-scheme:dark){
     :root{ --bg:#12161b; --panel:#1a1f26; --ink:#e8edf2; --muted:#9aa6b2;
@@ -188,6 +192,23 @@
   .jcol{min-width:0}
   .jcol.al-centre .tline{justify-content:center}
   .jcol.al-right .tline{justify-content:flex-end}
+  /* a field column renders one value on one line and truncates rather than wrapping,
+     so every card in the list keeps the same height and the columns stay in register */
+  .jcol.field .tline{flex-wrap:nowrap;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+  .jcol.field .tline>*{vertical-align:middle}
+  .jcol.field.al-centre .tline{text-align:center}
+  .jcol.field.al-right .tline{text-align:right}
+  .jcol.field .tline .dash{opacity:.5}
+  /* optional heading row above the job list */
+  /* Fixed height so the group headers below can be offset by exactly this much and the
+     two sticky rows stack instead of overlapping. */
+  .jhead{display:grid;gap:0 12px;padding:0 12px;margin:0 0 2px;height:24px;align-items:center;
+    border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:0;z-index:6}
+  .has-jhead .grp-head{top:24px}
+  .jhead span{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .jhead span.al-centre{text-align:center}
+  .jhead span.al-right{text-align:right}
 
   /* ---- job-card template editor ---- */
   .tpl-ta{width:100%;min-height:64px;font-size:13px;line-height:1.5;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace}
@@ -216,6 +237,31 @@
     border:1px dashed var(--accent);border-radius:10px;padding:9px 12px;cursor:pointer;width:100%}
   .cm-addcol:hover{filter:brightness(1.03)}
   .cm-addcol[disabled]{opacity:.5;cursor:not-allowed;border-style:solid}
+  /* ---- structured column rows (job cards + stone table), same model as the stone calendar ----
+     One row per column: drag handle, fixed heading, B/I/U, plain-or-pill, align, width, remove. */
+  .colrow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;border:1px solid var(--line);
+    border-radius:10px;padding:7px 8px;background:var(--bg)}
+  .colrow.dragging{opacity:.4}
+  .colrow.dropbefore{box-shadow:0 -2px 0 var(--accent)}
+  .colrow.dropafter{box-shadow:0 2px 0 var(--accent)}
+  .colrow .grip{cursor:grab;color:var(--muted);font-size:13px;line-height:1;user-select:none}
+  .colrow .colname{font-size:12.5px;font-weight:600;flex:1 1 84px;min-width:64px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .colrow .colname.none{color:var(--muted);font-style:italic;font-weight:500}
+  .cm-seg button.fb{font-weight:800} .cm-seg button.fi{font-style:italic} .cm-seg button.fu{text-decoration:underline}
+  .cm-seg button[disabled]{opacity:.35;cursor:not-allowed}
+  .col-x{margin-left:auto;cursor:pointer;color:var(--muted);border:1px solid var(--line);background:var(--panel);
+    border-radius:7px;width:22px;height:22px;font-size:12px;line-height:20px;text-align:center;flex:0 0 auto}
+  .col-x:hover{border-color:var(--danger);color:var(--danger)}
+  .col-x.off{opacity:.25;pointer-events:none}
+  .ce-tokens{display:flex;flex-wrap:wrap;gap:5px}
+  .ce-tok{font:inherit;font-size:11.5px;font-weight:600;border:1px dashed var(--line);border-radius:8px;
+    padding:4px 9px;background:var(--panel);color:var(--accent-ink);cursor:pointer}
+  .ce-tok:hover{border-style:solid;border-color:var(--accent);background:var(--accent-soft)}
+  .cm-check{display:flex;align-items:center;gap:8px;font-size:12.5px;margin:10px 2px 2px;cursor:pointer;user-select:none}
+  .cm-check input{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex:0 0 auto}
+  .cm-tplrow{display:flex;flex-direction:column;gap:5px;width:100%;margin-top:2px}
+  .cm-tplrow .tpl-ta{min-height:44px;font-size:12px}
   .tpl-sec{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 2px 7px}
   .tpl-prev{border:1px dashed var(--line);border-radius:10px;padding:10px 12px;background:var(--bg)}
   .tok-list{display:flex;flex-wrap:wrap;gap:6px}
@@ -246,6 +292,9 @@
   /* ---------- modal (change history) ---------- */
   .modal{position:fixed;inset:0;z-index:80;background:rgba(20,22,26,.42);display:flex;align-items:center;justify-content:center;padding:20px}
   .modal[hidden]{display:none}
+  /* The Customize modal holds a full column editor, so it gets more room than the
+     other modals - at 440px every column row wrapped onto two lines. */
+  #cardModal .modal-card{max-width:660px}
   .modal-card{background:var(--panel);width:100%;max-width:440px;max-height:80vh;display:flex;flex-direction:column;
     border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.34);overflow:hidden}
   .modal-head{display:flex;align-items:center;gap:8px;padding:14px 16px;border-bottom:1px solid var(--line2)}
@@ -358,9 +407,9 @@
   .field .ro{color:var(--ink);font-weight:500}
   /* Sectioned grid: [Product Scope Status Price] | [Order qty · date] | [Deliv qty · date] | [Note]
      12 tracks - the three 1px tracks are the vertical dividers between sections. */
-  .stone-head{display:grid;grid-template-columns:minmax(140px,1.2fr) 48px 150px 64px 1px 48px 140px 1px 48px 140px 1px minmax(140px,1fr);gap:8px;padding:0 0 8px;align-items:end}
+  .stone-head{display:grid;grid-template-columns:var(--stone-grid);gap:8px;padding:0 0 8px;align-items:end}
   .stonecard .card-body{overflow-x:auto}
-  .stonecard .stone-head,.stonecard .line{grid-template-columns:minmax(140px,1.2fr) 48px 150px 64px 1px 48px 140px 1px 48px 140px 1px minmax(140px,1fr);min-width:1010px}
+  .stonecard .stone-head,.stonecard .line{grid-template-columns:var(--stone-grid);min-width:var(--stone-min)}
   .stone-head span{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
   .stone-head span.num{text-align:right}
   .stone-div{align-self:stretch;width:1px;background:var(--line2)}
@@ -396,6 +445,25 @@
   .line .lprice input:focus{outline:none;border-bottom-color:var(--accent)}
   .line .prod .nm{font-weight:600;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
   .line .prod .sub{font-size:12px;color:var(--muted)}
+  /* ---- per-column alignment for the Stone Order table (Customize > Stone table) ----
+     Status and the two date cells carry a 22px left indent by default so they line up
+     under the status pill; that indent is dropped as soon as the column is centred or
+     right-aligned, otherwise the content never reaches the edge it was aligned to. */
+  .stone-head span.al-left{text-align:left}
+  .stone-head span.al-centre{text-align:center}
+  .stone-head span.al-right{text-align:right}
+  .stone-head span.al-centre,.stone-head span.al-right{padding-left:0}
+  .line>.al-left{text-align:left}
+  .line>.al-centre{text-align:center}
+  .line>.al-right{text-align:right}
+  .line>.al-centre,.line>.al-right{padding-left:0}
+  .line>.statuscell.al-centre{align-items:center}
+  .line>.statuscell.al-right{align-items:flex-end}
+  .line>.lprice.al-left{justify-content:flex-start}
+  .line>.lprice.al-centre{justify-content:center}
+  .line>.ldate.al-centre .ldateinp,.line>.ldate.al-right .ldateinp{max-width:none}
+  .line>.ldate.al-centre .ldateinp{text-align:center}
+  .line>.ldate.al-right .ldateinp{text-align:right}
   .visit{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line2)}
   .visit:first-child{border-top:0}
   .visit .date{font-weight:600;min-width:120px;display:flex;align-items:center;gap:6px}
@@ -510,9 +578,27 @@
   .stones .scope-n{margin-top:14px}
   .stones .scope-n:first-child{margin-top:0}
   .stones .scope-n + .stone{margin-top:4px}
-  .stone{display:grid;grid-template-columns:auto minmax(0,1.6fr) minmax(0,1fr);align-items:center;gap:8px;padding-left:16px}
-  .stone .snm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-stone,13px);font-weight:600}
-  .stone .snote{justify-self:stretch;text-align:left;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-stoneNote,12px);color:var(--muted);cursor:default}
+  /* Stone name + note split. The two tracks come from Customize > Stone table or
+     from dragging the divider between them; the leading `auto` is the bullet, which
+     is never configurable. The 8px track between name and note is the drag handle -
+     it doubles as the gap, so the row keeps its old spacing. */
+  .stone{display:grid;grid-template-columns:auto minmax(0,var(--sumstone-name-w,1.6fr)) 8px minmax(0,var(--sumstone-note-w,1fr));align-items:center;padding-left:16px}
+  .stones.wrapping .stone{align-items:start}
+  .stone .snm{min-width:0;font-size:var(--fs-stone,13px);font-weight:600}
+  .stone .snote{justify-self:stretch;text-align:left;min-width:0;font-size:var(--fs-stoneNote,12px);color:var(--muted);cursor:default}
+  /* Overflow behaviour, per column: one line + ellipsis, or wrap to N lines. */
+  .stone .wr-clip{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .stone .wr-wrap{white-space:normal;overflow-wrap:anywhere;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical}
+  .stone .snm.wr-wrap{-webkit-line-clamp:var(--sumstone-name-lines,2)}
+  .stone .snote.wr-wrap{-webkit-line-clamp:var(--sumstone-note-lines,2)}
+  .stone .snm.al-centre,.stone .snote.al-centre{text-align:center}
+  .stone .snm.al-right,.stone .snote.al-right{text-align:right}
+  .stone .snm.al-left,.stone .snote.al-left{text-align:left}
+  /* Divider: invisible until you're over the block, so the card stays clean. */
+  .stone .ssplit{align-self:stretch;cursor:col-resize;position:relative}
+  .stone .ssplit::after{content:"";position:absolute;left:3px;top:0;bottom:0;width:2px;border-radius:2px;background:var(--accent);opacity:0;transition:opacity .12s}
+  .stones:hover .stone .ssplit::after{opacity:.22}
+  .stones .stone .ssplit:hover::after,.stones.rsz-drag .stone .ssplit::after{opacity:.85}
   .sdot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.14) inset}
   /* per-status sub-heading (only used when a job spans multiple statuses) */
   .stgrp-head{display:flex;align-items:baseline;gap:5px;margin-top:14px;font-size:var(--fs-stoneStatus,14px)}
@@ -775,19 +861,194 @@ const TOKENS={
   input:   {desc:"Input date",          el:j=>txt(fmtShort(j.Input_Date))},
 };
 const DEFAULT_TEMPLATE="**{client}** {stage}\n{address}\n{assigned}";
-// ---- job-card COLUMNS: the card is a row of 1-4 columns, each its own template + align + width ----
+
+// ---- job-card COLUMNS ------------------------------------------------------
+// Same model the stone calendar uses for its table (COLDEF / tblCols): a column is a
+// CHOSEN FIELD plus formatting, not a string you type. One entry per available field;
+// the heading is fixed because the heading names the Grist field the column reads.
+// `pillable` fields can render as a colour pill; `colors` is their palette.
+// The `text` pseudo-column is the escape hatch - it keeps the old freeform
+// {token} template, which is also where any pre-existing custom layout lands.
+const JOBCOL={
+  client:  {label:"Client",      w:2, txt:j=>j.Client_Label},
+  jobid:   {label:"Job ID",      w:1, txt:j=>j.Job_ID},
+  address: {label:"Address",     w:2, txt:j=>j.Job_Address||j.Address_Formatted},
+  stage:   {label:"Stage",       w:1, pillable:true, colors:()=>STAGE_C, txt:j=>j.Stage},
+  payment: {label:"Payment",     w:1, pillable:true, colors:()=>PAY_C,   txt:j=>j.Payment_Status},
+  assigned:{label:"Assigned",    w:1, el:j=>choiceList(j.Assigned_To).length?avatarStack(j.Assigned_To,true):null,
+                                      txt:j=>choiceList(j.Assigned_To).join(", ")},
+  scope:   {label:"Scope qty",   w:1, align:"right", txt:j=>j.Scope_Qty!=null?j.Scope_Qty:0},
+  ordered: {label:"Ordered qty", w:1, align:"right", txt:j=>j.Ordered_Qty!=null?j.Ordered_Qty:0},
+  inwh:    {label:"In-WH qty",   w:1, align:"right", txt:j=>j.In_WH_Qty!=null?j.In_WH_Qty:0},
+  meas:    {label:"Meas. date",  w:1, txt:j=>fmtShort(j.Meas_Date)},
+  input:   {label:"Input date",  w:1, txt:j=>fmtShort(j.Input_Date)},
+  text:    {label:"Custom text", w:2, tpl:true}
+};
 const CARD_ALIGNS=["left","centre","right"];
+const mkJobCol=(k,over)=>Object.assign({ k, w:JOBCOL[k].w, align:JOBCOL[k].align||"left",
+  style:JOBCOL[k].pillable?"pill":"plain", b:false, i:false, u:false, tpl:"" }, over||{});
+const DEFAULT_JOB_COLS=()=>[ mkJobCol("client",{b:true}), mkJobCol("stage"),
+  mkJobCol("address"), mkJobCol("assigned") ];
+
+// A saved column written by the OLD freeform editor is {tpl,align,width}. When its
+// template is a single bare token ("{client}", or "**{client}**") it maps cleanly onto
+// that field; anything richer keeps its template verbatim as a `text` column, so no
+// existing layout is silently dropped.
+const LONE_TOKEN=/^\s*(\*\*|\*)?\{([a-z_]+)\}(\*\*|\*)?\s*$/i;
+function migrateLegacyCol(c){
+  const tpl=String((c&&c.tpl)||"");
+  const align=CARD_ALIGNS.includes(c&&c.align)?c.align:"left";
+  const w=Math.max(1,Math.min(6,Math.round(Number(c&&c.width)||1)));
+  const m=tpl.match(LONE_TOKEN);
+  if(m && JOBCOL[m[2]] && m[2]!=="text"){
+    return mkJobCol(m[2],{ w, align, b:m[1]==="**", i:m[1]==="*" });
+  }
+  return mkJobCol("text",{ w, align, tpl });
+}
 function normaliseCardCols(v, fallbackTpl){
   if(Array.isArray(v) && v.length){
-    return v.slice(0,4).map(c=>({ tpl:String((c&&c.tpl)||""),
-      align:CARD_ALIGNS.includes(c&&c.align)?c.align:"left",
-      width:Math.max(1,Math.min(6,Math.round(Number(c&&c.width)||1))) }));
+    const out=[];
+    v.forEach(c=>{
+      if(!c) return;
+      if(c.k!=null){                                     // already the structured shape
+        if(!JOBCOL[c.k]) return;                         // unknown key (stale save) → drop
+        out.push(mkJobCol(c.k,{
+          w:Math.max(1,Math.min(6,Math.round(Number(c.w)||JOBCOL[c.k].w))),
+          align:CARD_ALIGNS.includes(c.align)?c.align:(JOBCOL[c.k].align||"left"),
+          style:(c.style==="pill"&&JOBCOL[c.k].pillable)?"pill":"plain",
+          b:!!c.b, i:!!c.i, u:!!c.u, tpl:String(c.tpl||"") }));
+      } else if(c.tpl!=null){                            // legacy freeform column
+        out.push(migrateLegacyCol(c));
+      }
+    });
+    if(out.length) return out;
   }
-  const t=(typeof fallbackTpl==="string"&&fallbackTpl.trim())?fallbackTpl:DEFAULT_TEMPLATE;
-  return [{ tpl:t, align:"left", width:1 }];
+  // No saved columns at all. A legacy single-string template still gets honoured.
+  if(typeof fallbackTpl==="string" && fallbackTpl.trim() && fallbackTpl!==DEFAULT_TEMPLATE)
+    return [mkJobCol("text",{ tpl:fallbackTpl, w:1 })];
+  return DEFAULT_JOB_COLS();
 }
-function cloneCardCols(cols){ return (cols||[]).map(c=>({tpl:c.tpl,align:c.align,width:c.width})); }
-function colsToTemplate(cols){ return (cols&&cols[0]&&cols[0].tpl)||DEFAULT_TEMPLATE; }   // legacy single-string mirror
+function cloneCardCols(cols){
+  return (cols||[]).map(c=>({k:c.k,w:c.w,align:c.align,style:c.style,b:c.b,i:c.i,u:c.u,tpl:c.tpl||""}));
+}
+// Legacy single-string mirror, still written to the shared config so an older copy of
+// the widget that hasn't been reloaded yet keeps rendering something sensible.
+function colsToTemplate(cols){
+  const t=(cols||[]).find(c=>c.k==="text"&&c.tpl);
+  if(t) return t.tpl;
+  const parts=(cols||[]).filter(c=>c.k!=="text").map(c=>(c.b?"**{"+c.k+"}**":"{"+c.k+"}"));
+  return parts.length?parts.join(" "):DEFAULT_TEMPLATE;
+}
+
+// ---- STONE ORDER table columns (detail panel) ------------------------------
+// The nine columns of the Stone Order table, in their fixed left-to-right order.
+// Unlike the job card these can't be added, removed or reordered: each cell IS the
+// editor for its Grist field, and the three section dividers hang off the order.
+// What IS adjustable, as asked: the width and the alignment of every column.
+const STONECOL={
+  product:      {label:"Product",       w:168},
+  scope:        {label:"Scope",         w:48,  align:"right"},
+  status:       {label:"Status",        w:150},
+  price:        {label:"Price",         w:64,  align:"right"},
+  ordered:      {label:"Order",         w:48,  align:"right"},
+  orderdate:    {label:"Order date",    w:140},
+  delivered:    {label:"Deliv",         w:48,  align:"right"},
+  deliverydate: {label:"Delivery date", w:140},
+  note:         {label:"Note",          w:168}
+};
+const STONE_ORDER=["product","scope","status","price","ordered","orderdate","delivered","deliverydate","note"];
+const STONE_DIV_AFTER={price:true,orderdate:true,deliverydate:true};   // the three section breaks
+const STONE_W_MIN=36, STONE_W_MAX=420, STONE_GAP=8;
+function defaultStoneCols(){
+  return STONE_ORDER.map(k=>({k, w:STONECOL[k].w, align:STONECOL[k].align||"left"}));
+}
+// Always returns all nine, in order, so a stale or partial save can never leave the
+// table short of a column (which would silently shift every cell one track left).
+function normaliseStoneCols(v){
+  const saved={};
+  if(Array.isArray(v)) v.forEach(c=>{ if(c&&STONECOL[c.k]) saved[c.k]=c; });
+  return STONE_ORDER.map(k=>{
+    const s=saved[k]||{};
+    return { k,
+      w:Math.max(STONE_W_MIN,Math.min(STONE_W_MAX,Math.round(Number(s.w)||STONECOL[k].w))),
+      align:CARD_ALIGNS.includes(s.align)?s.align:(STONECOL[k].align||"left") };
+  });
+}
+function stoneCols(){ return state.stoneCols&&state.stoneCols.length===STONE_ORDER.length
+  ? state.stoneCols : defaultStoneCols(); }
+function stoneAlign(k){ const c=stoneCols().find(x=>x.k===k); return c?c.align:"left"; }
+function cloneStoneCols(cols){ return normaliseStoneCols(cols).map(c=>({k:c.k,w:c.w,align:c.align})); }
+
+// ---- SUMMARY CARD stone lines (the "Scope" block, detail panel) ------------
+// Each bulleted stone under a status heading is `bullet · name · note`. The bullet
+// is fixed; the other two are proportional tracks whose share, alignment and
+// overflow behaviour are adjustable, same as everywhere else. Widths are fr shares,
+// not pixels - this sits inside the summary card's resizable left column, so a pixel
+// width would fight the splitter every time it moved.
+// The share is set two ways and they are the same number: drag the divider between
+// the two columns on the card, or use +/- in Customize > Stone table. Dragging lands
+// on fractions, so `w` is a float, not an integer step.
+const SUMSTONECOL={ name:{label:"Stone name",w:3}, note:{label:"Stone note",w:2} };
+const SUMSTONE_ORDER=["name","note"];
+const SUMSTONE_WRAPS=["clip","wrap"];   // clip = one line + ellipsis, wrap = up to `lines`
+const SUMSTONE_W_MIN=0.4, SUMSTONE_W_MAX=8, SUMSTONE_LINES_MAX=6;
+function defaultSumStoneCols(){
+  return SUMSTONE_ORDER.map(k=>({k, w:SUMSTONECOL[k].w, align:"left", wrap:"clip", lines:2}));
+}
+function normaliseSumStoneCols(v){
+  const saved={};
+  if(Array.isArray(v)) v.forEach(c=>{ if(c&&SUMSTONECOL[c.k]) saved[c.k]=c; });
+  return SUMSTONE_ORDER.map(k=>{
+    const s=saved[k]||{}, w=Number(s.w);
+    return { k,
+      w:Math.round(Math.max(SUMSTONE_W_MIN,Math.min(SUMSTONE_W_MAX, w>0?w:SUMSTONECOL[k].w))*100)/100,
+      align:CARD_ALIGNS.includes(s.align)?s.align:"left",
+      wrap:SUMSTONE_WRAPS.includes(s.wrap)?s.wrap:"clip",
+      lines:Math.max(1,Math.min(SUMSTONE_LINES_MAX,Math.round(Number(s.lines)||2))) };
+  });
+}
+function sumStoneCols(){ return state.sumStoneCols&&state.sumStoneCols.length===SUMSTONE_ORDER.length
+  ? state.sumStoneCols : defaultSumStoneCols(); }
+function cloneSumStoneCols(cols){ return normaliseSumStoneCols(cols).map(c=>({k:c.k,w:c.w,align:c.align,wrap:c.wrap,lines:c.lines})); }
+function sumStoneCol(k){ return sumStoneCols().find(x=>x.k===k)||defaultSumStoneCols().find(x=>x.k===k); }
+function sumStoneAlign(k){ return sumStoneCol(k).align; }
+// Classes for one of the two text spans: alignment + how it handles overflow.
+function sumStoneClasses(k){
+  const c=sumStoneCol(k);
+  return " al-"+c.align+" wr-"+c.wrap;
+}
+// Applied to the .stones container; .stone reads it for its two non-bullet tracks.
+function applySumStoneGrid(el){
+  if(!el) return;
+  const cols=sumStoneCols();
+  cols.forEach(c=>{
+    el.style.setProperty("--sumstone-"+c.k+"-w", c.w+"fr");
+    el.style.setProperty("--sumstone-"+c.k+"-lines", String(c.lines));
+  });
+  // Multi-line rows read better top-aligned; single-line rows stay centred.
+  el.classList.toggle("wrapping", cols.some(c=>c.wrap==="wrap"));
+}
+// Drag the divider between name and note. Shares are relative, so we keep their sum
+// fixed and move the split point; 40px minimum a side so a column can't vanish.
+function startSumStoneDrag(e,handle){
+  e.preventDefault();
+  const box=handle.closest(".stones"); if(!box) return;
+  const nm=box.querySelector(".snm"), nt=box.querySelector(".snote"); if(!nm||!nt) return;
+  const cols=normaliseSumStoneCols(sumStoneCols()), name=cols[0], note=cols[1];
+  const sum=name.w+note.w, startW=nm.getBoundingClientRect().width;
+  const total=startW+nt.getBoundingClientRect().width, startX=e.clientX;
+  if(!(total>0)) return;
+  box.classList.add("rsz-drag");
+  const mv=ev=>{
+    const px=Math.max(40,Math.min(total-40,startW+(ev.clientX-startX)));
+    name.w=Math.round(Math.max(SUMSTONE_W_MIN,sum*(px/total))*100)/100;
+    note.w=Math.round(Math.max(SUMSTONE_W_MIN,sum-name.w)*100)/100;
+    state.sumStoneCols=cols; applySumStoneGrid(box);
+  };
+  const up=()=>{ document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up);
+    box.classList.remove("rsz-drag"); savePrefs(); pushSharedTemplate(); };
+  document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up);
+}
 
 // ---- helpers ----
 const $ = (t,c,txt)=>{const e=document.createElement(t); if(c)e.className=c; if(txt!=null)e.textContent=txt; return e;};
@@ -836,11 +1097,24 @@ function observeStoneNote(el){
   });
   ro.observe(el);
 }
-// Apply persisted stone-order column widths (fixed px once the user has dragged any).
+// Build the Stone Order grid from the configured column widths. Each column is
+// minmax(Wpx, Wfr) - exactly what the stone calendar's colTemplate() does - so W is a
+// real minimum and the columns share any spare width in the same proportion. The three
+// 1px tracks are the section dividers; --stone-min keeps the table scrollable rather
+// than crushed once the widths no longer fit the pane.
+function stoneGridTemplate(cols){
+  const parts=[]; let min=0;
+  cols.forEach(c=>{
+    parts.push("minmax("+c.w+"px,"+c.w+"fr)"); min+=c.w;
+    if(STONE_DIV_AFTER[c.k]){ parts.push("1px"); min+=1; }
+  });
+  return { tpl:parts.join(" "), min:min+STONE_GAP*(parts.length-1) };
+}
 function applyStoneGrid(cardEl){
-  if(state.stoneColW && state.stoneColW.length===9){
-    cardEl.style.setProperty("--stone-grid", state.stoneColW.map(w=>w+"px").join(" "));
-  } else { cardEl.style.removeProperty("--stone-grid"); }
+  if(!cardEl) return;
+  const g=stoneGridTemplate(stoneCols());
+  cardEl.style.setProperty("--stone-grid", g.tpl);
+  cardEl.style.setProperty("--stone-min", g.min+"px");
 }
 // Drag the splitter to resize the list pane (persisted), same feel as the note handle.
 function initSplitter(){
@@ -969,7 +1243,8 @@ const state = { jobs:[], stone:[], inst:[], clients:[], catalogue:[], selectedId
   formulaCols:{},                       // {tableId:{colId:true}} - Grist formula/rollup cols, detected from
                                         // the schema; the write path never sends these (brief §5)
   stoneNoteH:null,                      // shared height for stone-order note boxes
-  stoneColW:null,                       // persisted stone-order column widths (px)
+  stoneCols:defaultStoneCols(),         // Stone Order table: per-column width (px) + alignment
+  sumStoneCols:defaultSumStoneCols(),   // summary card stone lines: name/note share + alignment
   sumLeftPct:null,                      // summary card: left column width %
   listW:null,                           // adjustable list-pane width (drag splitter)
   assignChoices:null,                   // Assigned_To choice list (from schema / data)
@@ -980,6 +1255,7 @@ const state = { jobs:[], stone:[], inst:[], clients:[], catalogue:[], selectedId
   colors:{stage:{},payment:{},assignee:{},order:{}}, fmtCollapsed:{},
   schemaChoices:{stage:null,payment:null,order:null}, schemaChoiceColors:{stage:{},payment:{},order:{}},
   cardTemplate:DEFAULT_TEMPLATE, cardCols:normaliseCardCols(null,DEFAULT_TEMPLATE), templateShared:null, _sharedTemplate:null,
+  cardHeadings:false,                   // show a heading row above the job list
   grouping:{by:"",rules:[],restMode:"value"}, groupCollapsed:{},
   savedGroupings:[], activeGrouping:"",
   savedViews:[], activeView:"", filterDrill:null,
@@ -994,12 +1270,12 @@ function pruneRecent(){ let changed=false; const now=Date.now(); for(const k in 
 function pushRecentJobs(){ if(!state.grist) return; try{ grist.setOption("recentJobs", state.recentJobs); }catch(e){} }
 
 function loadPrefs(){ try{ return JSON.parse(localStorage.getItem(LSKEY))||{}; }catch(e){ return {}; } }
-function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ savedViews:state.savedViews.filter(v=>!v.shared), current:snapshot(true), stoneNoteH:state.stoneNoteH||null, listW:state.listW||null, templateShared:state.templateShared, groupCollapsed:state.groupCollapsed||{}, savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"", stoneColW:state.stoneColW||null, sumLeftPct:state.sumLeftPct||null, listCardFont:state.listCardFont, summaryFont:state.summaryFont, colors:state.colors, fmtCollapsed:state.fmtCollapsed, stageOrder:(state.stageOrder||STAGES).slice(), stageOrderShared:state.stageOrderShared, tab:state.tab||"all", recentJobs:state.recentJobs||{} })); }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ savedViews:state.savedViews.filter(v=>!v.shared), current:snapshot(true), stoneNoteH:state.stoneNoteH||null, listW:state.listW||null, templateShared:state.templateShared, groupCollapsed:state.groupCollapsed||{}, savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"", stoneCols:cloneStoneCols(state.stoneCols), sumStoneCols:cloneSumStoneCols(state.sumStoneCols), sumLeftPct:state.sumLeftPct||null, listCardFont:state.listCardFont, summaryFont:state.summaryFont, colors:state.colors, fmtCollapsed:state.fmtCollapsed, stageOrder:(state.stageOrder||STAGES).slice(), stageOrderShared:state.stageOrderShared, tab:state.tab||"all", recentJobs:state.recentJobs||{} })); }catch(e){} }
 function snapshot(withMeta){
   const s={ q:state.filter.q, stage:cleanSet(state.filter.stage), assigned:cleanSet(state.filter.assigned),
     payment:cleanSet(state.filter.payment), sort:{key:state.sort.key,dir:state.sort.dir}, sort2:{key:state.sort2.key,dir:state.sort2.dir}, stageOrder:(state.stageOrder||STAGES).slice(), cardFontSize:state.cardFontSize||12.5, fields:Object.assign({},state.fields),
     cardOrder:(state.cardOrder||CARD_ORDER_DEFAULT).slice(), cardTemplate:state.cardTemplate||DEFAULT_TEMPLATE,
-    cardCols:cloneCardCols(state.cardCols),
+    cardCols:cloneCardCols(state.cardCols), cardHeadings:!!state.cardHeadings,
     grouping:JSON.parse(JSON.stringify(state.grouping||{by:"",rules:[],restMode:"value"})) };
   if(withMeta) s.activeView=state.activeView;
   return s;
@@ -1015,6 +1291,7 @@ function applyConfig(c){ if(!c)return;
   state.cardOrder=normalizeCardOrder(c.cardOrder);
   state.cardCols=normaliseCardCols(c.cardCols, c.cardTemplate);
   state.cardTemplate=colsToTemplate(state.cardCols);
+  state.cardHeadings=!!c.cardHeadings;
   state.grouping=normalizeGrouping(c.grouping);
   if("activeView" in c) state.activeView=c.activeView||""; }
 function sig(s){ return JSON.stringify({q:s.q||"",st:Object.keys(cleanSet(s.stage)).sort(),
@@ -1948,6 +2225,9 @@ let _sharedSig=null;   // last shared config seen/pushed, to detect real changes
 function sharedConfigObj(){
   return { cardTemplate:state.cardTemplate||DEFAULT_TEMPLATE,
     cardCols:cloneCardCols(state.cardCols),
+    cardHeadings:!!state.cardHeadings,
+    stoneCols:cloneStoneCols(state.stoneCols),
+    sumStoneCols:cloneSumStoneCols(state.sumStoneCols),
     cardFontSize:state.cardFontSize||12.5,
     listCardFont:state.listCardFont, summaryFont:state.summaryFont,
     colors:state.colors, fields:state.fields,
@@ -2065,79 +2345,166 @@ function openCardEditor(){
   const sub=document.querySelector("#cardModal .modal-sub");
   // ---- tabs ----
   const tabs=$("div","cm-tabs");
-  const tCard=$("div","cm-tab","Card layout"), tGroup=$("div","cm-tab","Grouping");
-  tabs.appendChild(tCard); tabs.appendChild(tGroup); body.appendChild(tabs);
-  const panelCard=$("div","cm-panel"), panelGroup=$("div","cm-panel");
-  body.appendChild(panelCard); body.appendChild(panelGroup);
+  const tCard=$("div","cm-tab","Card layout"), tStone=$("div","cm-tab","Stone table"),
+        tGroup=$("div","cm-tab","Grouping");
+  tabs.appendChild(tCard); tabs.appendChild(tStone); tabs.appendChild(tGroup); body.appendChild(tabs);
+  const panelCard=$("div","cm-panel"), panelStone=$("div","cm-panel"), panelGroup=$("div","cm-panel");
+  body.appendChild(panelCard); body.appendChild(panelStone); body.appendChild(panelGroup);
+  const SUBS={ card:"Design how each job card looks",
+    stone:"Set the width and alignment of the Stone Order columns",
+    group:"Group the list by one column, with custom buckets" };
   function showTab(w){ state._cardTab=w;
-    tCard.classList.toggle("on",w==="card"); tGroup.classList.toggle("on",w==="group");
-    panelCard.hidden=w!=="card"; panelGroup.hidden=w!=="group";
-    if(sub) sub.textContent = w==="group" ? "Group the list by one column, with custom buckets" : "Design how each job card looks";
-    // The footer's "Save just for me / for everyone" store the CARD DESIGN only.
-    // On the Grouping tab they don't apply (the grouping has its own Save button
-    // in the panel), so hide them there to avoid the "I saved but nothing showed"
-    // trap. Reset stays - it's tab-aware and clears the grouping on this tab.
-    const dm=w!=="card"?"none":"";
+    tCard.classList.toggle("on",w==="card"); tStone.classList.toggle("on",w==="stone");
+    tGroup.classList.toggle("on",w==="group");
+    panelCard.hidden=w!=="card"; panelStone.hidden=w!=="stone"; panelGroup.hidden=w!=="group";
+    if(sub) sub.textContent=SUBS[w]||SUBS.card;
+    // The footer's "Save just for me / for everyone" store the card design AND the
+    // stone-table layout, so they apply on both of those tabs. On the Grouping tab
+    // they don't (the grouping has its own Save button in the panel), so hide them
+    // there to avoid the "I saved but nothing showed" trap. Reset stays - it's
+    // tab-aware and clears only the panel you're looking at.
+    const dm=(w==="card"||w==="stone")?"":"none";
     const bMe=document.getElementById("cardSaveMe"), bAll=document.getElementById("cardSaveAll");
     if(bMe) bMe.style.display=dm; if(bAll) bAll.style.display=dm;
   }
-  tCard.onclick=()=>showTab("card"); tGroup.onclick=()=>showTab("group");
+  tCard.onclick=()=>showTab("card"); tStone.onclick=()=>showTab("stone"); tGroup.onclick=()=>showTab("group");
 
   // ---- Card layout panel ----
+  // One row per column, drag to reorder - the same editor the stone calendar uses for
+  // its table. A column is a chosen field plus formatting; the heading is fixed because
+  // it names the Grist field the column reads.
   if(!Array.isArray(state.cardCols)||!state.cardCols.length) state.cardCols=normaliseCardCols(null,state.cardTemplate);
-  let activeTa=null, activeCol=null;                       // last-focused column — token chips insert here
   const prev=$("div","tpl-prev");
   function refresh(){
     state.cardTemplate=colsToTemplate(state.cardCols); savePrefs(); renderList();
     prev.innerHTML=""; const j=selectedJob()||state.jobs[0];
     if(j) prev.appendChild(renderCardBody(j,state.cardCols)); else prev.appendChild($("div","tpl-help","No sample job to preview."));
   }
-  panelCard.appendChild($("div","tpl-sec","Columns"));
+  panelCard.appendChild($("div","tpl-sec","Columns shown, left to right"));
+  panelCard.appendChild($("div","tpl-help","Drag a row to move the column. Headings are fixed - a heading names the field the column reads."));
   const colsWrap=$("div","cm-cols"); panelCard.appendChild(colsWrap);
+  let dragFrom=null;
+  function moveCardCol(from,to){
+    const a=state.cardCols;
+    if(from===to||from<0||to<0||from>=a.length||to>a.length) return false;
+    a.splice(from<to?to-1:to,0,a.splice(from,1)[0]);
+    return true;
+  }
   function drawCols(){
     colsWrap.innerHTML="";
     state.cardCols.forEach((col,i)=>{
-      const block=$("div","cm-col");
-      const head=$("div","cm-col-head");
-      head.appendChild($("span","cm-col-n","Column "+(i+1)));
-      const up=$("span","cm-col-mv"+(i===0?" off":""),"↑"); up.title="Move left";
-      up.onclick=()=>{ const a=state.cardCols; if(i>0){ [a[i-1],a[i]]=[a[i],a[i-1]]; refresh(); drawCols(); } };
-      const dn=$("span","cm-col-mv"+(i===state.cardCols.length-1?" off":""),"↓"); dn.title="Move right";
-      dn.onclick=()=>{ const a=state.cardCols; if(i<a.length-1){ [a[i+1],a[i]]=[a[i],a[i+1]]; refresh(); drawCols(); } };
-      const rm=$("span","cm-col-x"+(state.cardCols.length<=1?" off":""),"×"); rm.title="Remove column";
-      rm.onclick=()=>{ if(state.cardCols.length>1){ state.cardCols.splice(i,1); refresh(); drawCols(); } };
-      head.appendChild(up); head.appendChild(dn); head.appendChild(rm);
-      block.appendChild(head);
-      const t=document.createElement("textarea"); t.className="tpl-ta"; t.spellcheck=false; t.value=col.tpl;
-      t.oninput=()=>{ col.tpl=t.value; refresh(); };
-      t.onfocus=()=>{ activeTa=t; activeCol=col; };
-      t.onblur=pushSharedTemplate;
-      if(!activeTa){ activeTa=t; activeCol=col; }
-      block.appendChild(t);
-      const opts=$("div","cm-col-opts");
-      opts.appendChild($("span","cm-lab","Align"));
-      const aseg=$("div","cm-seg");
-      [["left","L","Left"],["centre","C","Centre"],["right","R","Right"]].forEach(([v,l,ti])=>{
-        const b=document.createElement("button"); b.type="button"; b.textContent=l; b.title=ti; if(col.align===v)b.className="on";
-        b.onclick=()=>{ col.align=v; refresh(); drawCols(); }; aseg.appendChild(b); });
-      opts.appendChild(aseg);
-      opts.appendChild($("span","cm-lab","Width"));
+      const def=JOBCOL[col.k];
+      const row=$("div","colrow"); row.draggable=true;
+
+      row.ondragstart=ev=>{ dragFrom=i; row.classList.add("dragging");
+        try{ ev.dataTransfer.effectAllowed="move"; ev.dataTransfer.setData("text/plain",String(i)); }catch(e){} };
+      row.ondragend=()=>{ dragFrom=null;
+        [...colsWrap.querySelectorAll(".colrow")].forEach(x=>x.classList.remove("dragging","dropbefore","dropafter")); };
+      row.ondragover=ev=>{ if(dragFrom==null||dragFrom===i) return;
+        ev.preventDefault();
+        const r=row.getBoundingClientRect(), after=(ev.clientY-r.top)>r.height/2;
+        row.classList.toggle("dropbefore",!after); row.classList.toggle("dropafter",after); };
+      row.ondragleave=()=>row.classList.remove("dropbefore","dropafter");
+      row.ondrop=ev=>{
+        ev.preventDefault();
+        const after=row.classList.contains("dropafter");
+        row.classList.remove("dropbefore","dropafter");
+        if(dragFrom==null) return;
+        const target=after?i+1:i, from=dragFrom; dragFrom=null;
+        if(moveCardCol(from,target)){ refresh(); drawCols(); }
+      };
+
+      row.appendChild($("span","grip","⠿"));
+      const nm=$("div","colname",def.label); nm.title="The heading is the field this column reads";
+      row.appendChild(nm);
+
+      const fmt=$("div","cm-seg");
+      [["b","B","fb","Bold"],["i","I","fi","Italic"],["u","U","fu","Underline"]].forEach(sp=>{
+        const b=document.createElement("button"); b.type="button"; b.textContent=sp[1];
+        b.className=sp[2]+(col[sp[0]]?" on":""); b.title=sp[3];
+        b.onclick=()=>{ col[sp[0]]=!col[sp[0]]; refresh(); drawCols(); };
+        fmt.appendChild(b); });
+      row.appendChild(fmt);
+
+      // Plain / Pill is only meaningful for the fields that HAVE a colour palette.
+      const st=$("div","cm-seg");
+      [["plain","Plain"],["pill","Pill"]].forEach(sp=>{
+        const b=document.createElement("button"); b.type="button"; b.textContent=sp[1];
+        if(col.style===sp[0]) b.className="on";
+        if(!def.pillable){ b.disabled=true; b.title="Only Stage and Payment have colours"; }
+        else b.onclick=()=>{ col.style=sp[0]; refresh(); drawCols(); };
+        st.appendChild(b); });
+      row.appendChild(st);
+
+      const al=$("div","cm-seg");
+      [["left","L","Left"],["centre","C","Centre"],["right","R","Right"]].forEach(sp=>{
+        const b=document.createElement("button"); b.type="button"; b.textContent=sp[1]; b.title=sp[2];
+        if(col.align===sp[0]) b.className="on";
+        b.onclick=()=>{ col.align=sp[0]; refresh(); drawCols(); };
+        al.appendChild(b); });
+      row.appendChild(al);
+
       const wseg=$("div","cm-wstep");
       const wm=document.createElement("button"); wm.type="button"; wm.className="cm-wb"; wm.textContent="−"; wm.title="Narrower";
-      wm.onclick=()=>{ col.width=Math.max(1,(col.width||1)-1); refresh(); drawCols(); };
-      const wv=$("span","cm-wv",(col.width||1)+"×");
+      wm.onclick=()=>{ col.w=Math.max(1,(col.w||1)-1); refresh(); drawCols(); };
+      const wv=$("span","cm-wv",(col.w||1)+"×");
       const wp=document.createElement("button"); wp.type="button"; wp.className="cm-wb"; wp.textContent="+"; wp.title="Wider";
-      wp.onclick=()=>{ col.width=Math.min(6,(col.width||1)+1); refresh(); drawCols(); };
-      wseg.appendChild(wm); wseg.appendChild(wv); wseg.appendChild(wp); opts.appendChild(wseg);
-      block.appendChild(opts);
-      colsWrap.appendChild(block);
+      wp.onclick=()=>{ col.w=Math.min(6,(col.w||1)+1); refresh(); drawCols(); };
+      wseg.appendChild(wm); wseg.appendChild(wv); wseg.appendChild(wp); row.appendChild(wseg);
+
+      const rm=$("span","col-x"+(state.cardCols.length<=1?" off":""),"×"); rm.title="Remove column";
+      rm.onclick=()=>{ if(state.cardCols.length>1){ state.cardCols.splice(i,1); refresh(); drawCols(); } };
+      row.appendChild(rm);
+      colsWrap.appendChild(row);
+
+      // The escape hatch: a "Custom text" column still takes the old {token} template.
+      if(def.tpl){
+        const tw=$("div","cm-tplrow");
+        const t=document.createElement("textarea"); t.className="tpl-ta"; t.spellcheck=false;
+        t.value=col.tpl||""; t.placeholder="e.g. **{client}** >> {stage}";
+        t.oninput=()=>{ col.tpl=t.value; refresh(); };
+        t.onblur=pushSharedTemplate;
+        tw.appendChild(t);
+        const tk=$("div","ce-tokens");
+        Object.keys(TOKENS).forEach(k=>{
+          const b=document.createElement("button"); b.type="button"; b.className="ce-tok"; b.textContent="{"+k+"}";
+          b.title=TOKENS[k].desc;
+          b.onmousedown=e=>e.preventDefault();
+          b.onclick=()=>{ insertAtCursor(t,"{"+k+"}"); col.tpl=t.value; refresh(); t.focus(); };
+          tk.appendChild(b); });
+        tw.appendChild(tk);
+        const th=$("div","tpl-help");
+        th.innerHTML="<code>**bold**</code> &nbsp;·&nbsp; <code>*italic*</code> &nbsp;·&nbsp; <code>&gt;&gt;</code> pushes the rest of the row right &nbsp;·&nbsp; each new line is a new row.";
+        tw.appendChild(th);
+        colsWrap.appendChild(tw);
+      }
     });
-    const add=document.createElement("button"); add.type="button"; add.className="cm-addcol";
-    add.textContent="＋ Add column"; add.disabled=state.cardCols.length>=4;
-    add.onclick=()=>{ if(state.cardCols.length<4){ state.cardCols.push({tpl:"",align:"left",width:1}); refresh(); drawCols(); } };
-    colsWrap.appendChild(add);
+
+    const rest=Object.keys(JOBCOL).filter(k=>k!=="text"&&!state.cardCols.some(c=>c.k===k));
+    if(rest.length||!state.cardCols.some(c=>c.k==="text")){
+      colsWrap.appendChild($("div","tpl-sec","Add a column"));
+      const av=$("div","ce-tokens");
+      rest.forEach(k=>{
+        const b=document.createElement("button"); b.type="button"; b.className="ce-tok"; b.textContent="+ "+JOBCOL[k].label;
+        b.onclick=()=>{ state.cardCols.push(mkJobCol(k)); refresh(); drawCols(); };
+        av.appendChild(b); });
+      // Custom text can be added more than once - it's a free slot, not a field.
+      const bt=document.createElement("button"); bt.type="button"; bt.className="ce-tok"; bt.textContent="+ Custom text";
+      bt.title="A free-form column using the old {token} template";
+      bt.onclick=()=>{ state.cardCols.push(mkJobCol("text")); refresh(); drawCols(); };
+      av.appendChild(bt);
+      colsWrap.appendChild(av);
+    }
   }
   drawCols();
+
+  const hdTog=document.createElement("label"); hdTog.className="cm-check";
+  const hdCb=document.createElement("input"); hdCb.type="checkbox"; hdCb.checked=!!state.cardHeadings;
+  hdCb.onchange=()=>{ state.cardHeadings=hdCb.checked; savePrefs(); renderList(); };
+  hdTog.appendChild(hdCb);
+  hdTog.appendChild(document.createTextNode("Show a heading row above the list (needs 2+ columns)"));
+  panelCard.appendChild(hdTog);
+
   const share=$("div","tpl-share");
   share.appendChild($("span","tpl-note","When you save, choose “Save for everyone” (team design, stored in the Grist doc) or “Save just for me” (this browser only)."));
   panelCard.appendChild(share);
@@ -2149,16 +2516,102 @@ function openCardEditor(){
   fsRow.appendChild(fr); fsRow.appendChild(fv); panelCard.appendChild(fsRow);
   panelCard.appendChild($("div","tpl-sec","Preview"));
   panelCard.appendChild(prev);
-  panelCard.appendChild($("div","tpl-sec","Available fields (click to insert into the selected column)"));
-  const toks=$("div","tok-list");
-  Object.keys(TOKENS).forEach(k=>{ const t=$("div","tok"); t.appendChild($("code",null,"{"+k+"}")); t.appendChild($("span","tokdesc",TOKENS[k].desc));
-    t.onmousedown=e=>e.preventDefault();
-    t.onclick=()=>{ if(!activeTa){ return; } insertAtCursor(activeTa,"{"+k+"}"); if(activeCol) activeCol.tpl=activeTa.value; refresh(); activeTa.focus(); }; toks.appendChild(t); });
-  panelCard.appendChild(toks);
-  panelCard.appendChild($("div","tpl-sec","Formatting"));
-  const help=$("div","tpl-help");
-  help.innerHTML="Each <b>column</b> is a section laid side-by-side, with its own align &amp; width. Inside a column: <code>**bold**</code> &nbsp;·&nbsp; <code>*italic*</code> &nbsp;·&nbsp; <code>&gt;&gt;</code> pushes the rest of a row to the right &nbsp;·&nbsp; each new line = a new row &nbsp;·&nbsp; e.g. <code>{client} &gt;&gt; {stage}</code> or <code>Scope: {scope}</code>.";
-  panelCard.appendChild(help);
+
+  // ---- Stone table panel ----
+  // The nine Stone Order columns. They can't be added, removed or reordered - each cell
+  // is the editor for its Grist field - but the width and alignment of every one of them
+  // is adjustable, which is what the detail panel was missing.
+  panelStone.appendChild($("div","tpl-sec","Stone Order columns"));
+  panelStone.appendChild($("div","tpl-help","Width is the column's minimum in pixels; spare space is shared out in the same proportion, so a wider number here also means a wider share of the table."));
+  const stWrap=$("div","cm-cols"); panelStone.appendChild(stWrap);
+  function refreshStone(){
+    state.stoneCols=normaliseStoneCols(state.stoneCols);
+    savePrefs(); renderDetail();
+  }
+  function drawStone(){
+    stWrap.innerHTML="";
+    stoneCols().forEach(col=>{
+      const row=$("div","colrow");
+      row.appendChild($("div","colname",STONECOL[col.k].label));
+
+      const al=$("div","cm-seg");
+      [["left","L","Left"],["centre","C","Centre"],["right","R","Right"]].forEach(sp=>{
+        const b=document.createElement("button"); b.type="button"; b.textContent=sp[1]; b.title=sp[2];
+        if(col.align===sp[0]) b.className="on";
+        b.onclick=()=>{ col.align=sp[0]; refreshStone(); drawStone(); };
+        al.appendChild(b); });
+      row.appendChild(al);
+
+      const sp2=document.createElement("span"); sp2.style.flex="1 1 auto"; row.appendChild(sp2);
+
+      const wseg=$("div","cm-wstep");
+      const wm=document.createElement("button"); wm.type="button"; wm.className="cm-wb"; wm.textContent="−"; wm.title="Narrower";
+      wm.onclick=()=>{ col.w=Math.max(STONE_W_MIN,col.w-8); refreshStone(); drawStone(); };
+      const wv=$("span","cm-wv",col.w+"px");
+      const wp=document.createElement("button"); wp.type="button"; wp.className="cm-wb"; wp.textContent="+"; wp.title="Wider";
+      wp.onclick=()=>{ col.w=Math.min(STONE_W_MAX,col.w+8); refreshStone(); drawStone(); };
+      wseg.appendChild(wm); wseg.appendChild(wv); wseg.appendChild(wp); row.appendChild(wseg);
+      stWrap.appendChild(row);
+    });
+  }
+  state.stoneCols=normaliseStoneCols(state.stoneCols);
+  drawStone();
+
+  // The bulleted stone lines in the summary card above the table are the other place
+  // a stone gets a note, and they had the same fixed split. Width here is a share of
+  // the row, not pixels, because the summary's left column is itself resizable.
+  panelStone.appendChild($("div","tpl-sec","Summary card · stone lines"));
+  panelStone.appendChild($("div","tpl-help","The bulleted “2× Cararra Lux · note” rows under Scope. Width is each one's share of the row (drag the divider on the card for the same thing); the bullet is fixed. Clip cuts a long value off with “…”, Wrap runs it onto more lines."));
+  const ssWrap=$("div","cm-cols"); panelStone.appendChild(ssWrap);
+  function refreshSumStone(){
+    state.sumStoneCols=normaliseSumStoneCols(state.sumStoneCols);
+    savePrefs(); renderDetail();
+  }
+  function drawSumStone(){
+    ssWrap.innerHTML="";
+    const cols=sumStoneCols(), total=cols.reduce((a,c)=>a+c.w,0)||1;
+    cols.forEach(col=>{
+      const row=$("div","colrow");
+      row.appendChild($("div","colname",SUMSTONECOL[col.k].label));
+      const al=$("div","cm-seg");
+      [["left","L","Left"],["centre","C","Centre"],["right","R","Right"]].forEach(sp=>{
+        const b=document.createElement("button"); b.type="button"; b.textContent=sp[1]; b.title=sp[2];
+        if(col.align===sp[0]) b.className="on";
+        b.onclick=()=>{ col.align=sp[0]; refreshSumStone(); drawSumStone(); };
+        al.appendChild(b); });
+      row.appendChild(al);
+      // Overflow: one line + ellipsis, or wrap to a set number of lines.
+      const wr=$("div","cm-seg");
+      [["clip","Clip","One line, cut off with …"],["wrap","Wrap","Run onto more lines"]].forEach(sp=>{
+        const b=document.createElement("button"); b.type="button"; b.textContent=sp[1]; b.title=sp[2];
+        if(col.wrap===sp[0]) b.className="on";
+        b.onclick=()=>{ col.wrap=sp[0]; refreshSumStone(); drawSumStone(); };
+        wr.appendChild(b); });
+      row.appendChild(wr);
+      if(col.wrap==="wrap"){
+        const lseg=$("div","cm-wstep");
+        const lm=document.createElement("button"); lm.type="button"; lm.className="cm-wb"; lm.textContent="−"; lm.title="Fewer lines";
+        lm.onclick=()=>{ col.lines=Math.max(1,col.lines-1); refreshSumStone(); drawSumStone(); };
+        const lv=$("span","cm-wv",col.lines+(col.lines===1?" line":" lines")); lv.style.minWidth="46px";
+        const lp=document.createElement("button"); lp.type="button"; lp.className="cm-wb"; lp.textContent="+"; lp.title="More lines";
+        lp.onclick=()=>{ col.lines=Math.min(SUMSTONE_LINES_MAX,col.lines+1); refreshSumStone(); drawSumStone(); };
+        lseg.appendChild(lm); lseg.appendChild(lv); lseg.appendChild(lp); row.appendChild(lseg);
+      }
+      const sp2=document.createElement("span"); sp2.style.flex="1 1 auto"; row.appendChild(sp2);
+      const wseg=$("div","cm-wstep");
+      const wm=document.createElement("button"); wm.type="button"; wm.className="cm-wb"; wm.textContent="−"; wm.title="Narrower";
+      wm.onclick=()=>{ col.w=Math.max(SUMSTONE_W_MIN,Math.round((col.w-0.25)*100)/100); refreshSumStone(); drawSumStone(); };
+      // Shown as a share of the pair, which is what the two numbers actually mean.
+      const wv=$("span","cm-wv",Math.round(col.w/total*100)+"%"); wv.title=col.w+"fr";
+      const wp=document.createElement("button"); wp.type="button"; wp.className="cm-wb"; wp.textContent="+"; wp.title="Wider";
+      wp.onclick=()=>{ col.w=Math.min(SUMSTONE_W_MAX,Math.round((col.w+0.25)*100)/100); refreshSumStone(); drawSumStone(); };
+      wseg.appendChild(wm); wseg.appendChild(wv); wseg.appendChild(wp); row.appendChild(wseg);
+      ssWrap.appendChild(row);
+    });
+  }
+  state.sumStoneCols=normaliseSumStoneCols(state.sumStoneCols);
+  drawSumStone();
+  panelStone.appendChild($("div","tpl-help","Select a job with stone lines to watch both areas change as you adjust them."));
 
   // ---- Grouping panel ----
   const gwrap=$("div","grp-editor"); panelGroup.appendChild(gwrap); renderGroupingEditor(gwrap);
@@ -2176,12 +2629,16 @@ function openCardEditor(){
 
   showTab(state._cardTab); refresh();
   document.getElementById("cardModal").hidden=false;
-  if(state._cardTab==="card") setTimeout(()=>{ if(activeTa) activeTa.focus(); },0);
+  // Columns are picked, not typed, so there's nothing to focus on open unless a
+  // Custom text column is present - then put the caret in the first one.
+  if(state._cardTab==="card") setTimeout(()=>{
+    const ta=panelCard.querySelector(".cm-tplrow .tpl-ta"); if(ta) ta.focus(); },0);
 }
 function resetActivePanel(){
   if(state._cardTab==="group") state.grouping={by:"",rules:[],restMode:"value"};
-  else { state.cardCols=normaliseCardCols(null,DEFAULT_TEMPLATE); state.cardTemplate=DEFAULT_TEMPLATE; }
-  savePrefs(); pushSharedTemplate(); renderList(); openCardEditor();
+  else if(state._cardTab==="stone"){ state.stoneCols=defaultStoneCols(); state.sumStoneCols=defaultSumStoneCols(); }
+  else { state.cardCols=DEFAULT_JOB_COLS(); state.cardTemplate=colsToTemplate(state.cardCols); state.cardHeadings=false; }
+  savePrefs(); pushSharedTemplate(); renderAll(); openCardEditor();
 }
 function closeCardModal(){ document.getElementById("cardModal").hidden=true; }
 const HFIELD={ Client_Label:"Client", Client_Name:"Client", Job_Address:"Address", Stage:"Stage",
@@ -2512,18 +2969,63 @@ function renderColLines(tpl,j,host){
     host.appendChild(el);
   });
 }
+// Render one field column: the value the registry pulls, wrapped in whatever
+// formatting the column carries (bold / italic / underline, plain or colour pill).
+function renderFieldCol(c,j,host){
+  const def=JOBCOL[c.k]; if(!def) return;
+  const el=$("div","tline");
+  let inner=null;
+  if(c.style==="pill" && def.pillable){
+    const v=def.txt(j);
+    if(v!=null && v!=="") inner=pill(v,def.colors(),{xs:true});
+  } else if(def.el){
+    inner=def.el(j);
+  }
+  if(!inner){
+    const v=def.txt?def.txt(j):"";
+    const s=(v==null||v==="")?"":String(v);
+    if(s==="") { el.appendChild($("span","dash","–")); host.appendChild(el); return; }
+    inner=document.createElement("span"); inner.textContent=s;
+  }
+  if(c.b||c.i||c.u){
+    const st=inner.style;
+    if(c.b) st.fontWeight="600";
+    if(c.i) st.fontStyle="italic";
+    if(c.u) st.textDecoration="underline";
+    if(inner.style.display==="") inner.style.display="inline-block";
+  }
+  el.appendChild(inner);
+  host.appendChild(el);
+}
+const cardCols=()=>state.cardCols&&state.cardCols.length?state.cardCols:normaliseCardCols(null,state.cardTemplate);
+const cardTemplateCols=cols=>cols.map(c=>"minmax(0,"+(c.w||1)+"fr)").join(" ");
 function renderCardBody(j,colsOverride){
   const body=$("div","jbody");
-  const cols=(colsOverride||state.cardCols||normaliseCardCols(null,state.cardTemplate));
-  if(cols.length<=1){
-    renderColLines(cols[0]?cols[0].tpl:DEFAULT_TEMPLATE, j, body);       // single column → same look as before
-  } else {
-    body.classList.add("cols");
-    body.style.gridTemplateColumns=cols.map(c=>"minmax(0,"+(c.width||1)+"fr)").join(" ");
-    cols.forEach(c=>{ const cell=$("div","jcol al-"+(c.align||"left")); renderColLines(c.tpl,j,cell); body.appendChild(cell); });
-  }
+  const cols=colsOverride||cardCols();
+  const one=cols.length<=1;
+  if(!one){ body.classList.add("cols"); body.style.gridTemplateColumns=cardTemplateCols(cols); }
+  cols.forEach(c=>{
+    // A single `text` column keeps the old full-card look: its lines flow straight
+    // into the card body rather than into a one-column grid.
+    const host=one?body:$("div","jcol"+(c.k==="text"?"":" field")+" al-"+(c.align||"left"));
+    if(c.k==="text") renderColLines(c.tpl||DEFAULT_TEMPLATE,j,host); else renderFieldCol(c,j,host);
+    if(!one) body.appendChild(host);
+  });
   if(!body.querySelector(".tline")){ body.innerHTML=""; body.className="jbody"; body.appendChild($("span","jnmtext",esc(j.Client_Label)||esc(j.Job_ID)||"-")); }
   return body;
+}
+// Optional heading row above the list. Only meaningful with 2+ columns - with one
+// column the card is a free-form block, not a table, so there is nothing to head.
+function renderListHead(){
+  const cols=cardCols();
+  if(!state.cardHeadings || cols.length<2) return null;
+  const h=$("div","jhead");
+  h.style.gridTemplateColumns=cardTemplateCols(cols);
+  cols.forEach(c=>{
+    const def=JOBCOL[c.k];
+    h.appendChild($("span","al-"+(c.align||"left"), def?def.label:""));
+  });
+  return h;
 }
 // ---------- list grouping (CASE-style rules + "group the rest by a field") ----------
 const GROUP_FIELDS=[{key:"client",label:"Client"},{key:"address",label:"Address"},{key:"stage",label:"Stage"},
@@ -2579,6 +3081,9 @@ function renderList(){
   const rows=filteredJobs();
   document.getElementById("jobCount").textContent=rows.length;
   if(!rows.length){ list.appendChild($("div","list-empty","No jobs match.")); return; }
+  const lh=renderListHead();
+  list.classList.toggle("has-jhead",!!lh);
+  if(lh) list.appendChild(lh);
   if(!groupingActive()){ rows.forEach(j=>list.appendChild(jobRow(j))); return; }
   const map=new Map();
   rows.forEach(j=>{ const gi=groupInfo(j); if(!map.has(gi.label)) map.set(gi.label,{label:gi.label,k1:gi.k1,k2:gi.k2,jobs:[]}); map.get(gi.label).jobs.push(j); });
@@ -2668,7 +3173,7 @@ function renderDetail(){
       tot.appendChild($("span",null,total===1?"slab":"slabs"));
       scopeBlk.appendChild(tot);
     }
-    const sl=$("div","stones");
+    const sl=$("div","stones"); applySumStoneGrid(sl);
     [...groups.entries()]
       .sort((a,b)=> (qtyOf(b[1])-qtyOf(a[1])) || ((ORDS.indexOf(a[0])+1||99)-(ORDS.indexOf(b[0])+1||99)))
       .forEach(([s,rows])=>{
@@ -2693,9 +3198,12 @@ function renderDetail(){
           const row=$("div","stone");
           row.appendChild($("span","sbul"));
           const showQty = !singleColour && g.hasQty;
-          row.appendChild($("span","snm", (showQty ? g.qty+"× " : "")+esc(g.label)));
+          const snm=$("span","snm"+sumStoneClasses("name"), (showQty ? g.qty+"× " : "")+esc(g.label));
+          snm.title=esc(g.label); row.appendChild(snm);
+          const hnd=$("span","ssplit"); hnd.title="Drag to resize the name / note split";
+          hnd.onmousedown=e=>startSumStoneDrag(e,hnd); row.appendChild(hnd);
           const noteTxt=g.notes.join(" \u00b7 ");
-          const sn=$("span","snote", esc(noteTxt)); if(noteTxt) sn.title=esc(noteTxt); row.appendChild(sn);
+          const sn=$("span","snote"+sumStoneClasses("note"), esc(noteTxt)); if(noteTxt) sn.title=esc(noteTxt); row.appendChild(sn);
           sl.appendChild(row);
         });
       });
@@ -2774,16 +3282,22 @@ function renderDetail(){
     sh.appendChild(mvsel);
   }
   sc.appendChild(sh);
+  applyStoneGrid(sc);                        // per-column widths from Customize > Stone table
   const sb=$("div","card-body");
   if(!stone.length){ sb.appendChild($("div","empty","No stone lines for this job.")); }
   else { const hd=$("div","stone-head");
     // Four sections, separated by divider cells (empty spans): [Product Scope Status Price]
     // | [Order qty · Order date] | [Deliv qty · Delivery date] | [Note].
-    const H=(t,cls)=>hd.appendChild($("span",cls||null,t||""));
-    H("Product"); H("Scope","num"); H("Status","status-h"); H("Price","num");
-    H("","stone-div"); H("Order","num"); H("Order date","date-h");
-    H("","stone-div"); H("Deliv","num"); H("Delivery date","date-h");
-    H("","stone-div"); H("Note");
+    // Headings are driven off STONE_ORDER so a heading can never drift out of step
+    // with the cell under it, and each one carries its column's alignment.
+    STONE_ORDER.forEach(k=>{
+      const c=stoneCols().find(x=>x.k===k);
+      const cls=["al-"+c.align];
+      if(k==="status") cls.push("status-h");
+      if(k==="orderdate"||k==="deliverydate") cls.push("date-h");
+      hd.appendChild($("span",cls.join(" "),STONECOL[k].label));
+      if(STONE_DIV_AFTER[k]) hd.appendChild($("span","stone-div"));
+    });
     sb.appendChild(hd); }
   const stoneSorted=[...stone].sort((a,b)=>(b.id||0)-(a.id||0));   // newest line on top
   stoneSorted.forEach(r=>{
@@ -2816,9 +3330,14 @@ function renderDetail(){
       nmrow.appendChild(mvb);
     }
     prod.appendChild(nmrow);
+    // Every cell goes in through put(), which tags it with its column's alignment and
+    // drops in the section divider after the columns that end a section. Keeping the
+    // order in one place is what lets the headings above stay in step.
+    const put=(k,el)=>{ el.classList.add("al-"+stoneAlign(k)); line.appendChild(el);
+      if(STONE_DIV_AFTER[k]) line.appendChild($("div","stone-div")); };
     // ── Section 1: Product · Scope · Status · Price ──
-    line.appendChild(prod);
-    line.appendChild(stoneQtyInput(r,"Scope_Qty","Scope qty",false));
+    put("product",prod);
+    put("scope",stoneQtyInput(r,"Scope_Qty","Scope qty",false));
     const scell=$("div","statuscell");
     scell.appendChild(pill(r.Order_Status,ORD_C,{options:ORDS,onchange:v=>update("Stone_Order",r.id,{Order_Status:v})}));
     // Relative-time under the status: counts up from the delivery date once delivered, otherwise
@@ -2827,27 +3346,24 @@ function renderDetail(){
     if(isDeliveredStatus(r) && toDate(r.Delivery_Date)) ageTxt=agoText("Delivered",relDays(r.Delivery_Date));
     else if(toDate(r.Order_Date)) ageTxt=agoText("Ordered",relDays(r.Order_Date));
     if(ageTxt) scell.appendChild($("div","statusage",ageTxt));
-    line.appendChild(scell);
+    put("status",scell);
     // Price / slab is a read-only Grist formula (looked up from the product) - edit via the product.
     const pw=$("div","lprice ro"); pw.title="Price / slab - from the product profile; edit the product to change it";
     const pv=(r.Product_Price_slab!=null&&r.Product_Price_slab!=="")?r.Product_Price_slab:0;
     pw.appendChild(document.createTextNode("$"+pv));
-    line.appendChild(pw);
+    put("price",pw);
     // ── Section 2: Order qty · Order date ──
-    line.appendChild($("div","stone-div"));
-    line.appendChild(stoneQtyInput(r,"Ordered_Qty","Order qty",true));
-    line.appendChild(stoneDateInput(r,"Order_Date"));
+    put("ordered",stoneQtyInput(r,"Ordered_Qty","Order qty",true));
+    put("orderdate",stoneDateInput(r,"Order_Date"));
     // ── Section 3: Delivery qty · Delivery date ──
-    line.appendChild($("div","stone-div"));
-    line.appendChild(stoneQtyInput(r,"Delivery_Qty","Delivered qty",true));
-    line.appendChild(stoneDateInput(r,"Delivery_Date"));
+    put("delivered",stoneQtyInput(r,"Delivery_Qty","Delivered qty",true));
+    put("deliverydate",stoneDateInput(r,"Delivery_Date"));
     // ── Section 4: Note ──
-    line.appendChild($("div","stone-div"));
     const nti=document.createElement("textarea"); nti.className="lnote"; nti.value=esc(r.Note); nti.placeholder="Note…";
     if(state.stoneNoteH) nti.style.height=state.stoneNoteH+"px";   // shared, remembered height
     nti.onblur=()=>{ if(nti.value!==esc(r.Note)) update("Stone_Order",r.id,{Note:nti.value}); };
     observeStoneNote(nti);
-    line.appendChild(nti);
+    put("note",nti);
     sb.appendChild(line);
   });
   sc.appendChild(sb); app.appendChild(sc);
@@ -2957,6 +3473,15 @@ if(typeof grist!=="undefined"){
     if(!editing){
       const sharedCols=(Array.isArray(opts.cardCols)&&opts.cardCols.length)?normaliseCardCols(opts.cardCols,shared):(shared!=null?normaliseCardCols(null,shared):null);
       if(sharedCols && J(sharedCols)!==J(state.cardCols)){ state.cardCols=sharedCols; state.cardTemplate=colsToTemplate(sharedCols); changed=true; }
+      if(typeof opts.cardHeadings==="boolean" && opts.cardHeadings!==state.cardHeadings){ state.cardHeadings=opts.cardHeadings; changed=true; }
+      if(Array.isArray(opts.stoneCols) && opts.stoneCols.length){
+        const sc=normaliseStoneCols(opts.stoneCols);
+        if(J(sc)!==J(cloneStoneCols(state.stoneCols))){ state.stoneCols=sc; changed=true; }
+      }
+      if(Array.isArray(opts.sumStoneCols) && opts.sumStoneCols.length){
+        const ss=normaliseSumStoneCols(opts.sumStoneCols);
+        if(J(ss)!==J(cloneSumStoneCols(state.sumStoneCols))){ state.sumStoneCols=ss; changed=true; }
+      }
     }
     // NB: the active grouping is intentionally NOT adopted - it's personal, so the
     // widget always defaults to "No grouping" and the team's grouping is never forced.
@@ -3106,7 +3631,8 @@ document.addEventListener("click",closeMenus);
 {
   const p=loadPrefs(); state.savedViews=p.savedViews||[]; applyConfig(p.current);
   state.stoneNoteH=p.stoneNoteH||null; state.listW=p.listW||null; state.groupCollapsed=p.groupCollapsed||{};
-  state.stoneColW=Array.isArray(p.stoneColW)?p.stoneColW:null; state.sumLeftPct=p.sumLeftPct||null;
+  state.stoneCols=normaliseStoneCols(p.stoneCols); state.sumStoneCols=normaliseSumStoneCols(p.sumStoneCols);
+  state.sumLeftPct=p.sumLeftPct||null;
   state.listCardFont=Object.assign({},LIST_CARD_FONT,p.listCardFont||{}); state.summaryFont=Object.assign({},SUMMARY_FONT,p.summaryFont||{});
   state.colors=normalizeColors(p.colors); applyColorOverrides();
   state.fmtCollapsed=(p.fmtCollapsed&&typeof p.fmtCollapsed==="object")?p.fmtCollapsed:{};

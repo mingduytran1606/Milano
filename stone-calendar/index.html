@@ -318,6 +318,16 @@
   .jp-line.here{border-color:var(--accent);background:var(--accent-soft)}
   .jp-note{font-size:11.5px;color:var(--muted);margin:2px 0 12px}
   .jp-saved{color:var(--accent-ink);font-weight:700;font-size:11.5px;margin-left:8px}
+  /* frozen (sticky) cells need an opaque background or the scrolling content shows through */
+  .frz{z-index:2}
+  .sthead>.stlab.frz,.stcols>.stlab.frz{background:var(--bg);z-index:4}
+  .strow>.frz{background:var(--panel)}
+  .strow:hover>.frz{background:var(--accent-soft)}
+  .stsum>.frz{background:var(--bg)}
+  .ag-day.tbl>.ag-date.frz{z-index:3}
+  .frz-edge{box-shadow:1px 0 0 var(--line),3px 0 6px -3px rgba(16,24,40,.18)}
+  .ce-freeze{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:2px 0 4px}
+  .ce-hint{font-size:11px;color:var(--muted)}
   .supgrp{display:flex;align-items:center;gap:9px;padding:6px 10px;
     background:var(--bg);border-top:1px solid var(--line2);border-bottom:1px solid var(--line);
     font-size:11px;font-weight:700;letter-spacing:.03em;color:var(--ink)}
@@ -587,17 +597,19 @@ function loadTablePrefs(){
     if(typeof p.datecol==="number") dateColW=Math.max(120,Math.min(360,p.datecol));
     if(typeof p.font==="number") tblFont=Math.max(9.5,Math.min(18,p.font));
     if(p.scope==="me"||p.scope==="everyone") colScope=p.scope;
+    if(typeof p.freeze==="number") tblFreeze=Math.max(0,Math.min(9,p.freeze));
   }catch(e){}
   applyTableVars();
 }
 function saveTablePrefs(){
   applyTableVars();
   try{ localStorage.setItem(TBL_LS,JSON.stringify({cols:tblCols,totals:showTotals,
-    datecol:dateColW,font:tblFont,scope:colScope})); }catch(e){}
+    datecol:dateColW,font:tblFont,scope:colScope,freeze:tblFreeze})); }catch(e){}
 }
 function publishTableCols(){
   try{ grist.setOption("tblCols",tblCols); grist.setOption("tblTotals",showTotals);
-       grist.setOption("tblDateCol",dateColW); grist.setOption("tblFont",tblFont); }catch(e){}
+       grist.setOption("tblDateCol",dateColW); grist.setOption("tblFont",tblFont);
+       grist.setOption("tblFreeze",tblFreeze); }catch(e){}
 }
 function loadPrefs(){ try{ const p=JSON.parse(localStorage.getItem(PREF_LS)||"{}")||{};
   if(p.sort==="asc"||p.sort==="desc") state.sortDir=p.sort;
@@ -630,6 +642,7 @@ function applyGristOptions(opts){
   if(typeof opts.tblTotals==="boolean") showTotals=opts.tblTotals;
   if(typeof opts.tblDateCol==="number") dateColW=Math.max(120,Math.min(360,opts.tblDateCol));
   if(typeof opts.tblFont==="number") tblFont=Math.max(9.5,Math.min(18,opts.tblFont));
+  if(typeof opts.tblFreeze==="number") tblFreeze=Math.max(0,Math.min(9,opts.tblFreeze));
   applyTableVars();
   render();
 }
@@ -739,6 +752,10 @@ const DEFAULT_COLS=["client","jobstatus","stone","supplier","scope","ordered","d
 let tblCols=DEFAULT_COLS.map(k=>mkCol(k,k==="client"?{b:true}:null));
 let showTotals=true;
 let groupBySup=false;   // group each day's rows under supplier headers
+// Freeze panes. 0 = nothing, 1 = the date gutter, 2 = date + the first column, 3 = date + two, ...
+// Only ever a contiguous block from the left, because that is the only thing sticky positioning
+// can express without the frozen cells floating over a gap.
+let tblFreeze=0;
 // The 26px slot carries the row handle: the bulk tick box, which leads the row so a column of
 // boxes is easy to run down, or the remove "x", which stays at the end out of the way.
 // Header, data rows and the totals row all use this one template, so the slot must move in all
@@ -755,6 +772,25 @@ const colTemplate=()=>{
 // and blow out the fixed column widths, losing the ellipsis truncation.
 const HANDLE_PX=26;
 const colBodyPx=()=>tblCols.reduce((s,c)=>s+c.w,0)+HANDLE_PX;   // the columns grid
+// Where each frozen thing sits, measured from the left edge of the scrolling area. Offsets are
+// absolute because sticky resolves against the scroll container (.agenda), not the nested grid.
+function freezePlan(){
+  // Always leave at least one column free to scroll, otherwise freezing everything just makes
+  // the table immovable and the feature looks broken.
+  const nCols=Math.max(0,Math.min(tblFreeze-1,Math.max(0,tblCols.length-1)));
+  const plan={ date:tblFreeze>=1, handle:null, cols:[], edge:0 };
+  if(!plan.date) return plan;
+  let x=dateColW;
+  if(state.bulk){ plan.handle=x; x+=HANDLE_PX; }   // in bulk the tick box leads the columns
+  for(let i=0;i<nCols;i++){ plan.cols.push(x); x+=tblCols[i].w; }
+  plan.edge=x;
+  return plan;
+}
+// Pin one cell open at a given offset. `last` draws the edge that separates frozen from scrolling.
+function freezeCell(el,left,last){
+  el.classList.add("frz"); if(last) el.classList.add("frz-edge");
+  el.style.position="sticky"; el.style.left=left+"px";
+}
 const colRowPx =()=>dateColW+colBodyPx();                        // date gutter + columns
 const alignCls=a=>a==="right"?" r":a==="centre"?" c":"";
 const wrapFmt=(h,c)=>{ let s=h; if(c.u)s="<u>"+s+"</u>"; if(c.i)s="<i>"+s+"</i>"; if(c.b)s="<b>"+s+"</b>"; return s; };
@@ -939,14 +975,21 @@ function refreshDayToggles(){
 }
 function stColHead(){
   const h=$("div","sthead"); h.style.minWidth=colRowPx()+"px";
-  h.appendChild($("div","stlab","Date"));
+  const fz=freezePlan();
+  const dlab=$("div","stlab","Date");
+  if(fz.date) freezeCell(dlab,0,!fz.cols.length&&fz.handle==null);
+  h.appendChild(dlab);
   const cols=$("div","stcols"); cols.style.gridTemplateColumns=colTemplate();
   cols.style.minWidth=colBodyPx()+"px";
-  if(state.bulk) cols.appendChild($("div","stlab"));   // spacer over the leading tick-box column
-  tblCols.forEach(c=>{
+  if(state.bulk){ const sp=$("div","stlab");            // spacer over the leading tick-box column
+    if(fz.handle!=null) freezeCell(sp,fz.handle,!fz.cols.length);
+    cols.appendChild(sp); }
+  tblCols.forEach((c,i)=>{
     const def=COLDEF[c.k];
     const l=$("div","stlab"+alignCls(c.align)+(def.edit?" ed":""));
-    l.textContent=def.label; cols.appendChild(l);
+    l.textContent=def.label;
+    if(i<fz.cols.length) freezeCell(l,fz.cols[i],i===fz.cols.length-1);
+    cols.appendChild(l);
   });
   h.appendChild(cols); return h;
 }
@@ -955,15 +998,17 @@ function stRow(r){
   const row=$("div","strow");
   row.style.gridTemplateColumns=colTemplate();
   row.style.minWidth=colBodyPx()+"px";
+  const fz=freezePlan();
   if(state.bulk){                        // leads the row, so the boxes form one column down the left
     const box=document.createElement("input"); box.type="checkbox"; box.className="evsel";
     box.checked=state.sel.has(r.id); box.title="Select for bulk edit";
     box.setAttribute("aria-label","Select the order for "+jobClient(jobFor(r))+" for bulk edit");
     box.onclick=ev=>ev.stopPropagation();
     box.onchange=()=>{ if(box.checked) state.sel.add(r.id); else state.sel.delete(r.id); renderBulkBar(); };
+    if(fz.handle!=null) freezeCell(box,fz.handle,!fz.cols.length);
     row.appendChild(box);
   }
-  tblCols.forEach(c=>{
+  tblCols.forEach((c,ci)=>{
     const def=COLDEF[c.k];
     const cell=$("div","stcell"+alignCls(c.align)+(def.edit?" ed":" roc"));
     cell.dataset.rid=String(r.id); cell.dataset.k=c.k;
@@ -971,6 +1016,7 @@ function stRow(r){
     const inner=wrapFmt(raw,c);
     cell.innerHTML=(c.style==="pill"&&raw)?('<span class="evpill">'+inner+"</span>"):inner;
     if(def.edit){ cell.title="Click to edit"; cell.onclick=ev=>{ ev.stopPropagation(); startCellEdit(cell,r,c); }; }
+    if(ci<fz.cols.length) freezeCell(cell,fz.cols[ci],ci===fz.cols.length-1);
     row.appendChild(cell);
   });
   if(!state.bulk){
@@ -997,7 +1043,10 @@ function stSumRow(rows){
   const row=$("div","stsum");
   row.style.gridTemplateColumns=colTemplate();
   row.style.minWidth=colBodyPx()+"px";
-  if(state.bulk) row.appendChild($("div","stcell"));   // spacer under the leading tick-box column
+  const fz=freezePlan();
+  if(state.bulk){ const sp=$("div","stcell");          // spacer under the leading tick-box column
+    if(fz.handle!=null) freezeCell(sp,fz.handle,!fz.cols.length);
+    row.appendChild(sp); }
   const labelAt=tblCols.length>1?1:0;
   tblCols.forEach((c,i)=>{
     const def=COLDEF[c.k];
@@ -1012,12 +1061,11 @@ function stSumRow(rows){
     } else if(i===labelAt){
       cell.appendChild($("span","lb","Total"));
     }
+    if(i<fz.cols.length) freezeCell(cell,fz.cols[i],i===fz.cols.length-1);
     row.appendChild(cell);
   });
   return row;
 }
-// The supplier box under each date: slabs per supplier for the WHOLE day, so the rows always add
-// up to the total. Single click filters that day, double click filters every day.
 // Per-supplier subtotal, sitting UNDER the rows it describes. Static on purpose: it is a read-out,
 // not a control, so there is nothing to click and no folded state to remember. The supplier is not
 // repeated in it - the rows above already carry the Supplier column.
@@ -1058,6 +1106,7 @@ function renderAgenda(byYmd,dayKeys){
     const day=$("div","ag-day tbl"+(k===todayK?" today":""));
     day.style.minWidth=colRowPx()+"px";   // so the day-boundary rule runs the full table width
     const dc=$("div","ag-date");
+    if(tblFreeze>=1) freezeCell(dc,0,tblFreeze===1);
     // Day number in a circle + weekday. The intense red is reserved for TODAY, so it is the one
     // thing that jumps out of the gutter; other days keep the same geometry in quiet neutrals.
     const chip=$("div","daychip"+(k===todayK?" today":""));
@@ -1595,6 +1644,26 @@ function renderColEditor(){
     row.appendChild(rm);
     box.appendChild(row);
   });
+
+  // Freeze panes: a contiguous block from the left, so the choice is "how far", not "which".
+  box.insertAdjacentHTML("beforeend",'<h4>Freeze while scrolling</h4>');
+  const fzrow=$("div","ce-freeze");
+  const seg=$("div","miniseg");
+  const maxN=Math.min(4,tblCols.length);
+  const opts=[[0,"None","Nothing stays put"],[1,"Date","The date column stays put"]];
+  for(let n=1;n<=maxN;n++){
+    opts.push([n+1,"Date +"+n,"Date and the first "+n+" column"+(n===1?"":"s")
+      +" stay put: "+tblCols.slice(0,n).map(c=>COLDEF[c.k].label||"Flag").join(", ")]);
+  }
+  opts.forEach(o=>{
+    const b=document.createElement("button"); b.type="button"; b.textContent=o[1]; b.title=o[2];
+    if(tblFreeze===o[0]) b.className="on";
+    b.onclick=()=>{ tblFreeze=o[0]; commit(); renderColEditor(); };
+    seg.appendChild(b);
+  });
+  fzrow.appendChild(seg);
+  fzrow.appendChild($("span","ce-hint","Frozen columns stay in view when the table scrolls sideways."));
+  box.appendChild(fzrow);
 
   const rest=Object.keys(COLDEF).filter(k=>!tblCols.some(c=>c.k===k));
   if(rest.length){

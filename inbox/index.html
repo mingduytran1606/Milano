@@ -1575,6 +1575,25 @@ function stoneProductLabel(r){
 const PRE_ORDER_STATES=["","3. Awaiting Order","7. Not Delivered Yet","1. No Stock"];
 // "6. Delivered" / "Delivered by …" but NOT "Not Delivered Yet".
 function isDeliveredStatus(r){ const low=String(r.Order_Status||"").toLowerCase(); return /deliver/.test(low) && !/not deliver/.test(low); }
+// Split a stone line into the slabs that have actually landed and the slabs still
+// owed, so the summary's per-status totals tell the truth about a part delivery:
+// scope 8 / delivered 4 on "Delivered by WF" is 4 delivered and 4 still outstanding,
+// not 8 delivered.
+// Only splits when a delivery qty is genuinely partial. A delivered line with qty 0
+// means the qty was never filled in (33 lines in the live doc are like that), so it
+// stays counted in full - guessing 0 delivered there would be worse than the old bug.
+// Over-delivery (qty > scope) clamps; the extra is a data error, not scope.
+const PARTIAL_PENDING="Not Delivered Yet";
+function pendingStatusKey(rows){
+  const hit=(rows||[]).map(r=>String(r.Order_Status||"")).find(s=>/not deliver/i.test(s));
+  return hit||PARTIAL_PENDING;   // reuse the doc's own spelling when the job already has one
+}
+function stonePortions(r,pendingKey){
+  const st=r.Order_Status||"-", scope=Number(r.Scope_Qty)||0, dq=Number(r.Delivery_Qty)||0;
+  if(isDeliveredStatus(r) && dq>0 && dq<scope)
+    return [{status:st,qty:dq},{status:pendingKey||PARTIAL_PENDING,qty:scope-dq}];
+  return [{status:st,qty:scope}];
+}
 function autoStatus(r){
   const s=String(r.Order_Status||""), low=s.toLowerCase();
   const isDelivered = isDeliveredStatus(r);
@@ -3159,10 +3178,17 @@ function renderDetail(){
   if(stone.length){
     // Group stone lines by order status, groups ordered by total slabs desc.
     // Rendering depends on how many statuses/colours are present (see below).
+    // A line can land in two groups at once: a part delivery counts its delivered
+    // slabs under its own status and the rest under "not delivered yet".
+    const pendingKey=pendingStatusKey(stone);
     const groups=new Map();
-    stone.forEach(r=>{ const s=r.Order_Status||"-"; if(!groups.has(s)) groups.set(s,[]); groups.get(s).push(r); });
-    const qtyOf=rows=>rows.reduce((m,r)=>m+(Number(r.Scope_Qty)||0),0);
-    const total=qtyOf(stone);
+    stone.forEach(r=>stonePortions(r,pendingKey).forEach(p=>{
+      if(!p.qty && r.Scope_Qty!=null && Number(r.Scope_Qty)) return;   // nothing left in this half
+      if(!groups.has(p.status)) groups.set(p.status,[]);
+      groups.get(p.status).push({r, qty:p.qty, hasQty:r.Scope_Qty!=null});
+    }));
+    const qtyOf=parts=>parts.reduce((m,p)=>m+(Number(p.qty)||0),0);
+    const total=qtyOf([...groups.values()].flat());
     const multiStatus=groups.size>1;
     // Multiple statuses: show one big overall total on top; each status then
     // renders as a smaller sub-heading below. Single status: the status line
@@ -3185,10 +3211,10 @@ function renderDetail(){
         // Merge identical stone lines within this status group: same product
         // label collapses to one bulleted row; notes are combined (de-duped).
         const byLabel=new Map();
-        rows.forEach(r=>{ const lbl=stoneProductLabel(r);
+        rows.forEach(p=>{ const r=p.r, lbl=stoneProductLabel(r);
           if(!byLabel.has(lbl)) byLabel.set(lbl,{label:lbl,qty:0,hasQty:false,notes:[]});
           const g=byLabel.get(lbl);
-          if(r.Scope_Qty!=null){ g.hasQty=true; g.qty+=(Number(r.Scope_Qty)||0); }
+          if(p.hasQty){ g.hasQty=true; g.qty+=(Number(p.qty)||0); }
           if(r.Note && !g.notes.includes(r.Note)) g.notes.push(r.Note);
         });
         // Per-colour count is shown whenever a group has 2+ colours. It's hidden

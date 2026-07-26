@@ -318,16 +318,9 @@
   .jp-line.here{border-color:var(--accent);background:var(--accent-soft)}
   .jp-note{font-size:11.5px;color:var(--muted);margin:2px 0 12px}
   .jp-saved{color:var(--accent-ink);font-weight:700;font-size:11.5px;margin-left:8px}
-  /* date gutter hidden: the day becomes one column, with a full-width date band on top */
+  /* date gutter hidden: the day is just its rows, one column wide */
   .ag-day.tbl.nogutter{grid-template-columns:1fr}
   .sthead.nogutter{grid-template-columns:1fr}
-  /* The band spans the whole table so its rule does, but sticky on the band itself buys nothing:
-     it is already as wide as the scroll area, so there is no room to slide. Stick the CONTENT
-     instead, and the date stays readable however far right you scroll. */
-  .dayband{display:flex;align-items:center;gap:10px;padding:7px 12px;background:var(--bg);
-    border-bottom:1px solid var(--line2)}
-  .dayband>.daychip{position:sticky;left:12px}
-  .ag-day.tbl.today>.dayband{background:var(--bg)}
 
   /* frozen (sticky) cells need an opaque background or the scrolling content shows through */
   .frz{z-index:2}
@@ -1129,28 +1122,33 @@ function renderAgenda(byYmd,dayKeys){
     const rows=evs.map(e=>e.r);
     const day=$("div","ag-day tbl"+(k===todayK?" today":"")+(showDateCol?"":" nogutter"));
     day.style.minWidth=colRowPx()+"px";   // so the day-boundary rule runs the full table width
-    const dc=$("div",showDateCol?"ag-date":"dayband");
-    if(showDateCol && tblFreeze>=1) freezeCell(dc,0,tblFreeze===1);
-    if(!showDateCol) dc.style.minWidth=colRowPx()+"px";   // the band spans the table, like the rules
-    // Day number in a circle + weekday. The intense red is reserved for TODAY, so it is the one
-    // thing that jumps out of the gutter; other days keep the same geometry in quiet neutrals.
-    const chip=$("div","daychip"+(k===todayK?" today":""));
-    chip.appendChild($("span","dtxt",DOW[(d.getDay()+6)%7]+" "+d.getDate()+" "
-      +MONTHS[d.getMonth()].slice(0,3)+" "+d.getFullYear()));
-    dc.appendChild(chip);
-    if(state.bulk && rows.length){
-      const ids=rows.map(r=>r.id);
-      const tog=$("span","ag-all");
-      tog.onclick=ev=>{ ev.stopPropagation();
-        const all=ids.every(id=>state.sel.has(id));
-        ids.forEach(id=>{ if(all) state.sel.delete(id); else state.sel.add(id); }); render(); };
-      dayToggles.push({ el:tog, ids });
-      dc.appendChild(tog);
+    // Hidden means gone: no gutter, no stand-in. The days still group and still carry their
+    // boundary rule, they just have no date on them. Add the Order date or Delivery date column
+    // if you want a date back in the table.
+    // NOTE the gutter also hosts the bulk "Select day" toggle, so that goes with it.
+    if(showDateCol){
+      const dc=$("div","ag-date");
+      if(tblFreeze>=1) freezeCell(dc,0,tblFreeze===1);
+      // Day number + weekday. The intense red is reserved for TODAY, so it is the one thing that
+      // jumps out of the gutter; other days keep the same geometry in quiet neutrals.
+      const chip=$("div","daychip"+(k===todayK?" today":""));
+      chip.appendChild($("span","dtxt",DOW[(d.getDay()+6)%7]+" "+d.getDate()+" "
+        +MONTHS[d.getMonth()].slice(0,3)+" "+d.getFullYear()));
+      dc.appendChild(chip);
+      if(state.bulk && rows.length){
+        const ids=rows.map(r=>r.id);
+        const tog=$("span","ag-all");
+        tog.onclick=ev=>{ ev.stopPropagation();
+          const all=ids.every(id=>state.sel.has(id));
+          ids.forEach(id=>{ if(all) state.sel.delete(id); else state.sel.add(id); }); render(); };
+        dayToggles.push({ el:tog, ids });
+        dc.appendChild(tog);
+      }
+      day.appendChild(dc);
     }
     // Whether the day has any orders at all, regardless of the current filters - drives the
     // empty-day copy and the double-click-to-create guard below.
     const dayAll=baseRows().filter(r=>{ const cd=calDateOf(r); return cd && ymd(cd.date)===k; });
-    day.appendChild(dc);
 
     if(!rows.length){
       const e=$("div","ag-none", dayAll.length ? "Nothing matching on this day"
@@ -1674,7 +1672,8 @@ function renderColEditor(){
   const dcrow=$("div","ce-datecol");
   const dseg=$("div","miniseg");
   [[true,"Show","The date sits in its own column down the left"],
-   [false,"Hide","Wins back the width. Each day gets a full-width date band above its rows instead"]]
+   [false,"Hide","Removes it completely and wins back its width. The rows stay grouped by day, "
+                +"just with no date shown - add the Order date column if you want one in the table"]]
    .forEach(o=>{
     const b=document.createElement("button"); b.type="button"; b.textContent=o[1]; b.title=o[2];
     if(showDateCol===o[0]) b.className="on";
@@ -1683,8 +1682,8 @@ function renderColEditor(){
   });
   dcrow.appendChild(dseg);
   dcrow.appendChild($("span","ce-hint",showDateCol
-    ? "Hiding it moves the date to a band above each day."
-    : "The date shows as a band above each day's rows."));
+    ? "Hiding it removes the date column completely."
+    : "Hidden. Rows are still grouped by day. Per-day \u201cSelect day\u201d is unavailable while it is hidden."));
   box.appendChild(dcrow);
 
   // Freeze panes: a contiguous block from the left, so the choice is "how far", not "which".

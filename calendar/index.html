@@ -389,6 +389,9 @@
   .je-dot { flex:0 0 auto; width:11px; height:11px; border-radius:3px; }
   .je-check { flex:0 0 14px; color:var(--accent); font-weight:700; }
   .je-prodmenu { min-width:240px; }
+  .je-jobmenu { min-width:260px; max-width:340px; }
+  .je-joblist { max-height:220px; overflow-y:auto; }
+  .je-pickjob { width:100%; margin:6px 0 10px; }
   .je-search { width:100%; font:inherit; font-size:12.5px; padding:6px 8px; margin-bottom:5px; border:1px solid var(--line2); border-radius:6px; background:var(--bg); color:var(--ink); }
   .je-search:focus { outline:none; border-color:var(--accent); }
   .je-prodlist { max-height:220px; overflow-y:auto; }
@@ -2329,7 +2332,75 @@
   function renderJobEditor(job){
     var body = document.querySelector('#jobModal .jm-body'); if (!body) return;
     body.innerHTML = '';
-    if (!job.id) { body.appendChild(elx('div', 'jm-empty', "This install isn't linked to a job record yet - open it in the Inbox to add job details.")); renderFooter(job); return; }
+    if (!job.id) {
+      var orphanVisits = mappingsCache ? jobVisitsAll(job) : [];
+
+      var msg = elx('div', 'jm-editnote');
+      msg.textContent = "This install isn't linked to a job yet. Pick one below to assign it.";
+      body.appendChild(msg);
+
+      if (jobsCache && jobsCache.length && mappingsCache && mappingsCache.groupBy != null) {
+        var pickBtn = elx('button', 'je-btn ghost je-pickjob', '+ Assign to a job…');
+        pickBtn.addEventListener('click', function (e) {
+          e.stopPropagation(); closeFloatMenu();
+          var m = elx('div', 'je-menu je-jobmenu');
+          var inp = elx('input', 'je-search'); inp.placeholder = 'Search jobs…';
+          inp.addEventListener('click', function (ev) { ev.stopPropagation(); }); m.appendChild(inp);
+          var listWrap = elx('div', 'je-joblist'); m.appendChild(listWrap);
+          var draw = function (q) {
+            listWrap.innerHTML = '';
+            var rows = (jobsCache || []).filter(function (j) {
+              if (!q) return true;
+              return [j.client, j.addr, j.jid, j.stage].filter(Boolean).join(' ').toLowerCase().indexOf(q) !== -1;
+            }).slice(0, 50);
+            if (!rows.length) { listWrap.appendChild(elx('div', 'je-menu-empty', 'No match')); return; }
+            rows.forEach(function (j) {
+              var label = [j.client, j.addr, j.jid].filter(Boolean).join(' \xb7 ') || ('Job #' + j.id);
+              var it = elx('div', 'je-menu-item');
+              it.textContent = label;
+              it.addEventListener('click', function (ev) {
+                ev.stopPropagation(); closeFloatMenu();
+                ensureEdit();
+                orphanVisits.forEach(function (v) { v[mappingsCache.groupBy] = j.id; });
+                saveEdit().then(function () { openJobDetails(j); });
+              });
+              m.appendChild(it);
+            });
+          };
+          draw(''); inp.addEventListener('input', function () { draw(inp.value.trim().toLowerCase()); });
+          _floatMenu = m; placeMenu(m, pickBtn); inp.focus();
+        });
+        body.appendChild(pickBtn);
+      } else {
+        body.appendChild(elx('div', 'jm-empty', 'No jobs loaded – open it in the Inbox to add job details.'));
+      }
+
+      if (orphanVisits.length) {
+        body.appendChild(elx('div', 'jm-sec', 'Installation'));
+        var instChoices = (mappingsCache && mappingsCache.installer != null)
+          ? (choiceKeys(colMeta(mappingsCache.installer)) || []) : null;
+        orphanVisits.forEach(function (v) {
+          var row = elx('div', 'je-inst');
+          var di = document.createElement('input'); di.type = 'date'; di.className = 'je-date';
+          di.value = toDateInputVal(v[mappingsCache.startDate]);
+          di.addEventListener('change', function () { setVisitField(v, mappingsCache.startDate, dateInputToGrist(di.value)); });
+          row.appendChild(di);
+          if (instChoices) {
+            row.appendChild(pillDropdown(installerOf(v), instChoices, colMeta(mappingsCache.installer),
+              function (val) { setVisitField(v, mappingsCache.installer, val); }, 'Installer -'));
+          }
+          if (mappingsCache.seqNote != null) {
+            var ni = document.createElement('input'); ni.className = 'je-inst-note'; ni.placeholder = 'Note…';
+            ni.value = fmtVal(v[mappingsCache.seqNote]);
+            ni.addEventListener('blur', function () { if (ni.value !== fmtVal(v[mappingsCache.seqNote])) setVisitField(v, mappingsCache.seqNote, ni.value); });
+            row.appendChild(ni);
+          }
+          body.appendChild(row);
+        });
+      }
+
+      renderFooter(job); return;
+    }
     var raw = job.raw || (job.raw = {});
 
     // header: job id chip + address

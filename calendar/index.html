@@ -120,6 +120,12 @@
   .navbar .ntab .ncount { background:rgba(0,0,0,.10); color:inherit; border-radius:999px; font-size:9px; padding:0 5px; font-weight:700; min-width:14px; text-align:center; }
   .navbar .ntab.on .ncount { background:rgba(255,255,255,.25); }
   .navbar .ntab.empty { opacity:.45; }
+  .navbar .ntab.sticky { color:#fff; background:var(--accent); border-color:var(--accent); animation:stickypulse 1.5s ease-in-out infinite; }
+  @keyframes stickypulse { 0%,100%{box-shadow:0 0 0 0 rgba(22,179,120,.45)} 50%{box-shadow:0 0 0 5px rgba(22,179,120,0)} }
+  #stickyHint { flex:0 0 auto; font-size:11px; color:var(--accent-ink); background:var(--accent-soft);
+    padding:5px 10px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:6px; }
+  #stickyHint .esc { font-size:10px; color:var(--muted); margin-left:auto; }
+  #cal.sticky-mode .ev { cursor:cell; }
   /* pill bar lives in the top toolbar, aligned with Today / Week / Jobs */
   #toolbar .navbar { flex:1 1 auto; min-width:0; margin:0 6px; padding:0; }
   #toolbar #navTabs:empty { display:none; }
@@ -504,6 +510,7 @@
       <button id="btnJobs" title="Show / hide the jobs panel">&#9783; Jobs</button>
     </div>
     <div id="instbar"></div>
+    <div id="stickyHint" style="display:none"></div>
     <div id="msg"></div>
     <div id="cal"></div>
   </div>
@@ -634,6 +641,7 @@
   //   'grid'  a pivot: installers down the left, days across the top
   // A string rather than a boolean so grouping by Stage/Payment later is another rowKeyOf() case.
   var groupLayout = 'off';
+  var stickyInstaller = null;  // when set, clicking a card assigns this installer instead of selecting it
   var filterView = null;       // (legacy) drill state for the retired combined Filter panel
   var sortBy = { key: 'client', dir: 1 };   // dir 1 = A-Z / soonest / fewest; -1 reversed
   var SORT_OPTS = [
@@ -1284,6 +1292,16 @@
 
     card.addEventListener('click', function (e) {
       e.stopPropagation();
+      if (stickyInstaller !== null && mappingsCache && mappingsCache.installer != null) {
+        var newVal = stickyInstaller === NO_INSTALLER ? '' : stickyInstaller;
+        if (installerOf(rec) !== (stickyInstaller === NO_INSTALLER ? '' : stickyInstaller)) {
+          rec[mappingsCache.installer] = newVal;
+          var f = {}; f[mappingsCache.installer] = newVal;
+          grist.getTable().update({ id: rec.id, fields: f }).catch(function (err) { console.error(err); });
+          render();
+        }
+        return;
+      }
       if (selectedRowId === rec.id && isolatedJobKey === key) {
         selectedRowId = null; isolatedJobKey = null;   // click again to clear
       } else {
@@ -1402,9 +1420,8 @@
     return groupLayout === 'grid' ? 'grid' : 'off';
   }
   function rowKeyOf(rec) { return installerOf(rec) || NO_INSTALLER; }
-  // Row order follows the Grist choice order, so it matches how the column reads in the
-  // document, with the unassigned row last because that is the queue you work down.
-  function rowList() { return installerValues().concat([NO_INSTALLER]); }
+  // Unassigned row first so the queue of work needing a fitter is always in view.
+  function rowList() { return [NO_INSTALLER].concat(installerValues()); }
 
   // ---- installer x day pivot ----
   // One row per installer (unassigned last), one column per day in the current range.
@@ -1746,6 +1763,25 @@
   // Installer pill bar, directly under the assignee bar and behaving the same way: one fitter at
   // a time, All to clear. The state stays a filters.installer set (so recPasses, jobPasses and
   // saved views need no special case) but the bar only ever puts a single key in it.
+  // Double-click a pill to enter sticky-assign mode: each card click assigns that fitter.
+  function exitStickyMode() {
+    if (stickyInstaller === null) return;
+    stickyInstaller = null;
+    document.getElementById('cal').classList.remove('sticky-mode');
+    document.getElementById('stickyHint').style.display = 'none';
+    renderInstallerBar();
+  }
+  function enterStickyMode(key, label) {
+    stickyInstaller = key;
+    document.getElementById('cal').classList.add('sticky-mode');
+    var hint = document.getElementById('stickyHint');
+    hint.innerHTML = '';
+    hint.appendChild(document.createTextNode('Assigning: ' + label + ' — click cards to assign.'));
+    var esc = document.createElement('span'); esc.className = 'esc'; esc.textContent = 'Right-click or Esc to exit';
+    hint.appendChild(esc);
+    hint.style.display = 'flex';
+    renderInstallerBar();
+  }
   function renderInstallerBar() {
     var host = document.getElementById('instbar');
     if (!host) return;
@@ -1767,30 +1803,38 @@
     var picked = activeKeys(filters.installer);
 
     var all = document.createElement('button'); all.type = 'button';
-    all.className = 'ntab' + (picked.length ? '' : ' on');
+    all.className = 'ntab' + (picked.length ? '' : (stickyInstaller === null ? ' on' : ''));
     all.appendChild(Object.assign(document.createElement('span'), { textContent: 'All' }));
     all.appendChild(Object.assign(document.createElement('span'),
       { className: 'ncount', textContent: String(recordsCache.length) }));
     all.title = 'Show every installer';
-    all.addEventListener('click', function () { filters.installer = {}; render(); });
+    all.addEventListener('click', function () { exitStickyMode(); filters.installer = {}; render(); });
     bar.appendChild(all);
 
     var add = function (key, label, n) {
       var el = document.createElement('button'); el.type = 'button';
-      el.className = 'ntab' + (filters.installer[key] ? ' on' : '') + (n ? '' : ' empty');
+      var isSticky = stickyInstaller === key;
+      el.className = 'ntab' + (isSticky ? ' sticky' : (filters.installer[key] ? ' on' : '')) + (n ? '' : ' empty');
       el.appendChild(Object.assign(document.createElement('span'), { textContent: label }));
       el.appendChild(Object.assign(document.createElement('span'),
         { className: 'ncount', textContent: String(n) }));
-      el.title = 'Show only ' + label;
+      el.title = isSticky ? 'Click to exit assign mode' : 'Click to filter \xb7 Double-click to assign';
       el.addEventListener('click', function () {
-        var f = {}; f[key] = true;      // replaces, never accumulates - one fitter at a time
+        if (stickyInstaller === key) { exitStickyMode(); return; }
+        if (stickyInstaller !== null) exitStickyMode();
+        var f = {}; f[key] = true;
         filters.installer = f;
         render();
       });
+      el.addEventListener('dblclick', function (e) {
+        e.preventDefault();
+        if (stickyInstaller === key) { exitStickyMode(); return; }
+        enterStickyMode(key, label);
+      });
       bar.appendChild(el);
     };
-    people.forEach(function (p) { add(p, p, counts[p] || 0); });
     if (none) add(NO_INSTALLER, 'Unassigned', none);
+    people.forEach(function (p) { add(p, p, counts[p] || 0); });
 
     host.appendChild(bar);
   }
@@ -2662,6 +2706,14 @@
   // ---- calendar rendering ----
   function render() {
     var cal = document.getElementById('cal');
+    var _gw = document.getElementById('gridwrap');
+    var _mw = document.getElementById('monthwrap');
+    var _db = cal.querySelector('.daybody');
+    var savedScroll = {
+      gw: _gw ? { top: _gw.scrollTop, left: _gw.scrollLeft } : null,
+      mw: _mw ? { top: _mw.scrollTop, left: _mw.scrollLeft } : null,
+      db: _db ? { top: _db.scrollTop } : null
+    };
     cal.innerHTML = '';
     if (!mappingsCache) { updateRangeLabel(); return; }
     seqById = computeSeq();
@@ -2700,6 +2752,7 @@
         for (var g = 0; g < n; g++) gdays.push(addDays(start, g));
         cal.appendChild(renderGrid(byDay, gdays, today));
         finishRender();
+        if (savedScroll.gw) { var _g = document.getElementById('gridwrap'); if (_g) { _g.scrollTop = savedScroll.gw.top; _g.scrollLeft = savedScroll.gw.left; } }
         return;
       }
       var cols = document.createElement('div'); cols.className = 'cols';
@@ -2720,6 +2773,8 @@
       cal.appendChild(cols);
     }
     finishRender();
+    if (savedScroll.mw) { var _m = document.getElementById('monthwrap'); if (_m) { _m.scrollTop = savedScroll.mw.top; _m.scrollLeft = savedScroll.mw.left; } }
+    if (savedScroll.db) { var _d = cal.querySelector('.daybody'); if (_d) { _d.scrollTop = savedScroll.db.top; } }
   }
 
   // everything outside the calendar grid itself - shared by the column and pivot paths
@@ -2914,10 +2969,14 @@
   document.getElementById('jobModalCard').addEventListener('click', function (e) { e.stopPropagation(); });
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
+    if (stickyInstaller !== null) { exitStickyMode(); return; }
     var ov = document.getElementById('jmConfirm');
     if (ov && ov.style.display === 'flex') { ov.style.display = 'none'; var r = _unsavedRes; _unsavedRes = null; if (r) r('cancel'); return; }
     if (_floatMenu) { closeFloatMenu(); return; }
     if (document.getElementById('jobModal').classList.contains('open')) closeJobModal();
+  });
+  document.getElementById('cal').addEventListener('contextmenu', function (e) {
+    if (stickyInstaller !== null) { e.preventDefault(); exitStickyMode(); }
   });
   (function () {
     var wrap = document.getElementById('wrap');

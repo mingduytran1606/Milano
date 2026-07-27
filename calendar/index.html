@@ -1773,6 +1773,10 @@
   }
   function enterStickyMode(key, label) {
     stickyInstaller = key;
+    // A double-click fires two single-clicks first, which filter the board down to this
+    // installer - hiding the Unassigned queue you're trying to assign. Clear that filter so
+    // the whole board (Unassigned row pinned on top) is clickable in assign mode.
+    filters.installer = {};
     document.getElementById('cal').classList.add('sticky-mode');
     var hint = document.getElementById('stickyHint');
     hint.innerHTML = '';
@@ -1781,6 +1785,7 @@
     hint.appendChild(esc);
     hint.style.display = 'flex';
     renderInstallerBar();
+    render();
   }
   function renderInstallerBar() {
     var host = document.getElementById('instbar');

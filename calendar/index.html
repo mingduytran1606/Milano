@@ -2123,7 +2123,7 @@
     var jobs = (jobsCache && jobsCache.length) ? jobsCache : jobsFromRecords();
     var found = jobs.filter(function (j) { return (j.id ? jobAliases(j) : [j.key]).indexOf(key) !== -1; })[0];
     if (found) return found;
-    return { id: null, key: key, addr: '', client: fmtVal(rec[mappingsCache.title]), stage: stageOf(rec), assigned: [], jid: '', raw: null };
+    return { id: null, key: key, addr: '', client: fmtVal(rec[mappingsCache.title]), stage: stageOf(rec), assigned: [], jid: '', raw: null, _orphanRecId: rec.id };
   }
   function jobVisits(job) {
     var aliases = job.id ? jobAliases(job) : [job.key];
@@ -2258,6 +2258,9 @@
   function addVisit(job){ ensureEdit(); var rec = { id: nextTmp() }; if (mappingsCache && mappingsCache.groupBy != null) rec[mappingsCache.groupBy] = job.id; recordsCache.push(rec); refreshDetail(job); render(); }
   function removeVisit(job, rec){ ensureEdit(); var i = recordsCache.indexOf(rec); if (i >= 0) recordsCache.splice(i, 1); refreshDetail(job); render(); }
   function jobVisitsAll(job){
+    if (job._orphanRecId) {
+      return recordsCache.filter(function (r) { return r.id === job._orphanRecId; });
+    }
     var aliases = job.id ? jobAliases(job) : [job.key];
     return recordsCache.filter(function (r) { return aliases.indexOf(jobKey(r)) !== -1; })
       .sort(function (a, b) { return (gristToLocalDate(a[mappingsCache.startDate]) || 0) - (gristToLocalDate(b[mappingsCache.startDate]) || 0); });

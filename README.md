@@ -1,37 +1,81 @@
 # Milano Grist Widgets
 
 Custom widgets for the Milano Marble job tracker (Grist doc `ezZUgCeS6Rq1` on
-`milano.getgrist.com`). Each folder is the **publish directory of its own Netlify
-site** — its contents mirror the live URL shape exactly. Once the sites are linked
-to this repo, **push to `main` = deploy**.
+`milano.getgrist.com`). All widgets are served from a single
+**Cloud Run** service (`milano-widgets`). Push to `main` triggers
+Cloud Build → deploy.
 
-| Folder | Widget | Netlify site | Live URL shape |
-|---|---|---|---|
-| `inbox/` | Consolidated Inbox (jobs master–detail) | *(inbox site)* | serves at **root** (`index.html`) |
-| `stone-order/` | Stone Order Board (procurement Kanban by status) | *(stone-order site)* | serves at **root** (`index.html`) |
-| `stone-calendar/` | Stone Order Calendar (Agenda / Month / Week; each line on its order date until delivered, then its delivery date) with a top **stone search** bar that live-filters events. Merges the old Catalogue Search in. | *(stone-calendar site)* | serves at **root** (`index.html`) |
-| `calendar/` | Installations calendar + jobs sidebar | `silly-paletas-da1298` | serves at **root** (`index.html`) |
-| `address/` | Address autocomplete / new-job creator | `milanoaddresswidget` | **`/milano-address-widget.html`** (root 404s — keep the filename!) |
-| `stage-summary/` | Stage summary counts | *(stage-summary site)* | `/milano-stage-summary-widget.html` |
-| `docs/` | Design briefs (v1 + v2) | — | — |
+| Folder | Widget | Cloud Run path |
+|---|---|---|
+| `inbox/` | Consolidated Inbox (jobs master–detail) | `/inbox/` |
+| `stone-calendar/` | Stone Order Calendar (Agenda / Month / Week; each line on its order date until delivered, then its delivery date) with a top **stone search** bar that live-filters events. Merges the old Catalogue Search in. | `/stone-calendar/` |
+| `calendar/` | Installations calendar + jobs sidebar | `/calendar/` |
+| `address/` | Address autocomplete / new-job creator | `/address/milano-address-widget.html` |
+| `stage-summary/` | Stage summary counts | `/stage-summary/milano-stage-summary-widget.html` |
+| `docs/` | Design briefs (v1 + v2) | — |
 
-## Linking a Netlify site to this repo (one-time, per site)
+## Deployment (Cloud Run)
 
-Netlify dashboard → the site → **Site configuration → Build & deploy →
-Continuous deployment → Link repository** → GitHub → `milano-widgets`, then:
+All widgets are packaged into a single nginx container and deployed to
+Cloud Run in `australia-southeast1`.
 
-- **Branch:** `main`
-- **Base directory:** *(leave empty)*
-- **Build command:** *(leave empty — static files, no build)*
-- **Publish directory:** the widget's folder, e.g. `inbox`
+### Prerequisites
 
-The site keeps its existing URL, so nothing embedded in Grist changes.
-After linking, drag-drop deploys are no longer needed (and would be overwritten
-by the next push).
+1. A GCP project with Cloud Run, Cloud Build, and Artifact Registry enabled.
+2. An Artifact Registry Docker repo named `milano` in `australia-southeast1`.
+3. A Cloud Build trigger on this repo's `main` branch (see `cloudbuild.yaml`).
+
+### One-time setup
+
+```bash
+# Create the Artifact Registry repo (once)
+gcloud artifacts repositories create milano \
+  --repository-format=docker \
+  --location=australia-southeast1
+
+# Set up the Cloud Build trigger
+gcloud builds triggers create github \
+  --repo-name=Milano \
+  --repo-owner=mingduytran1606 \
+  --branch-pattern='^main$' \
+  --build-config=cloudbuild.yaml
+```
+
+### Manual deploy (without Cloud Build trigger)
+
+```bash
+# Build and push
+gcloud builds submit --config=cloudbuild.yaml \
+  --substitutions=SHORT_SHA=$(git rev-parse --short HEAD)
+
+# Or deploy directly with gcloud run
+gcloud run deploy milano-widgets \
+  --source=. \
+  --region=australia-southeast1 \
+  --allow-unauthenticated \
+  --port=8080
+```
+
+### Updating widget URLs in Grist
+
+After the first deploy, update each Grist custom widget URL to point to the
+Cloud Run service URL. The service URL looks like:
+
+    https://milano-widgets-XXXXXXXX-ts.a.run.app
+
+Widget URLs in Grist become:
+
+| Widget | Grist custom widget URL |
+|---|---|
+| Inbox | `https://<service-url>/inbox/` |
+| Stone Calendar | `https://<service-url>/stone-calendar/` |
+| Calendar | `https://<service-url>/calendar/` |
+| Address | `https://<service-url>/address/milano-address-widget.html` |
+| Stage Summary | `https://<service-url>/stage-summary/milano-stage-summary-widget.html` |
 
 ## Workflow
 
-- **Edit → commit → push** → Netlify auto-deploys → hard-refresh the Grist page.
+- **Edit → commit → push** → Cloud Build auto-deploys → hard-refresh the Grist page.
 - Design iterations in claude.ai: give it the widget file; it should only touch the
   `<style>` block and HTML markup — never the `<script>` (Grist wiring, lookups,
   rules). Bring the result back as a commit so it's diffable.
@@ -42,8 +86,6 @@ by the next push).
 
 - Inbox: Custom widget on the Inbox page, **Table = Jobs_Detail**, **Access = Full**,
   **SELECT BY** = the Jobs list section.
-- Stone Order Board: Custom widget on the Stone Order page, **Table = Stone_Order**,
-  **Access = Full**, **SELECT BY** = unset (whole-table procurement board).
 - Stone Order Calendar: Custom widget, **Table = Stone_Order**, **Access = Full**,
   **SELECT BY** = unset (plots every line by order/delivery date; the top search bar
   filters events by stone name / supplier / code). Replaces the old Catalogue Search widget.

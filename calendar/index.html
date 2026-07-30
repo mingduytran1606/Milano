@@ -409,6 +409,12 @@
   .je-btn.ghost:hover { background:var(--line2); }
   #jobModal.has-edit .jm-foot { background:var(--panel); }
   .je-dirtydot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--accent); margin-right:6px; vertical-align:middle; }
+  /* new-job inline form */
+  .je-newjob { border:1px solid var(--line); border-radius:9px; padding:10px; margin-top:8px; background:var(--bg); display:flex; flex-direction:column; gap:7px; }
+  .je-newjob-row { display:flex; align-items:center; gap:8px; }
+  .je-newjob-row label { flex:0 0 56px; font-size:11px; font-weight:600; color:var(--muted); }
+  .je-newjob-row input { flex:1; min-width:0; }
+  .je-newjob-acts { display:flex; gap:8px; justify-content:flex-end; margin-top:4px; }
   /* unsaved-changes confirm overlay */
   .jm-confirm { display:none; position:absolute; inset:0; z-index:65; background:rgba(20,22,26,.5); align-items:center; justify-content:center; padding:18px; }
   .jm-confirm-card { background:var(--panel); border-radius:10px; box-shadow:0 14px 40px rgba(0,0,0,.3); padding:16px 18px; max-width:320px; }
@@ -694,6 +700,28 @@
   function nextTmp(){ return ++_tmpSeq; }
   function isTemp(id){ return typeof id === 'number' && id >= TMP_BASE; }
   var edit = { dirty:false, base:null };   // draft buffer for the detail popup
+
+  // ---- client lookup (for creating new jobs from the calendar) ----
+  var clientNameMap = {};   // lowercase name -> row id
+  var clientMapLoaded = false;
+  function ensureClientMap() {
+    if (clientMapLoaded) return Promise.resolve();
+    return grist.docApi.fetchTable('Client').then(function (t) {
+      var ids = t.id || [], names = t.Client_Name || [];
+      for (var i = 0; i < ids.length; i++) {
+        var nm = String(names[i] || '').trim();
+        if (nm) clientNameMap[nm.toLowerCase()] = ids[i];
+      }
+      clientMapLoaded = true;
+    }).catch(function (e) { console.warn('client table read failed', e); });
+  }
+  function resolveClient(name) {
+    name = (name || '').trim();
+    if (!name) return Promise.resolve(null);
+    if (clientNameMap[name.toLowerCase()]) return Promise.resolve(clientNameMap[name.toLowerCase()]);
+    return grist.docApi.applyUserActions([['AddRecord', 'Client', null, { Client_Name: name }]])
+      .then(function (res) { var id = res.retValues[0]; clientNameMap[name.toLowerCase()] = id; return id; });
+  }
 
   // ---- date helpers ----
   function gristToLocalDate(v) {
@@ -2385,7 +2413,7 @@
       var orphanVisits = mappingsCache ? jobVisitsAll(job) : [];
 
       var msg = elx('div', 'jm-editnote');
-      msg.textContent = "This install isn't linked to a job yet. Pick one below to assign it.";
+      msg.textContent = "This install isn't linked to a job yet. Assign it to an existing job or create a new one.";
       body.appendChild(msg);
 
       if (jobsCache && jobsCache.length && mappingsCache && mappingsCache.groupBy != null) {
@@ -2420,6 +2448,135 @@
           _floatMenu = m; placeMenu(m, pickBtn); inp.focus();
         });
         body.appendChild(pickBtn);
+
+        // "+ Create new job" button with inline form
+        var newJobBtn = elx('button', 'je-btn ghost je-pickjob', '+ Create new job');
+        var newJobForm = elx('div', 'je-newjob');
+        newJobForm.style.display = 'none';
+
+        var r1 = elx('div', 'je-newjob-row');
+        r1.appendChild(Object.assign(elx('label'), { textContent: 'Client' }));
+        var njClient = document.createElement('input'); njClient.className = 'je-addr'; njClient.placeholder = 'Client name…';
+        r1.appendChild(njClient); newJobForm.appendChild(r1);
+
+        var r2 = elx('div', 'je-newjob-row');
+        r2.appendChild(Object.assign(elx('label'), { textContent: 'Address' }));
+        var njAddr = document.createElement('input'); njAddr.className = 'je-addr'; njAddr.placeholder = 'Job address…';
+        r2.appendChild(njAddr); newJobForm.appendChild(r2);
+
+        var r3 = elx('div', 'je-newjob-row');
+        r3.appendChild(Object.assign(elx('label'), { textContent: 'Stage' }));
+        var njStageChoices = choiceKeys(jobMetaByColId[JOB_COLS.stage]) || Object.keys(STAGE_COLORS);
+        var njStageVal = 'Quote';
+        var njStagePill = pillDropdown(njStageVal, njStageChoices, jobMetaByColId[JOB_COLS.stage],
+          function (v) { njStageVal = v; }, 'Stage -');
+        r3.appendChild(njStagePill); newJobForm.appendChild(r3);
+
+        var acts = elx('div', 'je-newjob-acts');
+        var njCancel = elx('button', 'je-btn ghost', 'Cancel');
+        njCancel.addEventListener('click', function (e) { e.stopPropagation(); newJobForm.style.display = 'none'; newJobBtn.style.display = ''; });
+        acts.appendChild(njCancel);
+        var njSubmit = elx('button', 'je-btn primary', 'Create');
+        njSubmit.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var client = njClient.value.trim();
+          var addr = njAddr.value.trim();
+          if (!client && !addr) { alert('Enter at least a client name or address.'); return; }
+          njSubmit.disabled = true; njSubmit.textContent = 'Creating…';
+          ensureClientMap().then(function () {
+            return client ? resolveClient(client) : Promise.resolve(null);
+          }).then(function (clientRef) {
+            var fields = { Stage: njStageVal || 'Quote' };
+            if (clientRef) fields.Client_Name = clientRef;
+            if (addr) fields.Job_Address = addr;
+            return grist.docApi.applyUserActions([['AddRecord', jobsTableId, null, fields]]);
+          }).then(function (res) {
+            var newId = res.retValues[0];
+            ensureEdit();
+            orphanVisits.forEach(function (v) { v[mappingsCache.groupBy] = newId; });
+            return saveEdit().then(function () { return loadJobs(); }).then(function () {
+              var newJob = (jobsCache || []).find(function (j) { return j.id === newId; });
+              if (newJob) openJobDetails(newJob);
+            });
+          }).catch(function (err) { console.error(err); alert('Failed to create job: ' + (err.message || err)); })
+            .then(function () { njSubmit.disabled = false; njSubmit.textContent = 'Create'; });
+        });
+        acts.appendChild(njSubmit);
+        newJobForm.appendChild(acts);
+
+        newJobBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          newJobBtn.style.display = 'none';
+          newJobForm.style.display = '';
+          njClient.focus();
+        });
+        body.appendChild(newJobBtn);
+        body.appendChild(newJobForm);
+      } else if (jobsTableId && mappingsCache && mappingsCache.groupBy != null) {
+        // no existing jobs loaded, but we can still create one
+        var newJobBtn2 = elx('button', 'je-btn ghost je-pickjob', '+ Create new job');
+        var newJobForm2 = elx('div', 'je-newjob');
+        newJobForm2.style.display = 'none';
+
+        var r1b = elx('div', 'je-newjob-row');
+        r1b.appendChild(Object.assign(elx('label'), { textContent: 'Client' }));
+        var njClient2 = document.createElement('input'); njClient2.className = 'je-addr'; njClient2.placeholder = 'Client name…';
+        r1b.appendChild(njClient2); newJobForm2.appendChild(r1b);
+
+        var r2b = elx('div', 'je-newjob-row');
+        r2b.appendChild(Object.assign(elx('label'), { textContent: 'Address' }));
+        var njAddr2 = document.createElement('input'); njAddr2.className = 'je-addr'; njAddr2.placeholder = 'Job address…';
+        r2b.appendChild(njAddr2); newJobForm2.appendChild(r2b);
+
+        var r3b = elx('div', 'je-newjob-row');
+        r3b.appendChild(Object.assign(elx('label'), { textContent: 'Stage' }));
+        var njStageChoices2 = choiceKeys(jobMetaByColId[JOB_COLS.stage]) || Object.keys(STAGE_COLORS);
+        var njStageVal2 = 'Quote';
+        var njStagePill2 = pillDropdown(njStageVal2, njStageChoices2, jobMetaByColId[JOB_COLS.stage],
+          function (v) { njStageVal2 = v; }, 'Stage -');
+        r3b.appendChild(njStagePill2); newJobForm2.appendChild(r3b);
+
+        var acts2 = elx('div', 'je-newjob-acts');
+        var njCancel2 = elx('button', 'je-btn ghost', 'Cancel');
+        njCancel2.addEventListener('click', function (e) { e.stopPropagation(); newJobForm2.style.display = 'none'; newJobBtn2.style.display = ''; });
+        acts2.appendChild(njCancel2);
+        var njSubmit2 = elx('button', 'je-btn primary', 'Create');
+        njSubmit2.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var client = njClient2.value.trim();
+          var addr = njAddr2.value.trim();
+          if (!client && !addr) { alert('Enter at least a client name or address.'); return; }
+          njSubmit2.disabled = true; njSubmit2.textContent = 'Creating…';
+          ensureClientMap().then(function () {
+            return client ? resolveClient(client) : Promise.resolve(null);
+          }).then(function (clientRef) {
+            var fields = { Stage: njStageVal2 || 'Quote' };
+            if (clientRef) fields.Client_Name = clientRef;
+            if (addr) fields.Job_Address = addr;
+            return grist.docApi.applyUserActions([['AddRecord', jobsTableId, null, fields]]);
+          }).then(function (res) {
+            var newId = res.retValues[0];
+            var orphans = mappingsCache ? jobVisitsAll(job) : [];
+            ensureEdit();
+            orphans.forEach(function (v) { v[mappingsCache.groupBy] = newId; });
+            return saveEdit().then(function () { return loadJobs(); }).then(function () {
+              var newJob = (jobsCache || []).find(function (j) { return j.id === newId; });
+              if (newJob) openJobDetails(newJob);
+            });
+          }).catch(function (err) { console.error(err); alert('Failed to create job: ' + (err.message || err)); })
+            .then(function () { njSubmit2.disabled = false; njSubmit2.textContent = 'Create'; });
+        });
+        acts2.appendChild(njSubmit2);
+        newJobForm2.appendChild(acts2);
+
+        newJobBtn2.addEventListener('click', function (e) {
+          e.stopPropagation();
+          newJobBtn2.style.display = 'none';
+          newJobForm2.style.display = '';
+          njClient2.focus();
+        });
+        body.appendChild(newJobBtn2);
+        body.appendChild(newJobForm2);
       } else {
         body.appendChild(elx('div', 'jm-empty', 'No jobs loaded – open it in the Inbox to add job details.'));
       }

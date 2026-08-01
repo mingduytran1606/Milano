@@ -369,9 +369,12 @@
   .je-note { width:100%; min-height:46px; resize:none; overflow:hidden; field-sizing:content; font:inherit; font-size:12.5px; color:var(--ink); background:var(--bg); border:1px solid var(--line2); border-radius:7px; padding:7px 9px; }
   .je-note:focus { outline:none; border-color:var(--accent); background:var(--panel); }
   /* two-column layout (scope+note left, dates+installs right) */
-  .je-cols { display:grid; grid-template-columns:1fr 1fr; margin-top:14px; padding-top:14px; border-top:1px solid var(--line2); }
-  .je-col-l { padding-right:14px; border-right:1px solid var(--line2); }
+  .je-cols { display:grid; grid-template-columns:minmax(0,var(--je-left,1fr)) 9px minmax(0,1fr); margin-top:14px; padding-top:14px; border-top:1px solid var(--line2); }
+  .je-col-l { padding-right:14px; }
   .je-col-r { padding-left:14px; }
+  .je-split { position:relative; cursor:col-resize; align-self:stretch; }
+  .je-split::after { content:""; position:absolute; left:50%; top:0; bottom:0; width:1px; transform:translateX(-50%); background:var(--line2); }
+  .je-split:hover::after,.je-split.drag::after { background:var(--accent); width:2px; }
   .je-blk { margin-top:14px; } .je-blk:first-child { margin-top:0; }
   .je-slbl { display:block; margin-bottom:6px; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; font-weight:700; }
   .je-scope-n { display:flex; align-items:baseline; gap:6px; }
@@ -2767,6 +2770,26 @@
     noteBlk.appendChild(nt); requestAnimationFrame(autoFitNote);
     colL.appendChild(noteBlk);
     cols.appendChild(colL);
+
+    // draggable divider between the two columns
+    var spl = elx('div', 'je-split'); spl.title = 'Drag to resize';
+    spl.addEventListener('mousedown', function (e) {
+      e.preventDefault(); spl.classList.add('drag');
+      var rect = cols.getBoundingClientRect();
+      var onmove = function (ev) {
+        var pct = ((ev.clientX - rect.left) / rect.width) * 100;
+        pct = Math.max(20, Math.min(80, pct));
+        cols.style.setProperty('--je-left', pct + '%');
+      };
+      var onup = function () {
+        document.removeEventListener('mousemove', onmove);
+        document.removeEventListener('mouseup', onup);
+        spl.classList.remove('drag');
+      };
+      document.addEventListener('mousemove', onmove);
+      document.addEventListener('mouseup', onup);
+    });
+    cols.appendChild(spl);
 
     // RIGHT column: measure date + installations
     var colR = elx('div', 'je-col-r');

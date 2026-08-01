@@ -2325,7 +2325,7 @@
     }
     var aliases = job.id ? jobAliases(job) : [job.key];
     return recordsCache.filter(function (r) { return aliases.indexOf(jobKey(r)) !== -1; })
-      .sort(function (a, b) { return (gristToLocalDate(a[mappingsCache.startDate]) || 0) - (gristToLocalDate(b[mappingsCache.startDate]) || 0); });
+      .sort(function (a, b) { return (gristToLocalDate(b[mappingsCache.startDate]) || 0) - (gristToLocalDate(a[mappingsCache.startDate]) || 0); });
   }
 
   // ---- flush the draft to Grist (diff base → minimal actions) ----

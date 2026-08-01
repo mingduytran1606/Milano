@@ -3271,7 +3271,7 @@ function renderDetail(){
   const ih=$("div","inst-h2"); ih.appendChild($("span",null,"Installations"));
   const iadd=$("span","sum-add","+ Add"); iadd.onclick=()=>addRecord("Inst_",{Job:j.id}); ih.appendChild(iadd);
   colR.appendChild(ih);
-  const sorted=[...inst].sort((a,b)=>(+toDate(a.Installation_date)||0)-(+toDate(b.Installation_date)||0));
+  const sorted=[...inst].sort((a,b)=>(+toDate(b.Installation_date)||0)-(+toDate(a.Installation_date)||0));
   if(!sorted.length){ colR.appendChild($("div","empty","No installs scheduled.")); }
   sorted.forEach(r=>{
     const iv=$("div","inst");

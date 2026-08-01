@@ -396,6 +396,7 @@
   .je-inst-h { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; font-weight:700; margin:2px 0; padding-top:10px; border-top:1px solid var(--line2); }
   .je-inst-h .je-add { margin-left:auto; }
   .je-col-r .je-inst { margin-bottom:0; padding:8px 0 0; }
+  .je-inst-list { max-height:200px; overflow-y:auto; }
   .je-sec-add { display:flex; align-items:center; justify-content:space-between; }
   .je-add { font-size:11.5px; font-weight:700; color:var(--accent); cursor:pointer; letter-spacing:0; text-transform:none; }
   .je-add:hover { text-decoration:underline; }
@@ -2808,7 +2809,8 @@
     var iadd = elx('span', 'je-add', '+ Add'); iadd.addEventListener('click', function (e) { e.stopPropagation(); addVisit(job); }); ih.appendChild(iadd);
     colR.appendChild(ih);
     var visits = mappingsCache ? jobVisitsAll(job) : [];
-    if (!visits.length) colR.appendChild(elx('div', 'jm-empty', 'No installs scheduled.'));
+    var instWrap = elx('div', 'je-inst-list');
+    if (!visits.length) instWrap.appendChild(elx('div', 'jm-empty', 'No installs scheduled.'));
     var instChoices = (mappingsCache && mappingsCache.installer != null)
       ? (choiceKeys(colMeta(mappingsCache.installer)) || []) : null;
     visits.forEach(function (v) {
@@ -2826,8 +2828,9 @@
         row.appendChild(ni);
       }
       var del = elx('span', 'je-del', '×'); del.title = 'Delete install'; del.addEventListener('click', function (e) { e.stopPropagation(); removeVisit(job, v); }); row.appendChild(del);
-      colR.appendChild(row);
+      instWrap.appendChild(row);
     });
+    colR.appendChild(instWrap);
     cols.appendChild(colR);
     body.appendChild(cols);
 

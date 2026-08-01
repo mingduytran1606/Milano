@@ -1763,7 +1763,13 @@ function setProduct(r,cat){
 function positionPop(el,anchor,w){
   const rc=anchor.getBoundingClientRect();
   el.style.left=Math.max(8,Math.min(rc.left,window.innerWidth-(w||330)-12))+"px";
-  el.style.top=(rc.bottom+4)+"px"; el.style.right="auto";
+  el.style.right="auto";
+  const spaceBelow=window.innerHeight-rc.bottom;
+  if(spaceBelow<200 && rc.top>spaceBelow){
+    el.style.top="auto"; el.style.bottom=(window.innerHeight-rc.top+4)+"px";
+  } else {
+    el.style.top=(rc.bottom+4)+"px"; el.style.bottom="auto";
+  }
 }
 function openProductPicker(r,anchor){
   const R=state.ref.product;

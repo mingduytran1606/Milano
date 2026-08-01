@@ -1478,24 +1478,7 @@
     el.addEventListener('dblclick', function (e) {
       if (e.target !== el) return;
       if (!mappingsCache) return;
-      var fields = installerFields();
-      fields[mappingsCache.startDate] = localDateToGrist(day);
-      grist.getTable().create({ fields: fields })
-        .then(function (res) {
-          if (res && res.id) {
-            selectedRowId = res.id; isolatedJobKey = null;
-            pendingCursor = res.id;
-            grist.setCursorPos({ rowId: res.id });
-            var stub = { id: null, key: 'new:' + res.id, client: '', addr: '', stage: '', assigned: [], jid: '' };
-            var rec = { id: res.id };
-            rec[mappingsCache.startDate] = new Date(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate()));
-            Object.keys(fields).forEach(function (k) { rec[k] = fields[k]; });
-            recordsCache.push(rec);
-            render();
-            openJobDetails(jobForRecord(rec));
-          }
-        })
-        .catch(function (err) { console.error(err); });
+      openNewInstallForm(day, installerFields());
     });
   }
 
@@ -2481,6 +2464,90 @@
   function toDateInputVal(v){ var d = gristToLocalDate(v); if (!d) return ''; var mo = ('0' + (d.getMonth() + 1)).slice(-2), da = ('0' + d.getDate()).slice(-2); return d.getFullYear() + '-' + mo + '-' + da; }
   function dateInputToGrist(s){ if (!s) return null; var p = s.split('-'); return Date.UTC(+p[0], (+p[1]) - 1, +p[2]) / 1000; }
 
+  // ---- new-install creation form (double-click on empty cell) ----
+  // Shows the job modal with Client + Address fields. Nothing is created until Save.
+  var _pendingNewInstall = null;   // { day, extraFields } while the form is open
+  function openNewInstallForm(day, extraFields) {
+    _pendingNewInstall = { day: day, extraFields: extraFields };
+    currentDetailJob = null;
+    var modal = document.getElementById('jobModal');
+    modal.querySelector('.jm-title').textContent = 'New installation';
+    var body = modal.querySelector('.jm-body'); body.innerHTML = '';
+
+    var form = elx('div', 'je-newjob');
+    form.style.border = 'none'; form.style.margin = '0'; form.style.padding = '0';
+
+    var r0 = elx('div', 'je-newjob-row');
+    r0.appendChild(Object.assign(elx('label'), { textContent: 'Date' }));
+    var dateInp = document.createElement('input'); dateInp.type = 'date'; dateInp.className = 'je-date';
+    var mo = ('0' + (day.getMonth() + 1)).slice(-2), da = ('0' + day.getDate()).slice(-2);
+    dateInp.value = day.getFullYear() + '-' + mo + '-' + da;
+    r0.appendChild(dateInp); form.appendChild(r0);
+
+    var r1 = elx('div', 'je-newjob-row');
+    r1.appendChild(Object.assign(elx('label'), { textContent: 'Client' }));
+    var njClient = document.createElement('input'); njClient.className = 'je-addr'; njClient.placeholder = 'Client name…';
+    r1.appendChild(njClient); form.appendChild(r1);
+
+    var r2 = elx('div', 'je-newjob-row');
+    r2.appendChild(Object.assign(elx('label'), { textContent: 'Address' }));
+    var njAddr = document.createElement('input'); njAddr.className = 'je-addr'; njAddr.placeholder = 'Job address…';
+    r2.appendChild(njAddr); form.appendChild(r2);
+
+    body.appendChild(form);
+
+    var foot = modal.querySelector('.jm-foot'); foot.innerHTML = '';
+    var disc = elx('button', 'je-btn ghost', 'Discard'); disc.type = 'button';
+    disc.addEventListener('click', function (e) { e.stopPropagation(); _pendingNewInstall = null; reallyCloseModal(); });
+    foot.appendChild(disc);
+    var sv = elx('button', 'je-btn primary', 'Save'); sv.type = 'button';
+    sv.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var client = njClient.value.trim();
+      var addr = njAddr.value.trim();
+      if (!client && !addr) { alert('Enter at least a client name or address.'); return; }
+      sv.disabled = true; sv.textContent = 'Saving…';
+      var dateParts = dateInp.value.split('-');
+      var gristDate = Date.UTC(+dateParts[0], (+dateParts[1]) - 1, +dateParts[2]) / 1000;
+      var pending = _pendingNewInstall; _pendingNewInstall = null;
+      var instFields = Object.assign({}, pending.extraFields);
+      instFields[mappingsCache.startDate] = gristDate;
+
+      ensureClientMap().then(function () {
+        return client ? resolveClient(client) : Promise.resolve(null);
+      }).then(function (clientRef) {
+        var jobFields = { Stage: 'Quote' };
+        if (clientRef) jobFields.Client_Name = clientRef;
+        if (addr) jobFields.Job_Address = addr;
+        return grist.docApi.applyUserActions([['AddRecord', jobsTableId, null, jobFields]]);
+      }).then(function (res) {
+        var newJobId = res.retValues[0];
+        if (mappingsCache.groupBy != null) instFields[mappingsCache.groupBy] = newJobId;
+        return grist.getTable().create({ fields: instFields }).then(function (instRes) {
+          if (instRes && instRes.id) {
+            var rec = { id: instRes.id };
+            rec[mappingsCache.startDate] = new Date(Date.UTC(+dateParts[0], (+dateParts[1]) - 1, +dateParts[2]));
+            Object.keys(instFields).forEach(function (k) { rec[k] = instFields[k]; });
+            recordsCache.push(rec);
+            selectedRowId = instRes.id; isolatedJobKey = null;
+            pendingCursor = instRes.id;
+            grist.setCursorPos({ rowId: instRes.id });
+          }
+          return loadJobs();
+        }).then(function () {
+          var newJob = (jobsCache || []).find(function (j) { return j.id === newJobId; });
+          render();
+          if (newJob) openJobDetails(newJob); else reallyCloseModal();
+        });
+      }).catch(function (err) { console.error(err); alert('Failed to create: ' + (err.message || err)); })
+        .then(function () { sv.disabled = false; sv.textContent = 'Save'; });
+    });
+    foot.appendChild(sv);
+
+    modal.classList.add('open');
+    njClient.focus();
+  }
+
   // ---- render the editable detail body ----
   function renderJobEditor(job){
     var body = document.querySelector('#jobModal .jm-body'); if (!body) return;
@@ -2489,46 +2556,11 @@
       var orphanVisits = mappingsCache ? jobVisitsAll(job) : [];
 
       var msg = elx('div', 'jm-editnote');
-      msg.textContent = "This install isn't linked to a job yet. Assign it to an existing job or create a new one.";
+      msg.textContent = "This install isn't linked to a job yet. Enter client details to create one.";
       body.appendChild(msg);
 
-      if (jobsCache && jobsCache.length && mappingsCache && mappingsCache.groupBy != null) {
-        var pickBtn = elx('button', 'je-btn ghost je-pickjob', '+ Assign to a job…');
-        pickBtn.addEventListener('click', function (e) {
-          e.stopPropagation(); closeFloatMenu();
-          var m = elx('div', 'je-menu je-jobmenu');
-          var inp = elx('input', 'je-search'); inp.placeholder = 'Search jobs…';
-          inp.addEventListener('click', function (ev) { ev.stopPropagation(); }); m.appendChild(inp);
-          var listWrap = elx('div', 'je-joblist'); m.appendChild(listWrap);
-          var draw = function (q) {
-            listWrap.innerHTML = '';
-            var rows = (jobsCache || []).filter(function (j) {
-              if (!q) return true;
-              return [j.client, j.addr, j.jid, j.stage].filter(Boolean).join(' ').toLowerCase().indexOf(q) !== -1;
-            }).slice(0, 50);
-            if (!rows.length) { listWrap.appendChild(elx('div', 'je-menu-empty', 'No match')); return; }
-            rows.forEach(function (j) {
-              var label = [j.client, j.addr, j.jid].filter(Boolean).join(' \xb7 ') || ('Job #' + j.id);
-              var it = elx('div', 'je-menu-item');
-              it.textContent = label;
-              it.addEventListener('click', function (ev) {
-                ev.stopPropagation(); closeFloatMenu();
-                ensureEdit();
-                orphanVisits.forEach(function (v) { v[mappingsCache.groupBy] = j.id; });
-                saveEdit().then(function () { openJobDetails(j); });
-              });
-              m.appendChild(it);
-            });
-          };
-          draw(''); inp.addEventListener('input', function () { draw(inp.value.trim().toLowerCase()); });
-          _floatMenu = m; placeMenu(m, pickBtn); inp.focus();
-        });
-        body.appendChild(pickBtn);
-
-        // "+ Create new job" button with inline form
-        var newJobBtn = elx('button', 'je-btn ghost je-pickjob', '+ Create new job');
+      if (jobsTableId && mappingsCache && mappingsCache.groupBy != null) {
         var newJobForm = elx('div', 'je-newjob');
-        newJobForm.style.display = 'none';
 
         var r1 = elx('div', 'je-newjob-row');
         r1.appendChild(Object.assign(elx('label'), { textContent: 'Client' }));
@@ -2549,9 +2581,6 @@
         r3.appendChild(njStagePill); newJobForm.appendChild(r3);
 
         var acts = elx('div', 'je-newjob-acts');
-        var njCancel = elx('button', 'je-btn ghost', 'Cancel');
-        njCancel.addEventListener('click', function (e) { e.stopPropagation(); newJobForm.style.display = 'none'; newJobBtn.style.display = ''; });
-        acts.appendChild(njCancel);
         var njSubmit = elx('button', 'je-btn primary', 'Create');
         njSubmit.addEventListener('click', function (e) {
           e.stopPropagation();
@@ -2580,79 +2609,8 @@
         acts.appendChild(njSubmit);
         newJobForm.appendChild(acts);
 
-        newJobBtn.addEventListener('click', function (e) {
-          e.stopPropagation();
-          newJobBtn.style.display = 'none';
-          newJobForm.style.display = '';
-          njClient.focus();
-        });
-        body.appendChild(newJobBtn);
         body.appendChild(newJobForm);
-      } else if (jobsTableId && mappingsCache && mappingsCache.groupBy != null) {
-        // no existing jobs loaded, but we can still create one
-        var newJobBtn2 = elx('button', 'je-btn ghost je-pickjob', '+ Create new job');
-        var newJobForm2 = elx('div', 'je-newjob');
-        newJobForm2.style.display = 'none';
-
-        var r1b = elx('div', 'je-newjob-row');
-        r1b.appendChild(Object.assign(elx('label'), { textContent: 'Client' }));
-        var njClient2 = document.createElement('input'); njClient2.className = 'je-addr'; njClient2.placeholder = 'Client name…';
-        r1b.appendChild(njClient2); newJobForm2.appendChild(r1b);
-
-        var r2b = elx('div', 'je-newjob-row');
-        r2b.appendChild(Object.assign(elx('label'), { textContent: 'Address' }));
-        var njAddr2 = document.createElement('input'); njAddr2.className = 'je-addr'; njAddr2.placeholder = 'Job address…';
-        r2b.appendChild(njAddr2); newJobForm2.appendChild(r2b);
-
-        var r3b = elx('div', 'je-newjob-row');
-        r3b.appendChild(Object.assign(elx('label'), { textContent: 'Stage' }));
-        var njStageChoices2 = choiceKeys(jobMetaByColId[JOB_COLS.stage]) || Object.keys(STAGE_COLORS);
-        var njStageVal2 = 'Quote';
-        var njStagePill2 = pillDropdown(njStageVal2, njStageChoices2, jobMetaByColId[JOB_COLS.stage],
-          function (v) { njStageVal2 = v; }, 'Stage -');
-        r3b.appendChild(njStagePill2); newJobForm2.appendChild(r3b);
-
-        var acts2 = elx('div', 'je-newjob-acts');
-        var njCancel2 = elx('button', 'je-btn ghost', 'Cancel');
-        njCancel2.addEventListener('click', function (e) { e.stopPropagation(); newJobForm2.style.display = 'none'; newJobBtn2.style.display = ''; });
-        acts2.appendChild(njCancel2);
-        var njSubmit2 = elx('button', 'je-btn primary', 'Create');
-        njSubmit2.addEventListener('click', function (e) {
-          e.stopPropagation();
-          var client = njClient2.value.trim();
-          var addr = njAddr2.value.trim();
-          if (!client && !addr) { alert('Enter at least a client name or address.'); return; }
-          njSubmit2.disabled = true; njSubmit2.textContent = 'Creating…';
-          ensureClientMap().then(function () {
-            return client ? resolveClient(client) : Promise.resolve(null);
-          }).then(function (clientRef) {
-            var fields = { Stage: njStageVal2 || 'Quote' };
-            if (clientRef) fields.Client_Name = clientRef;
-            if (addr) fields.Job_Address = addr;
-            return grist.docApi.applyUserActions([['AddRecord', jobsTableId, null, fields]]);
-          }).then(function (res) {
-            var newId = res.retValues[0];
-            var orphans = mappingsCache ? jobVisitsAll(job) : [];
-            ensureEdit();
-            orphans.forEach(function (v) { v[mappingsCache.groupBy] = newId; });
-            return saveEdit().then(function () { return loadJobs(); }).then(function () {
-              var newJob = (jobsCache || []).find(function (j) { return j.id === newId; });
-              if (newJob) openJobDetails(newJob);
-            });
-          }).catch(function (err) { console.error(err); alert('Failed to create job: ' + (err.message || err)); })
-            .then(function () { njSubmit2.disabled = false; njSubmit2.textContent = 'Create'; });
-        });
-        acts2.appendChild(njSubmit2);
-        newJobForm2.appendChild(acts2);
-
-        newJobBtn2.addEventListener('click', function (e) {
-          e.stopPropagation();
-          newJobBtn2.style.display = 'none';
-          newJobForm2.style.display = '';
-          njClient2.focus();
-        });
-        body.appendChild(newJobBtn2);
-        body.appendChild(newJobForm2);
+        njClient.focus();
       } else {
         body.appendChild(elx('div', 'jm-empty', 'No jobs loaded – open it in the Inbox to add job details.'));
       }

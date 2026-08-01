@@ -1378,7 +1378,7 @@
     // content from the (customisable) event-card template
     var bc = barColorsFor(fmtVal(rec[mappingsCache.type]));
     renderCardTemplate(eventCardTpl, eventCardTokens(rec, info), card, { bar: bc });
-    if (bc.fill && bc.fill !== 'var(--line)') { card.style.borderColor = bc.fill; card.style.borderWidth = '1.5px'; }
+    if (bc.fill && bc.fill !== 'var(--line)') { card.style.borderColor = bc.fill; card.style.borderWidth = '1px'; }
 
     card.addEventListener('click', function (e) {
       e.stopPropagation();

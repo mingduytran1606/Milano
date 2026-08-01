@@ -617,6 +617,7 @@
   .inst-h2{display:flex;align-items:center;gap:8px;font-size:var(--fs-dateLabel,11px);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;margin:2px 0 2px;padding-top:10px;border-top:1px solid var(--line2)}
   .sum-add{margin-left:auto;color:var(--accent-ink);font-weight:600;cursor:pointer;text-transform:none;letter-spacing:0;font-size:12px}
   .sum-r .inst{padding:8px 0 0}
+  .inst-list{max-height:200px;overflow-y:auto}
   .inst-drow{display:flex;align-items:center;gap:8px}
   .inst .idate{font-size:var(--fs-instDate,14px);font-weight:700}
   .inst-del{margin-left:auto;color:var(--danger);cursor:pointer;opacity:.45;font-weight:700;padding:0 3px}
@@ -3277,7 +3278,8 @@ function renderDetail(){
   const iadd=$("span","sum-add","+ Add"); iadd.onclick=()=>addRecord("Inst_",{Job:j.id}); ih.appendChild(iadd);
   colR.appendChild(ih);
   const sorted=[...inst].sort((a,b)=>(+toDate(b.Installation_date)||0)-(+toDate(a.Installation_date)||0));
-  if(!sorted.length){ colR.appendChild($("div","empty","No installs scheduled.")); }
+  const instList=$("div","inst-list");
+  if(!sorted.length){ instList.appendChild($("div","empty","No installs scheduled.")); }
   sorted.forEach(r=>{
     const iv=$("div","inst");
     const idr=$("div","inst-drow");
@@ -3294,8 +3296,9 @@ function renderDetail(){
     const del=$("span","inst-del","×"); del.title="Delete install";
     del.onclick=()=>{ if(confirm("Delete this install?")) removeRecord("Inst_",r.id); };
     idr.appendChild(del); iv.appendChild(idr);
-    colR.appendChild(iv);
+    instList.appendChild(iv);
   });
+  colR.appendChild(instList);
   cols.appendChild(colR);
   head.appendChild(cols);
   app.appendChild(head);

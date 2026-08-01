@@ -1372,7 +1372,7 @@
     // content from the (customisable) event-card template
     var bc = barColorsFor(fmtVal(rec[mappingsCache.type]));
     renderCardTemplate(eventCardTpl, eventCardTokens(rec, info), card, { bar: bc });
-    if (bc.fill && bc.fill !== 'var(--line)') { card.style.borderColor = bc.fill; card.style.borderWidth = '1.5px'; }
+    if (bc.fill && bc.fill !== 'var(--line)') { card.style.borderColor = bc.fill; card.style.borderWidth = '2.5px'; }
 
     card.addEventListener('click', function (e) {
       e.stopPropagation();
@@ -2477,13 +2477,6 @@
     var form = elx('div', 'je-newjob');
     form.style.border = 'none'; form.style.margin = '0'; form.style.padding = '0';
 
-    var r0 = elx('div', 'je-newjob-row');
-    r0.appendChild(Object.assign(elx('label'), { textContent: 'Date' }));
-    var dateInp = document.createElement('input'); dateInp.type = 'date'; dateInp.className = 'je-date';
-    var mo = ('0' + (day.getMonth() + 1)).slice(-2), da = ('0' + day.getDate()).slice(-2);
-    dateInp.value = day.getFullYear() + '-' + mo + '-' + da;
-    r0.appendChild(dateInp); form.appendChild(r0);
-
     var r1 = elx('div', 'je-newjob-row');
     r1.appendChild(Object.assign(elx('label'), { textContent: 'Client' }));
     var njClient = document.createElement('input'); njClient.className = 'je-addr'; njClient.placeholder = 'Client name…';
@@ -2493,6 +2486,26 @@
     r2.appendChild(Object.assign(elx('label'), { textContent: 'Address' }));
     var njAddr = document.createElement('input'); njAddr.className = 'je-addr'; njAddr.placeholder = 'Job address…';
     r2.appendChild(njAddr); form.appendChild(r2);
+
+    var r3 = elx('div', 'je-newjob-row');
+    r3.appendChild(Object.assign(elx('label'), { textContent: 'Stage' }));
+    var njStageChoices = choiceKeys(jobMetaByColId[JOB_COLS.stage]) || Object.keys(STAGE_COLORS);
+    var njStageVal = 'Quote';
+    var njStagePill = pillDropdown(njStageVal, njStageChoices, jobMetaByColId[JOB_COLS.stage],
+      function (v) { njStageVal = v; }, 'Stage -');
+    r3.appendChild(njStagePill); form.appendChild(r3);
+
+    var r4 = elx('div', 'je-newjob-row');
+    r4.appendChild(Object.assign(elx('label'), { textContent: 'Install date' }));
+    var dateInp = document.createElement('input'); dateInp.type = 'date'; dateInp.className = 'je-date';
+    var mo = ('0' + (day.getMonth() + 1)).slice(-2), da = ('0' + day.getDate()).slice(-2);
+    dateInp.value = day.getFullYear() + '-' + mo + '-' + da;
+    r4.appendChild(dateInp); form.appendChild(r4);
+
+    var r5 = elx('div', 'je-newjob-row');
+    r5.appendChild(Object.assign(elx('label'), { textContent: 'Note' }));
+    var njNote = document.createElement('input'); njNote.className = 'je-addr'; njNote.placeholder = 'Installation note…';
+    r5.appendChild(njNote); form.appendChild(r5);
 
     body.appendChild(form);
 
@@ -2512,11 +2525,13 @@
       var pending = _pendingNewInstall; _pendingNewInstall = null;
       var instFields = Object.assign({}, pending.extraFields);
       instFields[mappingsCache.startDate] = gristDate;
+      var noteVal = njNote.value.trim();
+      if (noteVal && mappingsCache.seqNote != null) instFields[mappingsCache.seqNote] = noteVal;
 
       ensureClientMap().then(function () {
         return client ? resolveClient(client) : Promise.resolve(null);
       }).then(function (clientRef) {
-        var jobFields = { Stage: 'Quote' };
+        var jobFields = { Stage: njStageVal || 'Quote' };
         if (clientRef) jobFields.Client_Name = clientRef;
         if (addr) jobFields.Job_Address = addr;
         return grist.docApi.applyUserActions([['AddRecord', jobsTableId, null, jobFields]]);

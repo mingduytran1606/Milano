@@ -609,7 +609,7 @@
   .stone .sbul{justify-self:center;width:4px;height:4px;border-radius:50%;background:var(--muted);opacity:.5}
   .spill{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-pill,12px);font-weight:600;color:var(--ink);border-radius:999px;padding:3px 10px 3px 9px;cursor:pointer}
   .spill .pcaret{font-size:8px;opacity:.5;margin-left:1px;line-height:1}
-  .sum-note{font:inherit;font-size:var(--fs-note,13px);line-height:1.5;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 11px;width:100%;resize:vertical;min-height:46px}
+  .sum-note{font:inherit;font-size:var(--fs-note,13px);line-height:1.5;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 11px;width:100%;resize:none;overflow:hidden;min-height:46px;field-sizing:content}
   .sum-note:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
   .sum-r .drow{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:0 0 8px}
   .sum-r .dl{font-size:var(--fs-dateLabel,11px);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700}
@@ -3242,8 +3242,10 @@ function renderDetail(){
   const noteBlk=$("div","sum-blk");
   noteBlk.appendChild($("span","sum-lbl","Note"));
   const nta=document.createElement("textarea"); nta.className="sum-note"; nta.value=esc(j.Note); nta.placeholder="Capture your note";
+  const autoFitNote=()=>{nta.style.height="auto";nta.style.height=nta.scrollHeight+"px";};
+  nta.addEventListener("input",autoFitNote);
   nta.onblur=()=>{ if(nta.value!==esc(j.Note)) update("Jobs_Detail",j.id,{Note:nta.value}); };
-  noteBlk.appendChild(nta); colL.appendChild(noteBlk);
+  noteBlk.appendChild(nta); requestAnimationFrame(autoFitNote); colL.appendChild(noteBlk);
   cols.appendChild(colL);
   // draggable divider between the two summary columns
   const ssp=$("div","sum-split"); ssp.title="Drag to resize";

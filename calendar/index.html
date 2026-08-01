@@ -265,9 +265,12 @@
   .ev .cline { font-size:var(--ev-card-font,11.5px); line-height:1.4; white-space:normal; }
   .ev .cline + .cline { margin-top:2px; }
   .ev .cline:empty { display:none; }
+  .ev .cline.cline-split { display:flex; align-items:baseline; gap:4px; }
   .jbody .cline { font-size:var(--job-card-font,12.5px); line-height:1.4; }
   .jbody .cline + .cline { margin-top:2px; }
   .jbody .cline:empty { display:none; }
+  .jbody .cline.cline-split { display:flex; align-items:baseline; gap:4px; }
+  .csplit-push { margin-left:auto; }
   .cdivider { border-top:1px solid var(--line2); margin:5px 0 4px; }
   .cbar { font-weight:600; line-height:1.35; display:inline-block; max-width:100%; border-radius:6px; padding:1px 6px; }
   .avwrap { display:inline-flex; gap:2px; vertical-align:middle; }
@@ -973,7 +976,7 @@
   // edited via the ⋯ menu on an event. Markdown-ish: **bold**, *italic*, {token}, \n = new line.
   // {installer} renders nothing until the Installer column is mapped and set, and the
   // empty-token trim drops the leftover space - so this default is unchanged for existing docs.
-  var DEFAULT_EVENT_CARD = '{title}\n{assigned} {installer} {seq}\n---\n{note}';
+  var DEFAULT_EVENT_CARD = '{title}\n{client} >> {installer}\n{assigned} {seq}\n---\n{note}';
   var DEFAULT_JOB_CARD = '**{client}**\n{address}\n{stage} {visits}';
   var eventCardTpl = DEFAULT_EVENT_CARD;
   var jobCardTpl = DEFAULT_JOB_CARD;
@@ -1011,7 +1014,20 @@
       }
       var line = document.createElement('div'); line.className = 'cline';
       var stats = { tokens: 0, filled: 0 };
-      renderCardInline(lineStr, tokens, line, ctx, stats);
+      var splitParts = lineStr.split('>>');
+      if (splitParts.length > 1) {
+        line.classList.add('cline-split');
+        var left = document.createElement('span');
+        renderCardInline(splitParts[0].trim(), tokens, left, ctx, stats);
+        line.appendChild(left);
+        var right = document.createElement('span'); right.className = 'csplit-push';
+        var rStats = { tokens: 0, filled: 0 };
+        renderCardInline(splitParts.slice(1).join('>>').trim(), tokens, right, ctx, rStats);
+        stats.tokens += rStats.tokens; stats.filled += rStats.filled;
+        if (rStats.tokens === 0 || rStats.filled > 0) line.appendChild(right);
+      } else {
+        renderCardInline(lineStr, tokens, line, ctx, stats);
+      }
       // A line whose tokens ALL came back empty (e.g. "Note: {note}" on a job with no note)
       // is dropped entirely, so labels/characters don't strand on their own.
       if (stats.tokens > 0 && stats.filled === 0) return;
@@ -1168,7 +1184,7 @@
     note.textContent = (isEvent
       ? 'The coloured blocks on the calendar grid. '
       : 'The job cards in the right-hand list. ')
-      + 'Use **bold**, *italic*, {tokens}, line breaks, --- for a divider, and ==wrap== to put anything in the stage-coloured bar. Applies to every ' + (isEvent ? 'event.' : 'job.');
+      + 'Use **bold**, *italic*, {tokens}, line breaks, --- for a divider, ==wrap== for the stage-coloured bar, and >> to push the rest of the line to the right. Applies to every ' + (isEvent ? 'event.' : 'job.');
     body.appendChild(note);
     var ta = document.createElement('textarea'); ta.className = 'ce-ta'; ta.spellcheck = false;
     ta.value = isEvent ? eventCardTpl : jobCardTpl;
@@ -1212,6 +1228,15 @@
       commit();
     });
     toks.appendChild(barChip);
+    var pushChip = document.createElement('button'); pushChip.type = 'button'; pushChip.className = 'ce-tok';
+    pushChip.innerHTML = '<code>&gt;&gt;</code><span>Push right</span>'; pushChip.title = 'Push the rest of the line to the right side';
+    pushChip.addEventListener('click', function () {
+      var s = ta.selectionStart || 0, e = ta.selectionEnd || 0;
+      ta.value = ta.value.slice(0, s) + ' >> ' + ta.value.slice(e);
+      ta.focus(); ta.selectionStart = ta.selectionEnd = s + 4;
+      commit();
+    });
+    toks.appendChild(pushChip);
     body.appendChild(toks);
     var reset = document.createElement('div'); reset.className = 'ce-reset';
     reset.textContent = '↩ Reset this card to default';

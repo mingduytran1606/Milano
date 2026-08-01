@@ -15,8 +15,8 @@
     --radius:14px; --sw-off:#cfd4d1;
     /* Stone Order table geometry. Both are overwritten inline on .stonecard once the
        user has set their own widths in Customize > Stone table (see applyStoneGrid). */
-    --stone-grid:minmax(140px,1.2fr) 48px 150px 64px 1px 48px 140px 1px 48px 140px 1px minmax(140px,1fr);
-    --stone-min:1010px;
+    --stone-grid:minmax(30px,168fr) minmax(30px,48fr) minmax(30px,150fr) minmax(30px,64fr) 1px minmax(30px,48fr) minmax(30px,140fr) 1px minmax(30px,48fr) minmax(30px,140fr) 1px minmax(30px,168fr);
+    --stone-min:0;
   }
   @media (prefers-color-scheme:dark){
     :root{ --bg:#12161b; --panel:#1a1f26; --ink:#e8edf2; --muted:#9aa6b2;
@@ -1098,17 +1098,16 @@ function observeStoneNote(el){
   ro.observe(el);
 }
 // Build the Stone Order grid from the configured column widths. Each column is
-// minmax(Wpx, Wfr) - exactly what the stone calendar's colTemplate() does - so W is a
-// real minimum and the columns share any spare width in the same proportion. The three
-// 1px tracks are the section dividers; --stone-min keeps the table scrollable rather
-// than crushed once the widths no longer fit the pane.
+// minmax(floor, Wfr) so columns shrink to fit narrow panes instead of forcing a
+// horizontal scrollbar. The floor is small (30px) so the grid is truly fluid;
+// the fr proportions keep the visual balance.
 function stoneGridTemplate(cols){
-  const parts=[]; let min=0;
+  const parts=[];
   cols.forEach(c=>{
-    parts.push("minmax("+c.w+"px,"+c.w+"fr)"); min+=c.w;
-    if(STONE_DIV_AFTER[c.k]){ parts.push("1px"); min+=1; }
+    parts.push("minmax(30px,"+c.w+"fr)");
+    if(STONE_DIV_AFTER[c.k]) parts.push("1px");
   });
-  return { tpl:parts.join(" "), min:min+STONE_GAP*(parts.length-1) };
+  return { tpl:parts.join(" "), min:0 };
 }
 function applyStoneGrid(cardEl){
   if(!cardEl) return;

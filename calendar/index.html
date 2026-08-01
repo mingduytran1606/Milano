@@ -301,7 +301,7 @@
   #jobModal { display:none; position:fixed; inset:0; z-index:50; background:rgba(20,22,26,.42);
     align-items:center; justify-content:center; padding:20px; }
   #jobModal.open { display:flex; }
-  #jobModalCard { background:var(--panel); width:100%; max-width:620px; max-height:86vh; display:flex; flex-direction:column;
+  #jobModalCard { background:var(--panel); width:fit-content; min-width:440px; max-width:90vw; max-height:86vh; display:flex; flex-direction:column;
     border-radius:10px; box-shadow:0 18px 50px rgba(0,0,0,.3); overflow:hidden; position:relative; }
   .jm-head { flex:0 0 auto; display:flex; align-items:flex-start; gap:8px; padding:14px 16px 10px; border-bottom:1px solid var(--line2); }
   .jm-title { flex:1; min-width:0; font-size:15px; font-weight:700; color:var(--ink); line-height:1.3; overflow-wrap:break-word; }

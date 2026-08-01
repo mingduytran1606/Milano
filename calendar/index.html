@@ -2803,44 +2803,6 @@
     cols.appendChild(colR);
     body.appendChild(cols);
 
-    // stone order
-    var sh = elx('div', 'jm-sec je-sec-add'); sh.appendChild(document.createTextNode('Stone Order'));
-    var sadd = elx('span', 'je-add', '+ Add line'); sadd.addEventListener('click', function (e) { e.stopPropagation(); addStoneLine(job); }); sh.appendChild(sadd);
-    body.appendChild(sh);
-    if (stoneCache === null) { body.appendChild(elx('div', 'jm-empty', 'Loading stone lines…')); renderFooter(job); return; }
-    if (!stone.length) body.appendChild(elx('div', 'jm-empty', 'No stone lines for this job.'));
-    var statusChoices = choiceKeys(stoneMetaByColId[STONE.status]) || [];
-    stone.forEach(function (r) {
-      var card = elx('div', 'je-stone');
-      var top = elx('div', 'je-stone-top');
-      var nm = elx('span', 'je-prodname', productLabelFor(r));
-      if (catalogueCache && catalogueCache.length) { nm.title = 'Click to pick a product'; nm.classList.add('pick'); nm.addEventListener('click', function (e) { e.stopPropagation(); openProductMenu(nm, r); }); }
-      top.appendChild(nm);
-      var sdel = elx('span', 'je-del', '×'); sdel.title = 'Delete this stone line'; sdel.addEventListener('click', function (e) { e.stopPropagation(); removeStoneLine(job, r); }); top.appendChild(sdel);
-      card.appendChild(top);
-      var srowc = elx('div', 'je-stone-row');
-      srowc.appendChild(pillDropdown(String(r[STONE.status] || ''), statusChoices, stoneMetaByColId[STONE.status], function (v) { setStoneField(r, STONE.status, v); }, 'Status -'));
-      card.appendChild(srowc);
-      var qrow = elx('div', 'je-qrow');
-      [['scope', 'Scope'], ['order', 'Order'], ['deliv', 'Deliv']].forEach(function (q) {
-        var wrap = elx('label', 'je-q'); wrap.appendChild(elx('span', 'je-qlbl', q[1]));
-        var qi = document.createElement('input'); qi.type = 'number'; qi.className = 'je-qin'; var col = STONE[q[0]];
-        qi.value = (r[col] != null ? r[col] : '');
-        qi.addEventListener('change', function () { setStoneField(r, col, qi.value === '' ? null : Number(qi.value)); });
-        wrap.appendChild(qi); qrow.appendChild(wrap);
-      });
-      // Price / slab is a Grist formula (looked up from the product) - read-only, never written back.
-      var pwrap = elx('label', 'je-q'); pwrap.title = 'Price / slab - from the product; edit the product to change it';
-      pwrap.appendChild(elx('span', 'je-qlbl', 'Price $'));
-      pwrap.appendChild(elx('span', 'je-qin je-ro', (r[STONE.price] != null && r[STONE.price] !== '') ? String(r[STONE.price]) : '0'));
-      qrow.appendChild(pwrap);
-      card.appendChild(qrow);
-      var sn = document.createElement('input'); sn.className = 'je-inst-note'; sn.placeholder = 'Note…'; sn.value = String(r[STONE.note] || '');
-      sn.addEventListener('blur', function () { if (sn.value !== String(r[STONE.note] || '')) setStoneField(r, STONE.note, sn.value); });
-      card.appendChild(sn);
-      body.appendChild(card);
-    });
-
     renderFooter(job);
   }
   function choiceKeys(meta){ if (!meta) return null; if (Array.isArray(meta.choices) && meta.choices.length) return meta.choices.slice(); var k = Object.keys(meta.choiceOptions || {}); return k.length ? k : null; }

@@ -609,14 +609,20 @@
     'Not Invoiced':'#eef1f4', 'Deposit Paid':'#FFFACD', 'Outstanding Bal':'#ffb3ba',
     'Fully Paid':'#b3f0bf', 'Other':'#eef1f4', 'Not Paid Yet':'#FEE7C3', 'TBC By a Minh':'#E8D0FE'
   };
-  // Overwrite a meta map's Stage/Payment fillColors with our palette (textColor preserved).
+  // Fill in Stage/Payment fillColors from our palette ONLY when Grist metadata
+  // doesn't already carry a colour for that choice. This way colours set in
+  // Grist's column editor (or synced from the Inbox) take priority; hardcoded
+  // values are pure fallbacks for choices that have no colour at all.
   function applyChoiceColorOverrides(meta) {
     if (!meta) return;
     [['Stage', STAGE_COLORS], ['Payment_Status', PAY_COLORS]].forEach(function (p) {
       var m = meta[p[0]]; if (!m) return;
       m.choiceOptions = m.choiceOptions || {};
       Object.keys(p[1]).forEach(function (v) {
-        m.choiceOptions[v] = Object.assign({}, m.choiceOptions[v], { fillColor: p[1][v] });
+        var existing = m.choiceOptions[v];
+        if (!existing || !existing.fillColor) {
+          m.choiceOptions[v] = Object.assign({}, existing, { fillColor: p[1][v] });
+        }
       });
     });
   }

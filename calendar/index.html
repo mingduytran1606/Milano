@@ -295,7 +295,7 @@
   #jobModal { display:none; position:fixed; inset:0; z-index:50; background:rgba(20,22,26,.42);
     align-items:center; justify-content:center; padding:20px; }
   #jobModal.open { display:flex; }
-  #jobModalCard { background:var(--panel); width:100%; max-width:440px; max-height:86vh; display:flex; flex-direction:column;
+  #jobModalCard { background:var(--panel); width:100%; max-width:620px; max-height:86vh; display:flex; flex-direction:column;
     border-radius:10px; box-shadow:0 18px 50px rgba(0,0,0,.3); overflow:hidden; position:relative; }
   .jm-head { flex:0 0 auto; display:flex; align-items:flex-start; gap:8px; padding:14px 16px 10px; border-bottom:1px solid var(--line2); }
   .jm-title { flex:1; min-width:0; font-size:15px; font-weight:700; color:var(--ink); line-height:1.3; overflow-wrap:break-word; }
@@ -360,8 +360,33 @@
   .je-scope { font-weight:700; color:var(--ink); }
   .je-date { font:inherit; font-size:12.5px; color:var(--ink); background:var(--bg); border:1px solid var(--line2); border-radius:6px; padding:5px 7px; }
   .je-date:focus { outline:none; border-color:var(--accent); }
-  .je-note { width:100%; min-height:54px; resize:vertical; font:inherit; font-size:12.5px; color:var(--ink); background:var(--bg); border:1px solid var(--line2); border-radius:7px; padding:7px 9px; }
+  .je-note { width:100%; min-height:46px; resize:none; overflow:hidden; field-sizing:content; font:inherit; font-size:12.5px; color:var(--ink); background:var(--bg); border:1px solid var(--line2); border-radius:7px; padding:7px 9px; }
   .je-note:focus { outline:none; border-color:var(--accent); background:var(--panel); }
+  /* two-column layout (scope+note left, dates+installs right) */
+  .je-cols { display:grid; grid-template-columns:1fr 1fr; margin-top:14px; padding-top:14px; border-top:1px solid var(--line2); }
+  .je-col-l { padding-right:14px; border-right:1px solid var(--line2); }
+  .je-col-r { padding-left:14px; }
+  .je-blk { margin-top:14px; } .je-blk:first-child { margin-top:0; }
+  .je-slbl { display:block; margin-bottom:6px; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; font-weight:700; }
+  .je-scope-n { display:flex; align-items:baseline; gap:6px; }
+  .je-scope-n b { font-size:22px; font-weight:800; letter-spacing:-.02em; line-height:1; }
+  .je-scope-n span { font-size:12px; color:var(--muted); font-weight:600; }
+  .je-stones .je-scope-n { margin-top:12px; } .je-stones .je-scope-n:first-child { margin-top:0; }
+  .je-stones .je-scope-n + .je-srow { margin-top:4px; }
+  .je-grp-head { display:flex; align-items:baseline; gap:5px; margin-top:12px; font-size:13px; }
+  .je-grp-head:first-child { margin-top:0; }
+  .je-grp-n { font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; }
+  .je-grp-l { font-weight:600; color:var(--muted); }
+  .je-stones .je-grp-head + .je-srow { margin-top:4px; }
+  .je-srow { display:flex; align-items:center; gap:6px; margin-top:3px; font-size:12px; line-height:1.4; }
+  .je-srow .sbul { width:4px; height:4px; border-radius:50%; background:var(--muted); opacity:.5; flex:0 0 auto; }
+  .je-srow .snm { color:var(--ink); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .je-srow .snote { color:var(--muted); flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .je-col-r .je-drow { flex-direction:column; align-items:flex-start; gap:4px; padding:0 0 8px; }
+  .je-col-r .je-dl { flex:none; font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+  .je-inst-h { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; font-weight:700; margin:2px 0; padding-top:10px; border-top:1px solid var(--line2); }
+  .je-inst-h .je-add { margin-left:auto; }
+  .je-col-r .je-inst { margin-bottom:0; padding:8px 0 0; }
   .je-sec-add { display:flex; align-items:center; justify-content:space-between; }
   .je-add { font-size:11.5px; font-weight:700; color:var(--accent); cursor:pointer; letter-spacing:0; text-transform:none; }
   .je-add:hover { text-decoration:underline; }
@@ -2181,6 +2206,18 @@
     if (r.Product_Supplier) return String(r.Product_Supplier);
     return '-';
   }
+  function stripNo(s){ return String(s||'').replace(/^\s*\d+\s*\.?\s*/,'').trim(); }
+  function isDeliveredStatus(r){ var low = String(r[STONE.status]||'').toLowerCase(); return /deliver/.test(low) && !/not deliver/.test(low); }
+  function pendingStatusKey(rows){
+    var hit = (rows||[]).map(function(r){return String(r[STONE.status]||'');}).find(function(s){return /not deliver/i.test(s);});
+    return hit || 'Not Delivered Yet';
+  }
+  function stonePortions(r, pendingKey){
+    var st = r[STONE.status]||'-', scope = Number(r[STONE.scope])||0, dq = Number(r[STONE.deliv])||0;
+    if (isDeliveredStatus(r) && dq > 0 && dq < scope)
+      return [{status:st, qty:dq}, {status:pendingKey||'Not Delivered Yet', qty:scope-dq}];
+    return [{status:st, qty:scope}];
+  }
 
   // ---- draft buffer: every edit is held here until Save (Discard restores) ----
   function cloneVal(v){ if (v instanceof Date) return new Date(v.getTime()); if (Array.isArray(v)) return v.map(cloneVal); if (v && typeof v === 'object') { var o = {}; for (var k in v) o[k] = cloneVal(v[k]); return o; } return v; }
@@ -2379,30 +2416,91 @@
     pills.appendChild(asg);
     body.appendChild(pills);
 
-    // measure date + scope summary
+    // ── two-column layout: scope+note (left), dates+installs (right) ──
+    var stone = jobStone(job);
+    var cols = elx('div', 'je-cols');
+
+    // LEFT column: scope breakdown + note
+    var colL = elx('div', 'je-col-l');
+    var scopeBlk = elx('div', 'je-blk');
+    scopeBlk.appendChild(elx('span', 'je-slbl', 'Scope'));
+    if (stone.length) {
+      var pKey = pendingStatusKey(stone);
+      var groups = {};  var groupOrder = [];
+      stone.forEach(function (r) {
+        stonePortions(r, pKey).forEach(function (p) {
+          if (!p.qty && r[STONE.scope] != null && Number(r[STONE.scope])) return;
+          if (!groups[p.status]) { groups[p.status] = []; groupOrder.push(p.status); }
+          groups[p.status].push({ r: r, qty: p.qty, hasQty: r[STONE.scope] != null });
+        });
+      });
+      var qtyOf = function (parts) { return parts.reduce(function (m, p) { return m + (Number(p.qty) || 0); }, 0); };
+      var total = 0; groupOrder.forEach(function (k) { total += qtyOf(groups[k]); });
+      var multiStatus = groupOrder.length > 1;
+      if (multiStatus) {
+        var tot = elx('div', 'je-scope-n'); tot.appendChild(elx('b', null, String(total)));
+        tot.appendChild(elx('span', null, total === 1 ? 'slab' : 'slabs')); scopeBlk.appendChild(tot);
+      }
+      var sl = elx('div', 'je-stones');
+      groupOrder.sort(function (a, b) { return (qtyOf(groups[b]) - qtyOf(groups[a])); });
+      groupOrder.forEach(function (s) {
+        var rows = groups[s], n = qtyOf(rows);
+        var head = elx('div', multiStatus ? 'je-grp-head' : 'je-scope-n');
+        head.title = s;
+        head.appendChild(elx(multiStatus ? 'span' : 'b', multiStatus ? 'je-grp-n' : null, String(n)));
+        head.appendChild(elx('span', multiStatus ? 'je-grp-l' : null, (n === 1 ? 'slab ' : 'slabs ') + (stripNo(s) || '-').toLowerCase()));
+        sl.appendChild(head);
+        var byLabel = {};  var labelOrder = [];
+        rows.forEach(function (p) {
+          var lbl = productLabelFor(p.r);
+          if (!byLabel[lbl]) { byLabel[lbl] = { label: lbl, qty: 0, hasQty: false, notes: [] }; labelOrder.push(lbl); }
+          var g = byLabel[lbl];
+          if (p.hasQty) { g.hasQty = true; g.qty += (Number(p.qty) || 0); }
+          if (p.r[STONE.note] && g.notes.indexOf(p.r[STONE.note]) === -1) g.notes.push(p.r[STONE.note]);
+        });
+        var singleColour = labelOrder.length === 1;
+        labelOrder.forEach(function (lbl) {
+          var g = byLabel[lbl];
+          var row = elx('div', 'je-srow');
+          row.appendChild(elx('span', 'sbul'));
+          var showQty = !singleColour && g.hasQty;
+          var snm = elx('span', 'snm', (showQty ? g.qty + '× ' : '') + g.label);
+          snm.title = g.label; row.appendChild(snm);
+          var noteTxt = g.notes.join(' · ');
+          if (noteTxt) { var sn = elx('span', 'snote', noteTxt); sn.title = noteTxt; row.appendChild(sn); }
+          sl.appendChild(row);
+        });
+      });
+      scopeBlk.appendChild(sl);
+    } else {
+      var scopeTot = Number(raw.Scope_Qty) || 0;
+      var scn = elx('div', 'je-scope-n'); scn.appendChild(elx('b', null, String(scopeTot)));
+      scn.appendChild(elx('span', null, scopeTot === 1 ? 'slab' : 'slabs')); scopeBlk.appendChild(scn);
+    }
+    colL.appendChild(scopeBlk);
+    var noteBlk = elx('div', 'je-blk');
+    noteBlk.appendChild(elx('span', 'je-slbl', 'Note'));
+    var nt = document.createElement('textarea'); nt.className = 'je-note'; nt.placeholder = 'Capture your note'; nt.value = String(raw.Note || '');
+    var autoFitNote = function () { nt.style.height = 'auto'; nt.style.height = nt.scrollHeight + 'px'; };
+    nt.addEventListener('input', autoFitNote);
+    nt.addEventListener('blur', function () { if (nt.value !== String(raw.Note || '')) setJobField(job, 'Note', nt.value); });
+    noteBlk.appendChild(nt); requestAnimationFrame(autoFitNote);
+    colL.appendChild(noteBlk);
+    cols.appendChild(colL);
+
+    // RIGHT column: measure date + installations
+    var colR = elx('div', 'je-col-r');
     var mrow = elx('div', 'je-drow');
     mrow.appendChild(elx('span', 'je-dl', 'Measure date'));
     var md = document.createElement('input'); md.type = 'date'; md.className = 'je-date'; md.value = toDateInputVal(raw.Meas_Date);
     md.addEventListener('change', function () { setJobField(job, 'Meas_Date', dateInputToGrist(md.value)); });
-    mrow.appendChild(md); body.appendChild(mrow);
+    mrow.appendChild(md); colR.appendChild(mrow);
 
-    var stone = jobStone(job);
-    var scopeTot = stone.reduce(function (m, r) { return m + (Number(r[STONE.scope]) || 0); }, 0);
-    var srow = elx('div', 'je-drow'); srow.appendChild(elx('span', 'je-dl', 'Scope'));
-    srow.appendChild(elx('span', 'je-scope', scopeTot + (scopeTot === 1 ? ' slab' : ' slabs'))); body.appendChild(srow);
-
-    // note
-    var nlab = elx('div', 'jm-sec', 'Note'); body.appendChild(nlab);
-    var nt = document.createElement('textarea'); nt.className = 'je-note'; nt.placeholder = 'Capture your note'; nt.value = String(raw.Note || '');
-    nt.addEventListener('blur', function () { if (nt.value !== String(raw.Note || '')) setJobField(job, 'Note', nt.value); });
-    body.appendChild(nt);
-
-    // installations
-    var ih = elx('div', 'jm-sec je-sec-add'); ih.appendChild(document.createTextNode('Installations'));
+    var ih = elx('div', 'je-inst-h'); ih.appendChild(document.createTextNode('Installations'));
     var iadd = elx('span', 'je-add', '+ Add'); iadd.addEventListener('click', function (e) { e.stopPropagation(); addVisit(job); }); ih.appendChild(iadd);
-    body.appendChild(ih);
+    colR.appendChild(ih);
     var visits = mappingsCache ? jobVisitsAll(job) : [];
-    if (!visits.length) body.appendChild(elx('div', 'jm-empty', 'No installs scheduled.'));
+    if (!visits.length) colR.appendChild(elx('div', 'jm-empty', 'No installs scheduled.'));
     var instChoices = (mappingsCache && mappingsCache.installer != null)
       ? (choiceKeys(colMeta(mappingsCache.installer)) || []) : null;
     visits.forEach(function (v) {
@@ -2410,7 +2508,6 @@
       var di = document.createElement('input'); di.type = 'date'; di.className = 'je-date'; di.value = toDateInputVal(v[mappingsCache.startDate]);
       di.addEventListener('change', function () { setVisitField(v, mappingsCache.startDate, dateInputToGrist(di.value)); });
       row.appendChild(di);
-      // who is fitting this one - only when the Installer column is mapped
       if (instChoices) {
         row.appendChild(pillDropdown(installerOf(v), instChoices, colMeta(mappingsCache.installer),
           function (val) { setVisitField(v, mappingsCache.installer, val); }, 'Installer -'));
@@ -2421,8 +2518,10 @@
         row.appendChild(ni);
       }
       var del = elx('span', 'je-del', '×'); del.title = 'Delete install'; del.addEventListener('click', function (e) { e.stopPropagation(); removeVisit(job, v); }); row.appendChild(del);
-      body.appendChild(row);
+      colR.appendChild(row);
     });
+    cols.appendChild(colR);
+    body.appendChild(cols);
 
     // stone order
     var sh = elx('div', 'jm-sec je-sec-add'); sh.appendChild(document.createTextNode('Stone Order'));

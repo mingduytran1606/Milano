@@ -1428,10 +1428,7 @@
         if (!jobRowId) return;
         var job = (jobsCache || []).find(function (x) { return x.id === jobRowId; });
         var jobName = job ? (job.client || job.addr || job.jid) : 'this job';
-        var note = prompt('Schedule installation for ' + jobName + ' on ' + fmtDate(day) + '.\n' +
-                          'Add a note (optional) - or Cancel to abort:', '');
-        if (note === null) return;   // cancelled -> no visit created
-        note = note.trim();
+        var note = '';
         var idx = dropIndex(el, e.clientY, -1);
         var fields = installerFields();
         fields[mappingsCache.groupBy] = jobRowId;
@@ -1478,15 +1475,23 @@
     el.addEventListener('dblclick', function (e) {
       if (e.target !== el) return;
       if (!mappingsCache) return;
-      var note = prompt('Create a new installation on ' + fmtDate(day) + '.\n' +
-                        'Add a note (optional) - or Cancel to abort:', '');
-      if (note === null) return;   // cancelled
-      note = note.trim();
-      var fields = installerFields();   // dbl-clicking inside a section prefills that fitter
+      var fields = installerFields();
       fields[mappingsCache.startDate] = localDateToGrist(day);
-      if (note && mappingsCache.seqNote != null) fields[mappingsCache.seqNote] = note;
       grist.getTable().create({ fields: fields })
-        .then(function (res) { if (res && res.id) { selectedRowId = res.id; isolatedJobKey = null; grist.setCursorPos({ rowId: res.id }); } })
+        .then(function (res) {
+          if (res && res.id) {
+            selectedRowId = res.id; isolatedJobKey = null;
+            pendingCursor = res.id;
+            grist.setCursorPos({ rowId: res.id });
+            var stub = { id: null, key: 'new:' + res.id, client: '', addr: '', stage: '', assigned: [], jid: '' };
+            var rec = { id: res.id };
+            rec[mappingsCache.startDate] = new Date(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate()));
+            Object.keys(fields).forEach(function (k) { rec[k] = fields[k]; });
+            recordsCache.push(rec);
+            render();
+            openJobDetails(jobForRecord(rec));
+          }
+        })
         .catch(function (err) { console.error(err); });
     });
   }

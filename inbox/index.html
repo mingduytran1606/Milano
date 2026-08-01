@@ -1196,7 +1196,7 @@ function applyColorOverrides(){
 function distinctVals(coll,field){ return [...new Set((coll||[]).map(r=>r[field]).filter(v=>v!=null&&v!==""))]; }
 function rebuildChoiceMap(target,defaults,names,gristColors,overrides){
   Object.keys(target).forEach(k=>delete target[k]);
-  names.forEach((n,i)=>{ target[n]=(overrides&&overrides[n])||defaults[n]||(gristColors&&gristColors[n])||PALETTE[i%PALETTE.length]||"#e9edf1"; });
+  names.forEach((n,i)=>{ target[n]=(overrides&&overrides[n])||(gristColors&&gristColors[n])||defaults[n]||PALETTE[i%PALETTE.length]||"#e9edf1"; });
 }
 function syncChoiceMaps(){
   const sc=state.schemaChoices||{}, scc=state.schemaChoiceColors||{}, ov=state.colors||{};

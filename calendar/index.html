@@ -257,7 +257,7 @@
   .mcell.dragover { background:var(--accent-soft); }
 
   /* ---- event cards ---- */
-  .ev { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:5px 14px 5px 7px; cursor:pointer;
+  .ev { background:var(--panel); border:var(--ev-card-outline,1px) solid var(--line); border-radius:6px; padding:5px 14px 5px 7px; cursor:pointer;
         color:var(--ink); flex:0 0 auto; box-shadow:0 1px 1px rgba(0,0,0,.08);
         overflow-wrap:break-word; position:relative; }
   .ev .del { position:absolute; top:-6px; right:-6px; width:16px; height:16px; line-height:13px; text-align:center;
@@ -1172,14 +1172,16 @@
   var CARD_LS = 'milano_cal_cards';
   var cardScope = 'everyone';
   var eventCardFont = 11.5, jobCardFont = 12.5;
+  var eventCardOutline = 1;
   function applyCardFonts() {
     try {
       document.documentElement.style.setProperty('--ev-card-font', eventCardFont + 'px');
       document.documentElement.style.setProperty('--job-card-font', jobCardFont + 'px');
+      document.documentElement.style.setProperty('--ev-card-outline', eventCardOutline + 'px');
     } catch (e) {}
   }
   function loadLocalCards() { try { return JSON.parse(localStorage.getItem(CARD_LS) || '{}') || {}; } catch (e) { return {}; } }
-  function saveLocalCards() { try { localStorage.setItem(CARD_LS, JSON.stringify({ event: eventCardTpl, job: jobCardTpl, scope: cardScope, ef: eventCardFont, jf: jobCardFont })); } catch (e) {} }
+  function saveLocalCards() { try { localStorage.setItem(CARD_LS, JSON.stringify({ event: eventCardTpl, job: jobCardTpl, scope: cardScope, ef: eventCardFont, jf: jobCardFont, eo: eventCardOutline })); } catch (e) {} }
   (function () {
     var lc = loadLocalCards();
     if (typeof lc.event === 'string') eventCardTpl = lc.event;
@@ -1187,6 +1189,7 @@
     if (lc.scope === 'me' || lc.scope === 'everyone') cardScope = lc.scope;
     if (typeof lc.ef === 'number') eventCardFont = lc.ef;
     if (typeof lc.jf === 'number') jobCardFont = lc.jf;
+    if (typeof lc.eo === 'number') eventCardOutline = lc.eo;
     applyCardFonts();
   })();
   // tokens shown in the editor (label per token)
@@ -1307,7 +1310,7 @@
       address: function () { return txtNode(j && j.addr); }
     };
   }
-  function publishCards() { try { grist.setOption('eventCardTpl', eventCardTpl); grist.setOption('jobCardTpl', jobCardTpl); grist.setOption('eventCardFont', eventCardFont); grist.setOption('jobCardFont', jobCardFont); } catch (e) {} }
+  function publishCards() { try { grist.setOption('eventCardTpl', eventCardTpl); grist.setOption('jobCardTpl', jobCardTpl); grist.setOption('eventCardFont', eventCardFont); grist.setOption('jobCardFont', jobCardFont); grist.setOption('eventCardOutline', eventCardOutline); } catch (e) {} }
 
   // ---- Duplicate an installation: copy this visit's row (job + date + mapped fields) ----
   function duplicateInstall(rec) {
@@ -1450,6 +1453,24 @@
     showF();
     fRow.appendChild(fMinus); fRow.appendChild(fVal); fRow.appendChild(fPlus);
     body.appendChild(fRow);
+    // ---- outline width (event cards only) ----
+    if (isEvent) {
+      var oRow = document.createElement('div'); oRow.className = 'ce-fontrow';
+      var oLbl = document.createElement('span'); oLbl.className = 'ce-flabel'; oLbl.textContent = 'Outline'; oRow.appendChild(oLbl);
+      var oVal = document.createElement('span'); oVal.className = 'ce-fval';
+      var showO = function () { oVal.textContent = eventCardOutline + 'px'; };
+      var stepO = function (delta) {
+        eventCardOutline = Math.max(0, Math.min(6, Math.round((eventCardOutline + delta) * 10) / 10));
+        applyCardFonts(); saveLocalCards(); showO(); render();
+      };
+      var oMinus = document.createElement('button'); oMinus.type = 'button'; oMinus.className = 'ce-fbtn'; oMinus.textContent = '−';
+      oMinus.addEventListener('click', function () { stepO(-0.5); });
+      var oPlus = document.createElement('button'); oPlus.type = 'button'; oPlus.className = 'ce-fbtn'; oPlus.textContent = '+';
+      oPlus.addEventListener('click', function () { stepO(0.5); });
+      showO();
+      oRow.appendChild(oMinus); oRow.appendChild(oVal); oRow.appendChild(oPlus);
+      body.appendChild(oRow);
+    }
     // ---- save scope: just for me vs for everyone ----
     var foot = document.createElement('div'); foot.className = 'ce-foot';
     var scopeNote = document.createElement('div'); scopeNote.className = 'ce-scope';
@@ -1491,7 +1512,7 @@
     // content from the (customisable) event-card template
     var bc = barColorsFor(fmtVal(rec[mappingsCache.type]));
     renderCardTemplate(eventCardTpl, eventCardTokens(rec, info), card, { bar: bc });
-    if (bc.fill && bc.fill !== 'var(--line)') { card.style.borderColor = bc.fill; card.style.borderWidth = '1px'; }
+    if (bc.fill && bc.fill !== 'var(--line)') { card.style.borderColor = bc.fill; }
 
     card.addEventListener('click', function (e) {
       e.stopPropagation();
@@ -3464,6 +3485,7 @@
       if (typeof opts.jobCardTpl === 'string') jobCardTpl = opts.jobCardTpl;
       if (typeof opts.eventCardFont === 'number') eventCardFont = opts.eventCardFont;
       if (typeof opts.jobCardFont === 'number') jobCardFont = opts.jobCardFont;
+      if (typeof opts.eventCardOutline === 'number') eventCardOutline = opts.eventCardOutline;
       applyCardFonts();
     }
     if (opts.detailLayout && typeof opts.detailLayout === 'object') {

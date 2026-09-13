@@ -1690,14 +1690,14 @@ function createClientAndSet(j,name){
 // shows on the whole-table Stone Order board), so we adopt any orphans into a
 // catch-all "Ghost Job". New jobs get a playful placeholder client + the Ghost
 // assignee, so a half-entered job still reads nicely instead of "-".
-const GHOST_ASSIGNEE = "Nè Hé";
-const GHOST_RED = "#e5484d";                        // Nè Hé's avatar/pill colour (red, not the grey default)
+const GHOST_ASSIGNEE = "Oh Yeah";
+const GHOST_RED = "#e5484d";                        // Oh Yeah's avatar/pill colour (red, not the grey default)
 const GHOST_JOB_CLIENT = "👻 Ghost Job (unclaimed stones)";
 // The catch-all job - matched by its client label (or the address sentinel in the no-client fallback).
 // The stone select/relocate controls are shown only here.
 function isGhostJob(j){ return !!j && (String(j.Client_Label||"")===GHOST_JOB_CLIENT || String(j.Job_Address||"")===GHOST_JOB_CLIENT); }
 const GHOST_ADDRESS = "ê nha";                      // placeholder address for the catch-all Ghost Job
-const FUN_CLIENT = "Cưng ơi cưng";
+const FUN_CLIENT = "Hello Darling";
 function funnyClientName(){ return FUN_CLIENT; }
 // Give a freshly-created (draft) job a funny placeholder client, reusing one if it
 // already exists so we don't pile up duplicates. Runs inside the draft (flushed on Save).

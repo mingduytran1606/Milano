@@ -57,6 +57,17 @@
   .navbar .ntab .ncount{background:rgba(0,0,0,.10);color:inherit;border-radius:999px;font-size:10px;padding:0 6px;font-weight:700;min-width:16px;text-align:center}
   .navbar .ntab.on .ncount{background:rgba(255,255,255,.25)}
   .navbar .ntab.empty{opacity:.45}
+  .navwrap{position:relative;display:flex;align-items:flex-start}
+  .navwrap[hidden]{display:none}
+  .navwrap .navbar{flex:1;min-width:0}
+  .navgear{flex:0 0 auto;margin:0 12px 10px 0;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;
+    border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--muted);cursor:pointer;padding:0}
+  .navgear:hover,.navgear.open{color:var(--ink);border-color:var(--accent)}
+  .navwrap .popmenu{top:30px}
+  .sord-row .nvis{margin:0;cursor:pointer}
+  .sord-row .nname{flex:1;min-width:0;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sord-row.off .nname{color:var(--muted);text-decoration:line-through}
+  .sord-row .ncnt{font-size:10px;color:var(--muted);font-weight:700}
 
   /* ---------- toolbar ---------- */
   .filters{position:relative;padding:0 12px 11px;display:flex;flex-direction:column;gap:7px;border-bottom:1px solid var(--line2)}
@@ -692,7 +703,13 @@
         <button class="newbtn" id="newJob">+ New job</button>
       </div>
     </div>
-    <div class="navbar" id="navTabs"></div>
+    <div class="navwrap" id="navWrap">
+      <div class="navbar" id="navTabs"></div>
+      <button class="navgear" id="navGear" type="button" title="Choose which people show here, and their order">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+      </button>
+      <div class="popmenu" id="navMenu" hidden></div>
+    </div>
     <div class="filters">
       <div class="search">
         <svg class="sic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -1249,7 +1266,7 @@ const state = { jobs:[], stone:[], inst:[], clients:[], catalogue:[], selectedId
   listW:null,                           // adjustable list-pane width (drag splitter)
   assignChoices:null,                   // Assigned_To choice list (from schema / data)
   filter:{ q:"", stage:{}, assigned:{}, payment:{} }, tab:"all",
-  sort:{ key:"input", dir:-1 }, sort2:{ key:"", dir:1 }, stageOrder:STAGES.slice(), stageOrderShared:null, fields:defaultFields(), cardOrder:CARD_ORDER_DEFAULT.slice(),
+  sort:{ key:"input", dir:-1 }, sort2:{ key:"", dir:1 }, stageOrder:STAGES.slice(), stageOrderShared:null, navPeople:{order:[],hidden:{}}, navPeopleShared:null, fields:defaultFields(), cardOrder:CARD_ORDER_DEFAULT.slice(),
   cardFontSize:12.5,
   listCardFont:Object.assign({},LIST_CARD_FONT), summaryFont:Object.assign({},SUMMARY_FONT),
   colors:{stage:{},payment:{},assignee:{},order:{}}, fmtCollapsed:{},
@@ -1270,7 +1287,7 @@ function pruneRecent(){ let changed=false; const now=Date.now(); for(const k in 
 function pushRecentJobs(){ if(!state.grist) return; try{ grist.setOption("recentJobs", state.recentJobs); }catch(e){} }
 
 function loadPrefs(){ try{ return JSON.parse(localStorage.getItem(LSKEY))||{}; }catch(e){ return {}; } }
-function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ savedViews:state.savedViews.filter(v=>!v.shared), current:snapshot(true), stoneNoteH:state.stoneNoteH||null, listW:state.listW||null, templateShared:state.templateShared, groupCollapsed:state.groupCollapsed||{}, savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"", stoneCols:cloneStoneCols(state.stoneCols), sumStoneCols:cloneSumStoneCols(state.sumStoneCols), sumLeftPct:state.sumLeftPct||null, listCardFont:state.listCardFont, summaryFont:state.summaryFont, colors:state.colors, fmtCollapsed:state.fmtCollapsed, stageOrder:(state.stageOrder||STAGES).slice(), stageOrderShared:state.stageOrderShared, tab:state.tab||"all", recentJobs:state.recentJobs||{} })); }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem(LSKEY, JSON.stringify({ savedViews:state.savedViews.filter(v=>!v.shared), current:snapshot(true), stoneNoteH:state.stoneNoteH||null, listW:state.listW||null, templateShared:state.templateShared, groupCollapsed:state.groupCollapsed||{}, savedGroupings:state.savedGroupings||[], activeGrouping:state.activeGrouping||"", stoneCols:cloneStoneCols(state.stoneCols), sumStoneCols:cloneSumStoneCols(state.sumStoneCols), sumLeftPct:state.sumLeftPct||null, listCardFont:state.listCardFont, summaryFont:state.summaryFont, colors:state.colors, fmtCollapsed:state.fmtCollapsed, stageOrder:(state.stageOrder||STAGES).slice(), stageOrderShared:state.stageOrderShared, navPeople:state.navPeople, navPeopleShared:state.navPeopleShared, tab:state.tab||"all", recentJobs:state.recentJobs||{} })); }catch(e){} }
 function snapshot(withMeta){
   const s={ q:state.filter.q, stage:cleanSet(state.filter.stage), assigned:cleanSet(state.filter.assigned),
     payment:cleanSet(state.filter.payment), sort:{key:state.sort.key,dir:state.sort.dir}, sort2:{key:state.sort2.key,dir:state.sort2.dir}, stageOrder:(state.stageOrder||STAGES).slice(), cardFontSize:state.cardFontSize||12.5, fields:Object.assign({},state.fields),
@@ -2040,7 +2057,7 @@ function clientTitle(j){
 //  MENUS
 // ============================================================
 const MENUS=[["stageBtn","stageMenu",renderStageFilter],["paymentBtn","paymentMenu",renderPaymentFilter],
-  ["groupBtn","groupMenu",renderGroupMenu],["sortBtn","sortMenu",renderSortMenu]];  // Views removed + combined Filter split into Stage/Payment dropdowns; dispBtn opens the Customize-card modal (see boot)
+  ["groupBtn","groupMenu",renderGroupMenu],["sortBtn","sortMenu",renderSortMenu],["navGear","navMenu",renderNavMenu]];  // Views removed + combined Filter split into Stage/Payment dropdowns; dispBtn opens the Customize-card modal (see boot)
 function closeMenus(){ MENUS.forEach(([b,m])=>{ document.getElementById(m).hidden=true; document.getElementById(b).classList.remove("open"); });
   const rm=document.getElementById("rowMenu"); if(rm)rm.hidden=true;
   const pp=document.getElementById("prodPicker"); if(pp)pp.hidden=true;
@@ -2712,6 +2729,7 @@ function applyView(v){ applyConfig(Object.assign({},v.config,{activeView:v.name}
 // Write the "everyone" views to the Grist doc so all viewers see them.
 function pushSharedViews(){ if(!state.grist) return; try{ grist.setOption("sharedViews", state.savedViews.filter(v=>v.shared).map(v=>({name:v.name,config:v.config}))); }catch(e){} }
 // Stage order shares the same way: "everyone" writes it to the doc.
+function pushSharedNavPeople(){ if(!state.grist) return; try{ grist.setOption("sharedNavPeople", normalizeNavPeople(state.navPeople)); }catch(e){} }
 function pushSharedStageOrder(){ if(!state.grist) return; try{ grist.setOption("sharedStageOrder", (state.stageOrder||STAGES).slice()); }catch(e){} }
 // Save the current filters/sort/fields as a view. shared=true → team (Grist doc);
 // shared=false → personal (this browser only).
@@ -2920,23 +2938,39 @@ function withPinned(rows){
   return [...pinnedJobs, ...rows.filter(j=>!pinSet.has(j.id))];
 }
 // People pills for the mini nav bar, derived from ALL jobs so the bar stays stable while filtering.
-function navPeople(){ return [...new Set((state.jobs||[]).flatMap(j=>choiceList(j.Assigned_To)))].filter(Boolean).sort(); }
+// The "Unassigned" pill is the pseudo-person "__none". Order and hidden set are user-editable
+// (⚙ button): anyone in the saved order comes first in that order, anyone new is appended A-Z,
+// and people who no longer have jobs simply drop out - so staff coming and going needs no upkeep.
+function normalizeNavPeople(v){ v=(v&&typeof v==="object")?v:{};
+  const order=Array.isArray(v.order)?v.order.filter(x=>typeof x==="string"&&x):[];
+  const hidden={}; if(v.hidden&&typeof v.hidden==="object") for(const k in v.hidden) if(v.hidden[k]) hidden[k]=true;
+  return {order:[...new Set(order)], hidden}; }
+function navAllPeople(){
+  const set=new Set((state.jobs||[]).flatMap(j=>choiceList(j.Assigned_To)).filter(Boolean));
+  if((state.jobs||[]).some(j=>choiceList(j.Assigned_To).length===0)) set.add("__none");
+  const order=(state.navPeople&&state.navPeople.order)||[];
+  const known=order.filter(p=>set.has(p));
+  const fresh=[...set].filter(p=>!known.includes(p)&&p!=="__none").sort();
+  const out=[...known,...fresh];
+  if(set.has("__none")&&!out.includes("__none")) out.push("__none");   // Unassigned defaults to last
+  return out;
+}
+function navPeople(){ const h=(state.navPeople&&state.navPeople.hidden)||{}; return navAllPeople().filter(p=>!h[p]); }
+const navLabel=p=>p==="__none"?"Unassigned":p;
+const navCount=(base,p)=>p==="__none"?base.filter(j=>choiceList(j.Assigned_To).length===0).length:base.filter(j=>choiceList(j.Assigned_To).includes(p)).length;
+function navChanged(){ savePrefs(); if(state.navPeopleShared) pushSharedNavPeople(); renderTabs(); renderNavMenu(); }
 function renderTabs(){
   const bar=document.getElementById("navTabs"); if(!bar) return;
+  const wrap=document.getElementById("navWrap");
   const base=baseFilteredJobs();
-  const people=navPeople();
-  const anyUnassigned=(state.jobs||[]).some(j=>choiceList(j.Assigned_To).length===0);
-  // Selected pill must still exist; otherwise fall back to All (covers a removed person AND
-  // the Unassigned pill disappearing once every job has an assignee).
-  if(state.tab && state.tab!=="all"){
-    const stillThere = state.tab==="__none" ? anyUnassigned : people.includes(state.tab);
-    if(!stillThere){ state.tab="all"; savePrefs(); }
-  }
+  const all=navAllPeople(), people=navPeople();
+  // Selected pill must still exist and be visible; otherwise fall back to All (covers a removed
+  // or hidden person AND the Unassigned pill disappearing once every job has an assignee).
+  if(state.tab && state.tab!=="all" && !people.includes(state.tab)){ state.tab="all"; savePrefs(); }
   const tabs=[{key:"all",label:"All",count:base.length}];
-  people.forEach(p=>tabs.push({key:p,label:p,count:base.filter(j=>choiceList(j.Assigned_To).includes(p)).length}));
-  if(anyUnassigned) tabs.push({key:"__none",label:"Unassigned",count:base.filter(j=>choiceList(j.Assigned_To).length===0).length});
+  people.forEach(p=>tabs.push({key:p,label:navLabel(p),count:navCount(base,p)}));
   bar.innerHTML="";
-  bar.hidden = people.length===0;   // no assignees at all → hide the bar entirely
+  if(wrap) wrap.hidden = all.filter(p=>p!=="__none").length===0;   // no assignees at all → hide the bar entirely
   tabs.forEach(t=>{
     const on=(state.tab||"all")===t.key;
     const el=$("button","ntab"+(on?" on":"")+(t.count?"":" empty"));
@@ -2948,6 +2982,43 @@ function renderTabs(){
       renderList(); renderDetail(); };
     bar.appendChild(el);
   });
+}
+function renderNavMenu(){
+  const host=document.getElementById("navMenu"); if(!host) return; host.innerHTML="";
+  state.navPeople=normalizeNavPeople(state.navPeople);
+  const np=state.navPeople, all=navAllPeople(), base=baseFilteredJobs();
+  host.appendChild($("div","phead","People pills - tick to show, drag to reorder"));
+  const list=$("div","stageord");
+  all.forEach(p=>{
+    const off=!!np.hidden[p];
+    const row=$("div","sord-row"+(off?" off":"")); row.draggable=true;
+    row.appendChild($("span","sord-h","≡"));
+    const cb=document.createElement("input"); cb.type="checkbox"; cb.className="nvis"; cb.checked=!off;
+    cb.title=off?"Hidden - tick to show":"Shown - untick to hide";
+    cb.onchange=()=>{ if(cb.checked) delete np.hidden[p]; else np.hidden[p]=true; navChanged(); renderList(); };
+    row.appendChild(cb);
+    row.appendChild($("span","nname",navLabel(p)));
+    row.appendChild($("span","ncnt",String(navCount(base,p))));
+    row.ondragstart=e=>{ row.classList.add("dragging"); state._ndrag=p; try{e.dataTransfer.setData("text/plain",p);}catch(_){} };
+    row.ondragend=()=>row.classList.remove("dragging");
+    row.ondragover=e=>e.preventDefault();
+    row.ondrop=e=>{ e.preventDefault(); const from=state._ndrag||(e.dataTransfer&&e.dataTransfer.getData("text/plain"));
+      if(from&&from!==p){ const o=navAllPeople(); o.splice(o.indexOf(from),1); o.splice(o.indexOf(p),0,from);
+        np.order=[...o, ...np.order.filter(x=>!o.includes(x))];   // keep absent people's slots for when they return
+        navChanged(); } };
+    list.appendChild(row);
+  });
+  if(!all.length) list.appendChild($("div","pempty","No assignees yet."));
+  host.appendChild(list);
+  host.appendChild($("div","psep"));
+  const rs=$("div","paction","↺ Reset - show everyone, A-Z");
+  rs.onclick=()=>{ state.navPeople={order:[],hidden:{}}; navChanged(); renderList(); };
+  const sAll=$("div","paction","＋ Save for everyone"); sAll.title="Team setting - stored in the Grist doc";
+  sAll.onclick=()=>{ state.navPeopleShared=true; navChanged(); };
+  const sMe=$("div","paction","＋ Save just for me"); sMe.title="Personal setting - this browser only";
+  sMe.onclick=()=>{ state.navPeopleShared=false; navChanged(); };
+  host.appendChild(rs); host.appendChild(sAll); host.appendChild(sMe);
+  host.appendChild($("div","phint", state.navPeopleShared ? "Shared with everyone" : "Personal to this browser"));
 }
 function updateToolbar(){
   const gn=document.getElementById("groupName");
@@ -3499,6 +3570,15 @@ if(typeof grist!=="undefined"){
         state.stageOrder=opts.sharedStageOrder.slice(); normalizeStageOrder(); renderList(); updateToolbar();
       }
     }
+    // People pills - team order / hidden list, adopted by everyone following it.
+    if(opts.sharedNavPeople && typeof opts.sharedNavPeople==="object"){
+      if(state.navPeopleShared==null) state.navPeopleShared=true;
+      const sh=normalizeNavPeople(opts.sharedNavPeople);
+      if(state.navPeopleShared && JSON.stringify(sh)!==JSON.stringify(state.navPeople)){
+        state.navPeople=sh; savePrefs(); renderTabs(); renderList();
+        if(!document.getElementById("navMenu").hidden) renderNavMenu();
+      }
+    }
     const shared=(typeof opts.cardTemplate==="string" && opts.cardTemplate.trim())?opts.cardTemplate:null;
     state._sharedTemplate=shared;
     if(state.templateShared==null) state.templateShared=!!shared;   // first run: follow the team design if one exists
@@ -3675,6 +3755,8 @@ document.addEventListener("click",closeMenus);
   state.savedGroupings=p.savedGroupings||[]; state.activeGrouping=p.activeGrouping||"";
   if(Array.isArray(p.stageOrder)) state.stageOrder=p.stageOrder.slice();
   if("stageOrderShared" in p) state.stageOrderShared=(p.stageOrderShared==null?null:!!p.stageOrderShared);
+  state.navPeople=normalizeNavPeople(p.navPeople);
+  if("navPeopleShared" in p) state.navPeopleShared=(p.navPeopleShared==null?null:!!p.navPeopleShared);
   state.tab=p.tab||"all";
   state.recentJobs=(p.recentJobs&&typeof p.recentJobs==="object")?p.recentJobs:{}; pruneRecent();
   if(!state.assignChoices) state.assignChoices=["Julie","Phoebe","Nhi","a Minh","Louis"];
